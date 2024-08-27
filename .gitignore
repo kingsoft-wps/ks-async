@@ -1,0 +1,11 @@
+.vs/
+.vscode/
+.cache/
+Debug/
+Release/
+x64/
+out/
+build/
+compile_commands.json
+*.log
+*.swp
