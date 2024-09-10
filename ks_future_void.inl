@@ -146,13 +146,13 @@ public:
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>()>&& fn) const {
 		return m_nothing_future.flat_then<R>(
 			apartment, context,
-			[fn = std::move(fn)](const nothing_t& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result)); });
+			[fn = std::move(fn)](const nothing_t& result)->ks_future<R> { return fn(); });
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(ks_cancel_inspector*)>&& fn) const {
 		return m_nothing_future.flat_then<R>(
 			apartment, context,
-			[fn = std::move(fn)](const nothing_t& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result), ks_cancel_inspector::__for_future()); });
+			[fn = std::move(fn)](const nothing_t& result)->ks_future<R> { return fn(ks_cancel_inspector::__for_future()); });
 	}
 
 	template <class R>
