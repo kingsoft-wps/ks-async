@@ -62,10 +62,10 @@ void wait();
 <br>
 
 ```C++
-bool is_stopping_or_stopped();
 bool is_stopped();
+bool is_stopping_or_stopped();
 ```
-#### 描述：判定套间是否正在被停止、或已停止。
+#### 描述：判定套间是否已停止、或正在被停止。
 <br>
 <br>
 

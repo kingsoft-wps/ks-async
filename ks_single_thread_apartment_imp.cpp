@@ -94,14 +94,14 @@ void ks_single_thread_apartment_imp::wait() {
 	}
 }
 
-bool ks_single_thread_apartment_imp::is_stopping_or_stopped() {
-	_STATE state = m_d->state_v;
-	return state == _STATE::STOPPED || state == _STATE::STOPPING;
-}
-
 bool ks_single_thread_apartment_imp::is_stopped() {
 	_STATE state = m_d->state_v;
 	return state == _STATE::STOPPED;
+}
+
+bool ks_single_thread_apartment_imp::is_stopping_or_stopped() {
+	_STATE state = m_d->state_v;
+	return state == _STATE::STOPPED || state == _STATE::STOPPING;
 }
 
 
@@ -352,3 +352,35 @@ void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(_
 	}
 }
 
+
+bool ks_single_thread_apartment_imp::__try_pump_once() {
+	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
+
+	std::unique_lock<ks_mutex> lock(m_d->mutex);
+
+	//try next now_fn
+	//注：主动泵不必去执行idle任务
+	auto* now_fn_queue_sel = !m_d->now_fn_queue_prior.empty() ? &m_d->now_fn_queue_prior : &m_d->now_fn_queue_normal;
+	if (now_fn_queue_sel->empty()) 
+		return false; //check stop, end
+
+	//pop and exec a fn
+	_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
+	now_fn_queue_sel->pop_front();
+
+	lock.unlock();
+
+	try {
+		now_fn_item.fn();
+	}
+	catch (...) {
+		//TODO dump exception ...
+		ASSERT(false);
+		abort();
+	}
+
+	//注：无事待做，无需重锁
+	//lock.lock();
+
+	return true;
+}

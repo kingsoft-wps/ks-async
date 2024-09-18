@@ -74,6 +74,10 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 	return cur_apartment;
 }
 
+bool ks_apartment::__current_thread_apartment_try_pump_once() {
+	return tls_current_thread_apartment->__try_pump_once();
+}
+
 
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
 	ASSERT(g_ui_sta == nullptr || ui_sta == nullptr);

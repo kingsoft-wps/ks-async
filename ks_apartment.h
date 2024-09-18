@@ -35,13 +35,15 @@ public:
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 
+	KS_ASYNC_API static bool __current_thread_apartment_try_pump_once();
+
 public:
 	virtual bool start() = 0;
 	virtual void async_stop() = 0;
 	virtual void wait() = 0;
 
-	virtual bool is_stopping_or_stopped() = 0;
 	virtual bool is_stopped() = 0;
+	virtual bool is_stopping_or_stopped() = 0;
 
 public:
 	//注：schedule方法的uint返回值代表异步过程的id，且成功时要求返回一个“非零值”，后续可被用于try_unschedule调用传参。
@@ -60,4 +62,7 @@ protected:
 	KS_ASYNC_API static ks_apartment* __get_ui_sta();
 	KS_ASYNC_API static ks_apartment* __get_master_sta();
 	KS_ASYNC_API static ks_apartment* __tls_get_current_thread_apartment();
+
+	//注：主动泵下一条异步任务。
+	virtual bool __try_pump_once() { ASSERT(false); return false; }
 };

@@ -36,8 +36,8 @@ public:
 	virtual void async_stop() override;
 	virtual void wait() override;
 
-	virtual bool is_stopping_or_stopped() override;
 	virtual bool is_stopped() override;
+	virtual bool is_stopping_or_stopped() override;
 
 	virtual uint64_t schedule(std::function<void()>&& fn, int priority) override;
 	virtual uint64_t schedule_delayed(std::function<void()>&& fn, int priority, int64_t delay) override;
@@ -51,6 +51,9 @@ private:
 	void _single_thread_proc();
 
 	bool _debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const;
+
+protected:
+	virtual bool __try_pump_once() override;
 
 private:
 	struct _FN_ITEM {
