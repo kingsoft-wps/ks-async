@@ -75,7 +75,9 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 }
 
 bool ks_apartment::__current_thread_apartment_try_pump_once() {
-	return tls_current_thread_apartment->__try_pump_once();
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	ASSERT(cur_apartment != nullptr);
+	return cur_apartment->__try_pump_once();
 }
 
 
