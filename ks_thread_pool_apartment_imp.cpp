@@ -283,7 +283,8 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			catch (...) {
 				//TODO dump exception ...
 				ASSERT(false);
-				abort();
+				//abort();
+				throw;
 			}
 
 			lock.lock();
@@ -422,7 +423,8 @@ bool ks_thread_pool_apartment_imp::__try_pump_once() {
 	catch (...) {
 		//TODO dump exception ...
 		ASSERT(false);
-		abort();
+		//abort();
+		throw;
 	}
 
 	//注：无事待做，无需重锁

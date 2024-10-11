@@ -264,7 +264,8 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 				catch (...) {
 					//TODO dump exception ...
 					ASSERT(false);
-					abort();
+					//abort();
+					throw;
 				}
 
 				lock.lock();
@@ -376,7 +377,8 @@ bool ks_single_thread_apartment_imp::__try_pump_once() {
 	catch (...) {
 		//TODO dump exception ...
 		ASSERT(false);
-		abort();
+		//abort();
+		throw;
 	}
 
 	//注：无事待做，无需重锁

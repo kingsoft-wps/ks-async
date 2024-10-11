@@ -327,7 +327,8 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 					catch (...) {
 						//TODO dump exception ...
 						ASSERT(false);
-						abort();
+						//abort();
+						throw;
 					}
 
 					entry_context_rtstt.try_unapply();
