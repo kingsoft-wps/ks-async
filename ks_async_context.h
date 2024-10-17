@@ -26,13 +26,6 @@ limitations under the License.
 class ks_async_context final {
 public:
 	ks_async_context() {
-		this->do_init();
-	}
-
-	template <class SMART_PTR, class _ = std::enable_if_t<std::is_null_pointer_v<SMART_PTR> || std::is_shared_pointer_v<SMART_PTR> || std::is_weak_pointer_v<SMART_PTR>>>
-	explicit ks_async_context(const SMART_PTR& owner_ptr, const ks_async_controller* controller) {
-		static_assert(std::is_null_pointer_v<SMART_PTR> || std::is_shared_pointer_v<SMART_PTR> || std::is_weak_pointer_v<SMART_PTR>, "the type of owner-ptr must be smart-ptr");
-		this->do_init(owner_ptr, controller, std::bool_constant<std::is_weak_pointer_v<SMART_PTR> && !std::is_null_pointer_v<SMART_PTR>>{});
 	}
 
 	ks_async_context(const ks_async_context& r) {
@@ -40,7 +33,6 @@ public:
 		m_priority = r.m_priority;
 		if (m_fat_data_p != nullptr)
 			++m_fat_data_p->ref_count;
-
 	}
 
 	ks_async_context(ks_async_context&& r) noexcept {
@@ -72,65 +64,83 @@ public:
 		do_release_fat_data();
 	}
 
-private:
-	void do_init() {
-	}
-
-	template <class SMART_PTR>
-	void do_init(const SMART_PTR& owner_ptr, const ks_async_controller* controller, std::false_type owner_ptr_is_weak) {
-		if (owner_ptr != nullptr && controller != nullptr) {
-			m_fat_data_p = new _FAT_DATA();
-
-			if (owner_ptr != nullptr) {
-				m_fat_data_p->owner_ptr = ks_any::of(owner_ptr);
-				m_fat_data_p->owner_ptr_is_weak = false;
-			}
-
-			if (controller != nullptr) {
-				m_fat_data_p->controller_data_ptr = controller->m_controller_data_ptr;
-			}
-		}
-	}
-
-	template <class SMART_PTR>
-	void do_init(const SMART_PTR& owner_ptr, const ks_async_controller* controller, std::true_type owner_ptr_is_weak) {
-		if (true && controller != nullptr) {
-			m_fat_data_p = new _FAT_DATA();
-
-			if (true) { //owner为weak指针时，即使此时即已为expired也要正常初始化，以便未来在异步过程执行时可进行正常检查（理论上彼时仍会为expired）
-				m_fat_data_p->owner_ptr = ks_any::of(owner_ptr);
-				m_fat_data_p->owner_ptr_is_weak = true;
-
-				m_fat_data_p->owner_pointer_check_expired_fn = [owner_ptr]() {
-					return std::weak_pointer_traits<SMART_PTR>::check_weak_pointer_expired(owner_ptr);
-				};
-				m_fat_data_p->owner_pointer_try_lock_fn = [owner_ptr]() {
-					auto typed_locker = std::weak_pointer_traits<SMART_PTR>::try_lock_weak_pointer(owner_ptr);
-					if (typed_locker)
-						return ks_any::of(std::move(typed_locker));
-					std::weak_pointer_traits<SMART_PTR>::unlock_weak_pointer(owner_ptr, typed_locker);
-					return ks_any();
-				};
-				m_fat_data_p->owner_pointer_unlock_fn = [owner_ptr](ks_any& locker) {
-					if (locker.has_value()) {
-						using typed_locker_t = std::invoke_result_t<decltype(std::weak_pointer_traits<SMART_PTR>::try_lock_weak_pointer), const SMART_PTR&>;
-						typed_locker_t& typed_locker = const_cast<typed_locker_t&>(locker.get<typed_locker_t>());
-						std::weak_pointer_traits<SMART_PTR>::unlock_weak_pointer(owner_ptr, typed_locker);
-						locker.reset();
-					}
-				};
-			}
-
-			if (controller != nullptr) {
-				m_fat_data_p->controller_data_ptr = controller->m_controller_data_ptr;
-			}
-		}
-	}
-
 public:
+	template <class SMART_PTR, class _ = std::enable_if_t<std::is_null_pointer_v<SMART_PTR> || std::is_shared_pointer_v<SMART_PTR> || std::is_weak_pointer_v<SMART_PTR>>>
+	ks_async_context& bind_owner(SMART_PTR&& owner_ptr) {
+		static_assert(std::is_null_pointer_v<SMART_PTR> || std::is_shared_pointer_v<SMART_PTR> || std::is_weak_pointer_v<SMART_PTR>, "the type of owner-ptr must be smart-ptr");
+		do_bind_owner(std::forward<SMART_PTR>(owner_ptr), std::bool_constant<std::is_weak_pointer_v<SMART_PTR> && !std::is_null_pointer_v<SMART_PTR>>{});
+		return *this;
+	}
+
+	ks_async_context& bind_controller(const ks_async_controller* controller) {
+		if (controller != nullptr || (m_fat_data_p != nullptr && m_fat_data_p->owner_ptr.has_value())) {
+			do_prepare_fat_data_cow();
+
+			if (controller != nullptr)
+				m_fat_data_p->controller_data_ptr = controller->m_controller_data_ptr;
+			else
+				m_fat_data_p->controller_data_ptr.reset();
+		}
+		else {
+			do_release_fat_data();
+		}
+		return *this;
+	}
+
 	ks_async_context& set_priority(int priority) {
 		m_priority = priority;
 		return *this;
+	}
+
+private:
+	template <class SMART_PTR>
+	void do_bind_owner(SMART_PTR&& owner_ptr, std::false_type owner_ptr_is_weak) {
+		if (owner_ptr != nullptr || (m_fat_data_p != nullptr && m_fat_data_p->controller_data_ptr != nullptr)) {
+			do_prepare_fat_data_cow();
+			_FAT_DATA* fatData = m_fat_data_p;
+
+			if (owner_ptr != nullptr)
+				fatData->owner_ptr = ks_any::of(std::forward<SMART_PTR>(owner_ptr));
+			else
+				fatData->owner_ptr.reset();
+			fatData->owner_ptr_is_weak = false;
+			fatData->owner_pointer_check_expired_fn = nullptr;
+			fatData->owner_pointer_try_lock_fn = nullptr;
+			fatData->owner_pointer_unlock_fn = nullptr;
+		}
+		else {
+			do_release_fat_data();
+		}
+	}
+
+	template <class SMART_PTR>
+	void do_bind_owner(SMART_PTR&& owner_ptr, std::true_type owner_ptr_is_weak) {
+		do_prepare_fat_data_cow();
+		_FAT_DATA* fatData = m_fat_data_p;
+
+		fatData->owner_ptr = ks_any::of(owner_ptr);
+		fatData->owner_ptr_is_weak = true;
+
+		fatData->owner_pointer_check_expired_fn = [owner_ptr]() {
+			return std::weak_pointer_traits<SMART_PTR>::check_weak_pointer_expired(owner_ptr);
+		};
+
+		fatData->owner_pointer_try_lock_fn = [owner_ptr]() {
+			auto typed_locker = std::weak_pointer_traits<SMART_PTR>::try_lock_weak_pointer(owner_ptr);
+			if (typed_locker)
+				return ks_any::of(std::move(typed_locker));
+			std::weak_pointer_traits<SMART_PTR>::unlock_weak_pointer(owner_ptr, typed_locker);
+			return ks_any();
+		};
+
+		fatData->owner_pointer_unlock_fn = [owner_ptr](ks_any& locker) {
+			if (locker.has_value()) {
+				using typed_locker_t = std::invoke_result_t<decltype(std::weak_pointer_traits<SMART_PTR>::try_lock_weak_pointer), const SMART_PTR&>;
+				typed_locker_t& typed_locker = const_cast<typed_locker_t&>(locker.get<typed_locker_t>());
+				std::weak_pointer_traits<SMART_PTR>::unlock_weak_pointer(owner_ptr, typed_locker);
+				locker.reset();
+			}
+		};
 	}
 
 public: //called by ks_raw_future internally
@@ -185,13 +195,14 @@ private:
 			m_fat_data_p = new _FAT_DATA();
 		}
 		else if (m_fat_data_p->ref_count >= 2) {
+			_FAT_DATA* fatDataOrig = m_fat_data_p;
 			_FAT_DATA* fatDataCopy = new _FAT_DATA();
-			fatDataCopy->owner_ptr = m_fat_data_p->owner_ptr;
-			fatDataCopy->owner_ptr_is_weak = m_fat_data_p->owner_ptr_is_weak;
-			fatDataCopy->owner_pointer_check_expired_fn = m_fat_data_p->owner_pointer_check_expired_fn;
-			fatDataCopy->owner_pointer_try_lock_fn = m_fat_data_p->owner_pointer_try_lock_fn;
-			fatDataCopy->owner_pointer_unlock_fn = m_fat_data_p->owner_pointer_unlock_fn;
-			fatDataCopy->controller_data_ptr = m_fat_data_p->controller_data_ptr;
+			fatDataCopy->owner_ptr = fatDataOrig->owner_ptr;
+			fatDataCopy->owner_ptr_is_weak = fatDataOrig->owner_ptr_is_weak;
+			fatDataCopy->owner_pointer_check_expired_fn = fatDataOrig->owner_pointer_check_expired_fn;
+			fatDataCopy->owner_pointer_try_lock_fn = fatDataOrig->owner_pointer_try_lock_fn;
+			fatDataCopy->owner_pointer_unlock_fn = fatDataOrig->owner_pointer_unlock_fn;
+			fatDataCopy->controller_data_ptr = fatDataOrig->controller_data_ptr;
 			do_release_fat_data();
 			m_fat_data_p = fatDataCopy;
 		}

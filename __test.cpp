@@ -280,14 +280,16 @@ void test_alive() {
         auto obj1 = std::make_shared<OBJ>(1);
 
         ks_future<void>::post_delayed(
-            ks_apartment::default_mta(), ks_async_context(std::move(obj1), nullptr), []() {
-                std::cout << "->fn() ";
-            }, 100).on_completion(ks_apartment::default_mta(), ks_async_context(), [](auto& result) {
-                ks_future<void>::post_delayed(
-                    ks_apartment::default_mta(), ks_async_context(), []() {
-                        g_exit_latch.count_down(); 
-                    }, 100);
-            });
+            ks_apartment::default_mta(), 
+            ks_async_context().bind_owner(std::move(obj1)).bind_controller(nullptr), 
+            []() { std::cout << "->fn() "; }, 
+            100
+        ).on_completion(ks_apartment::default_mta(), ks_async_context(), [](auto& result) {
+            ks_future<void>::post_delayed(
+                ks_apartment::default_mta(), ks_async_context(), []() {
+                    g_exit_latch.count_down(); 
+                }, 100);
+        });
     }
 
     g_exit_latch.wait();
