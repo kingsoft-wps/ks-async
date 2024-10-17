@@ -166,50 +166,6 @@ namespace std {
 	template <class... Ts>
 	constexpr bool is_all_same_v = is_all_same<Ts...>::value;
 
-	//shareable_pointer_traits
-	template <class T> 
-	struct shareable_pointer_traits {
-		static constexpr bool is_shareable_pointer = false;
-		static constexpr bool is_strong_shareable_pointer = false;
-		static constexpr bool is_weak_shareable_pointer = false;
-	};
-	template <class X>
-	struct shareable_pointer_traits<std::shared_ptr<X>> { //特化shared_ptr
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(const std::shared_ptr<X>& pointer) { return pointer == nullptr; }
-		static bool check_pointer_expired(const std::shared_ptr<X>& pointer) { return false; }
-		static const void* try_lock_pointer(const std::shared_ptr<X>& pointer) { return (const void*)(-1); }
-		static void  unlock_pointer(const std::shared_ptr<X>& pointer, const void*& locker) { locker = nullptr; }
-		using pointer_type = std::shared_ptr<X>;
-		using pointer_locker_type = const void*;
-	};
-	template <>
-	struct shareable_pointer_traits<nullptr_t> { //特化nullptr_t（按shared_ptr等同看待）
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(nullptr_t) { return true; }
-		static bool check_pointer_expired(nullptr_t) { return false; }
-		static const void* try_lock_pointer(nullptr_t) { return (const void*)(-1); }
-		static void  unlock_pointer(nullptr_t, const void*& locker) { locker = nullptr; }
-		using pointer_type = nullptr_t;
-		using pointer_locker_type = const void*;
-	};
-	template <class X>
-	struct shareable_pointer_traits<std::weak_ptr<X>> { //特化weak_ptr
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
-		static bool check_pointer_expired(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
-		static std::shared_ptr<X> try_lock_pointer(const std::weak_ptr<X>& pointer) { return pointer.lock(); }
-		static void  unlock_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) { locker.reset(); }
-		using pointer_type = std::weak_ptr<X>;
-		using pointer_locker_type = std::shared_ptr<X>;
-	};
-
 	//shared_pointer_traits
 	template <class T>
 	struct shared_pointer_traits {
