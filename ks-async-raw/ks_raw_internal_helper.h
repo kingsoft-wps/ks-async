@@ -94,7 +94,7 @@ public:
 		m_cur_context.__decrement_pending_count();
 
 		m_applied_flag = false;
-		m_cur_context = {};
+		m_cur_context = ks_async_context::__empty_inst();
 		m_cur_context_owner_locker = {};
 	}
 
@@ -104,7 +104,7 @@ public:
 
 private:
 	bool m_applied_flag = false;
-	ks_async_context m_cur_context;
+	ks_async_context m_cur_context = ks_async_context::__empty_inst();
 	ks_any m_cur_context_owner_locker;
 };
 

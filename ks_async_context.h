@@ -18,6 +18,7 @@ limitations under the License.
 #include "ks_async_base.h"
 #include "ktl/ks_any.h"
 #include "ktl/ks_concurrency.h"
+#include "ktl/ks_source_location.h"
 #include "ks_async_controller.h"
 #include <memory>
 #include <vector>
@@ -25,6 +26,7 @@ limitations under the License.
 
 class ks_async_context final {
 public:
+	//注意：这个默认构造即将被废弃！
 	ks_async_context() {
 	}
 
@@ -64,6 +66,18 @@ public:
 		do_release_fat_data();
 	}
 
+	static ks_async_context __empty_inst() {
+		return ks_async_context(ks_source_location::__empty_inst());
+	}
+
+private:
+	explicit ks_async_context(const ks_source_location& from_source_location) {
+		if (!from_source_location.is_empty()) {
+			do_prepare_fat_data_cow();
+			m_fat_data_p->from_source_location = from_source_location;
+		}
+	}
+
 public:
 	template <class SMART_PTR, class _ = std::enable_if_t<std::is_null_pointer_v<SMART_PTR> || std::is_shared_pointer_v<SMART_PTR> || std::is_weak_pointer_v<SMART_PTR>>>
 	ks_async_context& bind_owner(SMART_PTR&& owner_ptr) {
@@ -73,7 +87,7 @@ public:
 	}
 
 	ks_async_context& bind_controller(const ks_async_controller* controller) {
-		if (controller != nullptr || (m_fat_data_p != nullptr && m_fat_data_p->owner_ptr.has_value())) {
+		if (controller != nullptr || do_check_fat_data_avail(true, false)) {
 			do_prepare_fat_data_cow();
 
 			if (controller != nullptr)
@@ -93,26 +107,6 @@ public:
 	}
 
 private:
-	template <class SMART_PTR>
-	void do_bind_owner(SMART_PTR&& owner_ptr, std::false_type owner_ptr_is_weak) {
-		if (owner_ptr != nullptr || (m_fat_data_p != nullptr && m_fat_data_p->controller_data_ptr != nullptr)) {
-			do_prepare_fat_data_cow();
-			_FAT_DATA* fatData = m_fat_data_p;
-
-			if (owner_ptr != nullptr)
-				fatData->owner_ptr = ks_any::of(std::forward<SMART_PTR>(owner_ptr));
-			else
-				fatData->owner_ptr.reset();
-			fatData->owner_ptr_is_weak = false;
-			fatData->owner_pointer_check_expired_fn = nullptr;
-			fatData->owner_pointer_try_lock_fn = nullptr;
-			fatData->owner_pointer_unlock_fn = nullptr;
-		}
-		else {
-			do_release_fat_data();
-		}
-	}
-
 	template <class SMART_PTR>
 	void do_bind_owner(SMART_PTR&& owner_ptr, std::true_type owner_ptr_is_weak) {
 		do_prepare_fat_data_cow();
@@ -143,6 +137,26 @@ private:
 		};
 	}
 
+	template <class SMART_PTR>
+	void do_bind_owner(SMART_PTR&& owner_ptr, std::false_type owner_ptr_is_weak) {
+		if (owner_ptr != nullptr || do_check_fat_data_avail(false, true)) {
+			do_prepare_fat_data_cow();
+			_FAT_DATA* fatData = m_fat_data_p;
+
+			if (owner_ptr != nullptr)
+				fatData->owner_ptr = ks_any::of(std::forward<SMART_PTR>(owner_ptr));
+			else
+				fatData->owner_ptr.reset();
+			fatData->owner_ptr_is_weak = false;
+			fatData->owner_pointer_check_expired_fn = nullptr;
+			fatData->owner_pointer_try_lock_fn = nullptr;
+			fatData->owner_pointer_unlock_fn = nullptr;
+		}
+		else {
+			do_release_fat_data();
+		}
+	}
+
 public: //called by ks_raw_future internally
 	bool __check_owner_expired() const {
 		if (m_fat_data_p != nullptr && m_fat_data_p->owner_ptr_is_weak)
@@ -156,6 +170,13 @@ public: //called by ks_raw_future internally
 			return m_fat_data_p->controller_data_ptr->cancel_all_ctrl_v;
 		else
 			return false;
+	}
+
+	ks_source_location __get_from_source_location() const {
+		if (m_fat_data_p != nullptr && true)
+			return m_fat_data_p->from_source_location;
+		else
+			return ks_source_location::__empty_inst();
 	}
 
 	int  __get_priority() const {
@@ -190,6 +211,18 @@ public: //called by ks_raw_future internally
 	}
 
 private:
+	bool do_check_fat_data_avail(bool check_owner, bool check_controller) const {
+		if (m_fat_data_p != nullptr) {
+			if (check_owner && m_fat_data_p->owner_ptr.has_value())
+				return true;
+			if (check_controller && m_fat_data_p->controller_data_ptr != nullptr)
+				return true;
+			if (true && !m_fat_data_p->from_source_location.is_empty())
+				return true;
+		}
+		return false;
+	}
+
 	void do_prepare_fat_data_cow() {
 		if (m_fat_data_p == nullptr) {
 			m_fat_data_p = new _FAT_DATA();
@@ -228,6 +261,9 @@ private:
 		//关于controller
 		std::shared_ptr<ks_async_controller::_CONTROLLER_DATA> controller_data_ptr;
 
+		//关于from_source_location
+		ks_source_location from_source_location = ks_source_location::__empty_inst();
+
 		//引用计数
 		//std::atomic<int> ref_count = { 1 };  //被移动位置，使内存更紧凑
 
@@ -239,4 +275,15 @@ private:
 	_FAT_DATA* m_fat_data_p = nullptr; //_FAT_DATA结构体有点大，采用COW技术优化
 
 	int m_priority = 0;
+
+	friend ks_async_context __make_async_context_from(const ks_source_location& from_source_location);
 };
+
+
+inline 
+ks_async_context __make_async_context_from(const ks_source_location& from_source_location) {
+	return ks_async_context(from_source_location);
+}
+
+#define make_async_context()  \
+	(__make_async_context_from(current_source_location()))

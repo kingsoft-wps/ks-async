@@ -67,7 +67,7 @@ public:
 	const this_async_task_type& connect(const ks_future<ARG>& prev_future) const {
 		ASSERT(this->is_valid());
 		prev_future.on_completion(
-			ks_apartment::default_mta(), ks_async_context().set_priority(0x10000),
+			ks_apartment::default_mta(), make_async_context().set_priority(0x10000),
 			[arg_promise = m_arg_promise](auto& result) { arg_promise.try_complete(result); });
 		return *this;
 	}

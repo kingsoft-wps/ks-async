@@ -40,13 +40,13 @@ public: //tuple aggr
 					const std::vector<ks_raw_value>& raw_value_vector = raw_value_aggr.get<std::vector<ks_raw_value>>();
 					std::tuple<Ts...> typed_value_tuple = __convert_raw_value_vector_to_typed_value_tuple<Ts...>(raw_value_vector, std::index_sequence_for<Ts...>());
 					return ks_raw_value::of(std::move(typed_value_tuple));
-				}, ks_async_context().set_priority(0x10000), nullptr);
+				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
 			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<std::tuple<Ts...>>::__from_raw(raw_future);
 	}
@@ -59,13 +59,13 @@ public: //tuple aggr
 			->then(
 				[](const ks_raw_value& raw_value_aggr) -> ks_raw_result {
 					return ks_raw_value::of(nothing);
-				}, ks_async_context().set_priority(0x10000), nullptr);
+				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
 			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<void>::__from_raw(raw_future);
 	}
@@ -80,7 +80,7 @@ public: //tuple aggr
 			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<T>::__from_raw(raw_future);
 	}
@@ -101,13 +101,13 @@ public: //vector aggr
 					for (auto& raw_value : raw_value_vector)
 						typed_value_vector.push_back(raw_value.get<T>());
 					return ks_raw_value::of(std::move(typed_value_vector));
-				}, ks_async_context().set_priority(0x10000), nullptr);
+				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
 			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<std::vector<T>>::__from_raw(raw_future);
 	}
@@ -121,13 +121,13 @@ public: //vector aggr
 			->then(
 				[](const ks_raw_value& raw_value_aggr) -> ks_raw_result {
 					return ks_raw_value::of(nothing);
-				}, ks_async_context().set_priority(0x10000), nullptr);
+				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
 			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<void>::__from_raw(raw_future);
 	}
@@ -144,7 +144,7 @@ public: //vector aggr
 			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
-			}, ks_async_context().set_priority(0x10000), nullptr);
+			}, make_async_context().set_priority(0x10000), nullptr);
 		}
 		return ks_future<T>::__from_raw(raw_future);
 	}

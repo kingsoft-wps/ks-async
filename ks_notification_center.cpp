@@ -53,7 +53,7 @@ private:
 	struct _ENTRY_DATA : _PARSED_NOTIFICATION_NAME {
 		const void* observer;
 		std::function<void(const ks_notification&)> fn;
-		ks_async_context context;
+		ks_async_context context = ks_async_context::__empty_inst();
 		ks_apartment* apartment;
 		volatile bool removed_flag_v = false;
 	};

@@ -53,7 +53,7 @@ private:
 	struct _NOTIFICATION_PROPS {
 		const void* sender;
 		std::string notification_name;
-		ks_async_context notification_context;
+		ks_async_context notification_context = ks_async_context::__empty_inst();
 		ks_any notification_data_any;
 	};
 

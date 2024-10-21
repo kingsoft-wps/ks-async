@@ -264,7 +264,7 @@ public:
 		ASSERT(this->is_valid());
 		m_raw_future->on_completion(
 			[raw_promise = promise.__get_raw()](const ks_raw_result& raw_result) { raw_promise->try_complete(raw_result); },
-			ks_async_context().set_priority(0x10000), nullptr);
+			make_async_context().set_priority(0x10000), nullptr);
 		return *this;
 	}
 
@@ -843,7 +843,7 @@ private:
 
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[](const ks_raw_value& value) -> ks_raw_result { return ks_raw_value::of(nothing); },
-			ks_async_context().set_priority(0x10000), nullptr);
+			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 
@@ -859,7 +859,7 @@ private:
 			[](const ks_raw_value& value) -> ks_raw_result {
 				return ks_raw_value::of(static_cast<PROXR>(value.get<PROXT>()));
 			},
-			ks_async_context().set_priority(0x10000), nullptr);
+			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 

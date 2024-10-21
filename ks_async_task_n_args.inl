@@ -67,7 +67,7 @@ private:
 	void do_connect(std::index_sequence<IDXs...>, const TASKs&... prev_tasks) const {
 		ASSERT(this->is_valid());
 		ks_future_util::all(to_prev_future<IDXs>(prev_tasks)...).on_completion(
-			ks_apartment::default_mta(), ks_async_context().set_priority(0x10000),
+			ks_apartment::default_mta(), make_async_context().set_priority(0x10000),
 			[arg_promise = m_arg_promise](auto& result) { arg_promise.try_complete(result); });
 	}
 

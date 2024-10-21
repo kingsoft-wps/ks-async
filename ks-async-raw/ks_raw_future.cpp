@@ -251,7 +251,7 @@ protected:
 
 		this->do_reset_extra_data_locked(lock);
 
-		m_living_context = {}; //clear
+		m_living_context = ks_async_context::__empty_inst(); //clear
 		m_living_context_controller_available_v = false;
 
 		if (m_next_future_0 != nullptr || !m_next_future_more.empty()) {
@@ -404,7 +404,7 @@ class ks_raw_promise_future final : public ks_raw_future_baseimp, public ks_raw_
 public:
 	//注：默认apartment原设计使用current_thread_apartment，现已改为使用default_mta
 	explicit ks_raw_promise_future(ks_raw_future_mode mode, ks_apartment* spec_apartment)
-		: ks_raw_future_baseimp(mode, true, spec_apartment != nullptr ? spec_apartment : ks_apartment::default_mta(), ks_async_context()) {}
+		: ks_raw_future_baseimp(mode, true, spec_apartment != nullptr ? spec_apartment : ks_apartment::default_mta(), ks_async_context::__empty_inst()) {}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise_future);
 
@@ -835,7 +835,7 @@ private:
 class ks_raw_aggr_future final : public ks_raw_future_baseimp {
 public:
 	explicit ks_raw_aggr_future(ks_raw_future_mode mode, ks_apartment* spec_apartment) 
-		: ks_raw_future_baseimp(mode, true, spec_apartment, ks_async_context()) {}
+		: ks_raw_future_baseimp(mode, true, spec_apartment, ks_async_context::__empty_inst()) {}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_aggr_future);
 
@@ -1248,7 +1248,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::noop(ks_apartment* apartment) {
 			ks_raw_future_mode::FORWARD,
 			apartment,
 			[](auto& input) { return input; },
-			ks_async_context().set_priority(0x10000),
+			ks_async_context(m_living_context).set_priority(0x10000),
 			false);
 	pipe_future->connect(this->shared_from_this());
 	return pipe_future;
