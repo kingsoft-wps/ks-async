@@ -19,7 +19,6 @@ limitations under the License.
 #include "ks_apartment.h"
 #include "ktl/ks_concurrency.h"
 #include <deque>
-#include <deque>
 
 
 class ks_single_thread_apartment_imp final : public ks_apartment {
