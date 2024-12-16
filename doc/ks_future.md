@@ -57,43 +57,43 @@ static ks_future<T> rejected(ks_error error);
 
 
 ```C++
-static ks_future<T> post(ks_apartment* apartment, const ks_async_context& context, function<T()>&& task_fn);
-static ks_future<T> post(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>()>&& task_fn);
-static ks_future<T> post(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn);
+static ks_future<T> post(ks_apartment* apartment, function<T()>&& task_fn, const ks_async_context& context = {});
+static ks_future<T> post(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, const ks_async_context& context = {});
+static ks_future<T> post(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, const ks_async_context& context = {});
 ```
 #### 描述：发起一个异步任务，此任务将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步任务执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步任务执行时所需上下文。
   - task_fn: 异步任务函数，返回值类型为T或ks_result\<T>。（入参ks_cancel_inspector*可选）
+  - context: 异步任务执行时所需上下文。
 #### 返回值：新ks_future对象。
 <br>
 
 ```C++
-static ks_future<T> post_delayed(ks_apartment* apartment, const ks_async_context& context, function<T()>&& task_fn, int64_t delay);
-static ks_future<T> post_delayed(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>()>&& task_fn, int64_t delay);
-static ks_future<T> post_delayed(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay);
+static ks_future<T> post_delayed(ks_apartment* apartment, function<T()>&& task_fn, int64_t delay, const ks_async_context& context = {});
+static ks_future<T> post_delayed(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, int64_t delay, const ks_async_context& context = {});
+static ks_future<T> post_delayed(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay, const ks_async_context& context = {});
 ```
 #### 描述：发起一个延时的异步任务（相当于一个单次timer），此任务将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步任务执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步任务执行时所需上下文。
   - task_fn: 异步任务函数，返回值类型为T或ks_result\<T>。（入参ks_cancel_inspector*可选）
   - delay: 延时时长，单位是毫秒（ms）。
+  - context: 异步任务执行时所需上下文。
 #### 返回值：新ks_future对象。
 <br>
 
 ```C++
-static ks_future<T> post_pending(ks_apartment* apartment, const ks_async_context& context, function<T()>&& task_fn, ks_pending_trigger* trigger);
-static ks_future<T> post_pending(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>()>&& task_fn, ks_pending_trigger* trigger);
-static ks_future<T> post_pending(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger);
+static ks_future<T> post_pending(ks_apartment* apartment, function<T()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+static ks_future<T> post_pending(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+static ks_future<T> post_pending(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
 ```
 #### 描述：发起一个挂起的异步任务（以避免异步任务被立即被调度执行），此任务将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步任务执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步任务执行时所需上下文。
   - task_fn: 异步任务函数，返回值类型为T或ks_result\<T>。（入参ks_cancel_inspector*可选）
   - trigger: 异步任务触发器。异步任务将在trigger->start()后才会被触发执行。
+  - context: 异步任务执行时所需上下文。
 #### 返回值：新ks_future对象。
 <br>
 <br>
@@ -104,38 +104,38 @@ static ks_future<T> post_pending(ks_apartment* apartment, const ks_async_context
 
 ```C++
 template <class R>
-ks_future<R> then<R>(ks_apartment* apartment, const ks_async_context& context, function<R(const T&)>&& fn);
+ks_future<R> then<R>(ks_apartment* apartment, function<R(const T&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> then<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<R>(const T&)>&& fn);
+ks_future<R> then<R>(ks_apartment* apartment, function<ks_result<R>(const T&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> then<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<R>(const T&, ks_cancel_inspector*)>&& fn);
+ks_future<R> then<R>(ks_apartment* apartment, function<ks_result<R>(const T&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：仅当this成功时，执行fn函数进行值变换，返回新的R类型结果。此函数将在指定apartment套间中被执行。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的then异步函数，其入参类型为T，返回值类型为R或ks_result\<R>。（入参ks_cancel_inspector*可选）
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<R>对象。
 #### 特别说明：若R为void，则fn返回值类型要求为 `void` 或 `ks_result<void>`。
 <br>
 
 ```C++
 template <class R>
-ks_future<R> transform<R>(ks_apartment* apartment, const ks_async_context& context, function<R(const ks_result<T>&)>&& fn);
+ks_future<R> transform<R>(ks_apartment* apartment, function<R(const ks_result<T>&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> transform<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<R>(const ks_result<T>&)>&& fn);
+ks_future<R> transform<R>(ks_apartment* apartment, function<ks_result<R>(const ks_result<T>&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> transform<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn);
+ks_future<R> transform<R>(ks_apartment* apartment, function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：当this完成时（无论成功/失败），执行fn函数进行值变换，返回新的R类型结果。此函数将在指定apartment套间中被执行。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的transform异步函数，其入参类型为ks_result\<T>，返回值类型为R或ks_result\<R>。（入参ks_cancel_inspector*可选）
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<R>对象。
 #### 特别说明：若R为void，则fn返回值类型要求为 `void` 或 `ks_result<void>`。
 <br>
@@ -144,68 +144,68 @@ ks_future<R> transform<R>(ks_apartment* apartment, const ks_async_context& conte
 
 ```C++
 template <class R>
-ks_future<R> flat_then<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_future<R>(const T&)>&& fn);
+ks_future<R> flat_then<R>(ks_apartment* apartment, function<ks_future<R>(const T&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> flat_then<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_future<R>(const T&, ks_cancel_inspector*)>&& fn);
+ks_future<R> flat_then<R>(ks_apartment* apartment, function<ks_future<R>(const T&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：仅当this成功时，执行fn函数进行值变换，返回新的R类型结果。此函数将在指定apartment套间中被执行。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的then异步函数，其入参类型为T，返回值类型为ks_future\<R>。（入参ks_cancel_inspector*可选）
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<R>对象。
 <br>
 
 ```C++
 template <class R>
-ks_future<R> flat_transform<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_future<R>(const ks_result<T>&)>&& fn);
+ks_future<R> flat_transform<R>(ks_apartment* apartment, function<ks_future<R>(const ks_result<T>&)>&& fn, const ks_async_context& context = {});
 template <class R>
-ks_future<R> flat_transform<R>(ks_apartment* apartment, const ks_async_context& context, function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn);
+ks_future<R> flat_transform<R>(ks_apartment* apartment, function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {};
 ```
 #### 描述：当this完成时（无论成功/失败），执行fn函数进行值变换，返回新的R类型结果。此函数将在指定apartment套间中被执行。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的transform异步函数，其入参类型为ks_result\<T>，返回值类型为ks_future\<R>。（入参ks_cancel_inspector*可选）
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<R>对象。
 <br>
 <br>
 
 
 ```C++
-ks_future<T> on_success(ks_apartment* apartment, const ks_async_context& context, function<void(const T&)>&& fn);
+ks_future<T> on_success(ks_apartment* apartment, function<void(const T&)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：仅当this成功时，执行fn函数进行值处理，但新ks_future的仍保持原结果。此函数将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的on_success异步函数，其入参类型为T，无返回值。
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<T>对象，其值将与this相同。
 <br>
 
 ```C++
-ks_future<T> on_failure(ks_apartment* apartment, const ks_async_context& context, function<void(const ks_error&)>&& fn);
+ks_future<T> on_failure(ks_apartment* apartment, function<void(const ks_error&)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：仅当this失败时，执行fn函数进行错误处理，但新ks_future的仍保持原结果。此函数将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的on_failure异步函数，其入参类型为ks_error，无返回值。
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<T>对象，其值将与this相同。
 <br>
 
 ```C++
-ks_future<T> on_completion(ks_apartment* apartment, const ks_async_context& context, function<void(const ks_result<T>&)>&& fn);
+ks_future<T> on_completion(ks_apartment* apartment, function<void(const ks_result<T>&)>&& fn, const ks_async_context& context = {});
 ```
 #### 描述：当this完成时（无论成功/失败），执行fn函数进行结果处理，但新ks_future的仍保持原结果。此函数将在指定apartment套间中被执行。
 #### 参数：
   - apartment: 指定异步函数执行时所在套间。若传nullptr，则使用default_mta套间。
-  - context: 异步函数执行时所需上下文。
   - fn: 待执行的on_completion异步函数，其入参类型为ks_result\<T>，无返回值。
+  - context: 异步函数执行时所需上下文。
 #### 返回值：新ks_future\<T>对象，其值将与this相同。
 <br>
 <br>

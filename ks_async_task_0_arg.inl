@@ -31,10 +31,20 @@ public:
 		this->do_init(future);
 	}
 
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& fn) {
+	explicit ks_async_task(ks_apartment* apartment, std::function<T()>&& fn, const ks_async_context& context = {}) {
 		this->do_init(apartment, context, std::move(fn));
 	}
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& fn, ks_pending_trigger* trigger) {
+	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& fn) { //only for compat
+		this->do_init(apartment, context, std::move(fn));
+	}
+
+	explicit ks_async_task(ks_apartment* apartment, std::function<T()>&& fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
+		if (trigger == nullptr)
+			this->do_init(apartment, context, std::move(fn));
+		else
+			this->do_init(apartment, context, std::move(fn), trigger);
+	}
+	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& fn, ks_pending_trigger* trigger) { //only for compat
 		if (trigger == nullptr)
 			this->do_init(apartment, context, std::move(fn));
 		else
@@ -42,12 +52,12 @@ public:
 	}
 
 	template <class FN = std::function<ks_result<T>()>, class _ = std::enable_if_t<std::is_same_v<std::invoke_result_t<FN>, ks_result<T>>>>
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, FN&& fn) {
+	explicit ks_async_task(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) {
 		static_assert(!std::is_lvalue_reference_v<FN>, "FN must be rvalue-ref type");
 		this->do_init_ex(apartment, context, std::function<ks_result<T>()>(std::move(fn)));
 	}
 	template <class FN = std::function<ks_result<T>()>, class _ = std::enable_if_t<std::is_same_v<std::invoke_result_t<FN>, ks_result<T>>>>
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, FN&& fn, ks_pending_trigger* trigger) {
+	explicit ks_async_task(ks_apartment* apartment, FN&& fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
 		static_assert(!std::is_lvalue_reference_v<FN>, "FN must be rvalue-ref type");
 		if (trigger == nullptr)
 			this->do_init_ex(apartment, context, std::function<ks_result<T>()>(std::move(fn)));

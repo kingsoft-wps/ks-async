@@ -15,17 +15,17 @@
 ks_async_task<T>(const T& value);
 ks_async_task<T>(const ks_future<T>& future);
 
-ks_async_task<T>(ks_apartment* apartment, const ks_async_context& context, function<T()>&& fn);
-ks_async_task<T>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>()>&& fn);
+ks_async_task<T>(ks_apartment* apartment, function<T()>&& fn, const ks_async_context& context = {});
+ks_async_task<T>(ks_apartment* apartment, function<ks_result<T>()>&& fn, const ks_async_context& context = {});
 
-ks_async_task<T>(ks_apartment* apartment, const ks_async_context& context, function<T()>&& fn, ks_pending_trigger* trigger);
-ks_async_task<T>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>()>&& fn, ks_pending_trigger* trigger);
+ks_async_task<T>(ks_apartment* apartment, function<T()>&& fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+ks_async_task<T>(ks_apartment* apartment, function<ks_result<T>()>&& fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
 
-ks_async_task<T, ARG>(ks_apartment* apartment, const ks_async_context& context, function<T(const ARG&)>&& fn);
-ks_async_task<T, ARG>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>(const ARG&)>&& fn);
+ks_async_task<T, ARG>(ks_apartment* apartment, function<T(const ARG&)>&& fn, const ks_async_context& context = {});
+ks_async_task<T, ARG>(ks_apartment* apartment, function<ks_result<T>(const ARG&)>&& fn, const ks_async_context& context = {});
 
-ks_async_task<T, ARG0, ARG1, ...>(ks_apartment* apartment, const ks_async_context& context, function<T(const ARG0&, const ARG1&, ...)>&& fn);
-ks_async_task<T, ARG0, ARG1, ...>(ks_apartment* apartment, const ks_async_context& context, function<ks_result<T>(const ARG0&, const ARG1&, ...)>&& fn);
+ks_async_task<T, ARG0, ARG1, ...>(ks_apartment* apartment, function<T(const ARG0&, const ARG1&, ...)>&& fn, const ks_async_context& context = {});
+ks_async_task<T, ARG0, ARG1, ...>(ks_apartment* apartment, function<ks_result<T>(const ARG0&, const ARG1&, ...)>&& fn, const ks_async_context& context = {});
 ```
 
 #### 描述：创建ks_async_task对象。若有ARG...模板参数，则通常还需要调用connect与上游异步任务进行关联。

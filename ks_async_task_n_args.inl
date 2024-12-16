@@ -23,12 +23,20 @@ public:
 	ks_async_task& operator=(ks_async_task&&) noexcept = default;
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_task);
 
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T(const ARGs&...)>&& fn) {
+	explicit ks_async_task(ks_apartment* apartment, std::function<T(const ARGs&...)>&& fn, const ks_async_context& context = {}) {
+		this->do_init(apartment, context, std::move(fn));
+	}
+	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, std::function<T(const ARGs&...)>&& fn) { //only for compat
 		this->do_init(apartment, context, std::move(fn));
 	}
 
 	template <class FN = std::function<ks_result<T>(const ARGs&...)>, class _ = std::enable_if_t<std::is_same_v<std::invoke_result_t<FN, const ARGs&...>, ks_result<T>>>>
-	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, FN&& fn) {
+	explicit ks_async_task(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) {
+		static_assert(!std::is_lvalue_reference_v<FN>, "FN must be rvalue-ref type");
+		this->do_init_ex(apartment, context, std::function<ks_result<T>(const ARGs&...)>(std::move(fn)));
+	}
+	template <class FN = std::function<ks_result<T>(const ARGs&...)>, class _ = std::enable_if_t<std::is_same_v<std::invoke_result_t<FN, const ARGs&...>, ks_result<T>>>>
+	explicit ks_async_task(ks_apartment* apartment, const ks_async_context& context, FN&& fn) { //only for compat
 		static_assert(!std::is_lvalue_reference_v<FN>, "FN must be rvalue-ref type");
 		this->do_init_ex(apartment, context, std::function<ks_result<T>(const ARGs&...)>(std::move(fn)));
 	}
