@@ -31,3 +31,6 @@ limitations under the License.
 
 #define __KS_ASYNC_RAW_BEGIN  namespace __ks_async_raw {
 #define __KS_ASYNC_RAW_END    }
+
+
+#define __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED  (false)

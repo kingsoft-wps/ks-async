@@ -74,7 +74,9 @@ private:
 	explicit ks_async_context(const ks_source_location& from_source_location) {
 		if (!from_source_location.is_empty()) {
 			do_prepare_fat_data_cow();
+#if __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED
 			m_fat_data_p->from_source_location = from_source_location;
+#endif
 		}
 	}
 
@@ -174,7 +176,11 @@ public: //called by ks_raw_future internally
 
 	ks_source_location __get_from_source_location() const {
 		if (m_fat_data_p != nullptr && true)
+#if __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED
 			return m_fat_data_p->from_source_location;
+#else
+			return ks_source_location::__empty_inst();
+#endif
 		else
 			return ks_source_location::__empty_inst();
 	}
@@ -217,8 +223,10 @@ private:
 				return true;
 			if (check_controller && m_fat_data_p->controller_data_ptr != nullptr)
 				return true;
+#if __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED
 			if (true && !m_fat_data_p->from_source_location.is_empty())
 				return true;
+#endif
 		}
 		return false;
 	}
@@ -262,7 +270,9 @@ private:
 		std::shared_ptr<ks_async_controller::_CONTROLLER_DATA> controller_data_ptr;
 
 		//关于from_source_location
+#if __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED
 		ks_source_location from_source_location = ks_source_location::__empty_inst();
+#endif
 
 		//引用计数
 		//std::atomic<int> ref_count = { 1 };  //被移动位置，使内存更紧凑
