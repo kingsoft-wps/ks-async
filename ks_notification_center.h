@@ -29,12 +29,16 @@ class ks_notification_center;
 class ks_notification {
 public:
 	template <class DATA_TYPE>
-	explicit ks_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data)
+	explicit ks_notification(const void* sender, const char* notification_name, DATA_TYPE&& notification_data, const ks_async_context& notification_context = {})
 		: m_props(std::make_shared<_NOTIFICATION_PROPS>()) {
 		m_props->sender = sender;
 		m_props->notification_name = notification_name != nullptr ? notification_name : "";
-		m_props->notification_context = notification_context;
 		m_props->notification_data_any = ks_any::of(std::forward<DATA_TYPE>(notification_data));
+		m_props->notification_context = notification_context;
+	}
+	template <class DATA_TYPE>
+	explicit ks_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data)
+		: ks_notification(sender, notification_name, std::forward<DATA_TYPE>(notification_data), notification_context) { //only for compat
 	}
 
 	ks_notification(const ks_notification&) = default;
@@ -45,16 +49,16 @@ public:
 public:
 	const void* get_sender() const { ASSERT(m_props != nullptr); return m_props->sender; }
 	const char* get_notification_name() const { ASSERT(m_props != nullptr); return m_props->notification_name.c_str(); }
-	const ks_async_context& get_notification_context() const { ASSERT(m_props != nullptr); return m_props->notification_context; }
 	template <class DATA_TYPE>
 	const DATA_TYPE& get_notification_data() const { ASSERT(m_props != nullptr); return m_props->notification_data_any.get<DATA_TYPE>(); }
+	const ks_async_context& get_notification_context() const { ASSERT(m_props != nullptr); return m_props->notification_context; }
 
 private:
 	struct _NOTIFICATION_PROPS {
 		const void* sender;
 		std::string notification_name;
-		ks_async_context notification_context = ks_async_context::__empty_inst();
 		ks_any notification_data_any;
+		ks_async_context notification_context = ks_async_context::__empty_inst();
 	};
 
 	std::shared_ptr<_NOTIFICATION_PROPS> m_props;
@@ -79,15 +83,24 @@ public:
 public:
 	KS_ASYNC_API void add_observer(
 		const void* observer, const char* notification_name, 
-		ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn);
+		ks_apartment* apartment, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context = {});
+	KS_ASYNC_INLINE_API void add_observer(
+		const void* observer, const char* notification_name,
+		ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn) { //only for compat
+		return this->add_observer(observer, notification_name, apartment, std::move(fn), context);
+	}
 
 	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name);
 	KS_ASYNC_API void remove_observer(const void* observer);
 
 public:
 	template <class DATA_TYPE>
-	KS_ASYNC_INLINE_API void post_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data) {
-		return this->do_post_notification(ks_notification(sender, notification_name, notification_context, std::forward<DATA_TYPE>(notification_data)));
+	KS_ASYNC_INLINE_API void post_notification(const void* sender, const char* notification_name, DATA_TYPE&& notification_data, const ks_async_context& notification_context = {}) {
+		return this->do_post_notification(ks_notification(sender, notification_name, std::forward<DATA_TYPE>(notification_data), notification_context));
+	}
+	template <class DATA_TYPE>
+	KS_ASYNC_INLINE_API void post_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data) { //only for compat
+		return this->post_notification(sender, notification_name, std::forward<DATA_TYPE>(notification_data), notification_context);
 	}
 
 private:

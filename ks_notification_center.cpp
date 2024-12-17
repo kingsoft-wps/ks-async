@@ -467,7 +467,7 @@ std::shared_ptr<ks_notification_center> ks_notification_center::_create_center(c
 }
 
 
-void ks_notification_center::add_observer(const void* observer, const char* notification_name, ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn) {
+void ks_notification_center::add_observer(const void* observer, const char* notification_name, ks_apartment* apartment, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context) {
 	m_d->add_observer(observer, notification_name, std::move(fn), context, apartment);
 }
 
