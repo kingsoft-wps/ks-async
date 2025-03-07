@@ -480,7 +480,7 @@ private:
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<R>(ks_cancel_inspector*)>>>>
 	static std::function<ks_future<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<R> {
+		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_future<R> {
 			return fn(ks_cancel_inspector::__for_future());
 		};
 	}
