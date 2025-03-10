@@ -258,15 +258,15 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 
 				lock.unlock();
 
-				try {
+				//try {
 					now_fn_item.fn();
-				}
-				catch (...) {
-					//TODO dump exception ...
-					ASSERT(false);
-					//abort();
-					throw;
-				}
+				//}
+				//catch (...) {
+				//	//TODO dump exception ...
+				//	ASSERT(false);
+				//	//abort();
+				//	throw;
+				//}
 
 				lock.lock();
 				continue;
@@ -371,15 +371,15 @@ bool ks_single_thread_apartment_imp::__try_pump_once() {
 
 	lock.unlock();
 
-	try {
+	//try {
 		now_fn_item.fn();
-	}
-	catch (...) {
-		//TODO dump exception ...
-		ASSERT(false);
-		//abort();
-		throw;
-	}
+	//}
+	//catch (...) {
+	//	//TODO dump exception ...
+	//	ASSERT(false);
+	//	//abort();
+	//	throw;
+	//}
 
 	//注：无事待做，无需重锁
 	//lock.lock();

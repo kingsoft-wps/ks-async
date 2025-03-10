@@ -277,15 +277,15 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 				++m_d->busy_thread_count_for_idle;
 			lock.unlock();
 
-			try {
+			//try {
 				now_fn_item.fn();
-			}
-			catch (...) {
-				//TODO dump exception ...
-				ASSERT(false);
-				//abort();
-				throw;
-			}
+			//}
+			//catch (...) {
+			//	//TODO dump exception ...
+			//	ASSERT(false);
+			//	//abort();
+			//	throw;
+			//}
 
 			lock.lock();
 			--m_d->busy_thread_count;
@@ -417,15 +417,15 @@ bool ks_thread_pool_apartment_imp::__try_pump_once() {
 	//	++m_d->busy_thread_count_for_idle;
 	lock.unlock();
 
-	try {
+	//try {
 		now_fn_item.fn();
-	}
-	catch (...) {
-		//TODO dump exception ...
-		ASSERT(false);
-		//abort();
-		throw;
-	}
+	//}
+	//catch (...) {
+	//	//TODO dump exception ...
+	//	ASSERT(false);
+	//	//abort();
+	//	throw;
+	//}
 
 	//注：无事待做，无需重锁
 	//lock.lock();

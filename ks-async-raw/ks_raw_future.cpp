@@ -494,11 +494,11 @@ public:
 			catch (ks_error error) {
 				result = error;
 			}
-			catch (...) {
-				ASSERT(false);
-				//result = ks_error::unexpected_error();
-				throw;
-			}
+			//catch (...) {
+			//	ASSERT(false);
+			//	//result = ks_error::unexpected_error();
+			//	throw;
+			//}
 
 			this->do_complete_locked<false>(result, prefer_apartment, true, lock2);
 
@@ -651,11 +651,11 @@ protected:
 			catch (ks_error error) {
 				result = error;
 			}
-			catch (...) {
-				ASSERT(false);
-				//result = ks_error::unexpected_error();
-				throw;
-			}
+			//catch (...) {
+			//	ASSERT(false);
+			//	//result = ks_error::unexpected_error();
+			//	throw;
+			//}
 
 			this->do_complete_locked<false>(result, prefer_apartment, true, lock2);
 
@@ -756,11 +756,11 @@ public:
 			catch (ks_error error) {
 				else_error = error;
 			}
-			catch (...) {
-				ASSERT(false);
-				//else_error = ks_error::unexpected_error();
-				throw;
-			}
+			//catch (...) {
+			//	ASSERT(false);
+			//	//else_error = ks_error::unexpected_error();
+			//	throw;
+			//}
 
 			if (extern_future != nullptr) {
 				m_extern_future = extern_future;

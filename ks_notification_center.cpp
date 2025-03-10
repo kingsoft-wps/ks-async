@@ -320,16 +320,16 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 					__ks_async_raw::ks_raw_living_context_rtstt entry_context_rtstt;
 					entry_context_rtstt.apply(entry_context);
 
-					try {
+					//try {
 						if (!entry_ptr->context.__check_cancel_all_ctrl() && !entry_context.__check_owner_expired())
 							entry_ptr->fn(notification);
-					}
-					catch (...) {
-						//TODO dump exception ...
-						ASSERT(false);
-						//abort();
-						throw;
-					}
+					//}
+					//catch (...) {
+					//	//TODO dump exception ...
+					//	ASSERT(false);
+					//	//abort();
+					//	throw;
+					//}
 
 					entry_context_rtstt.try_unapply();
 				}, 0);
