@@ -545,7 +545,7 @@ private:
 	}
 	static ks_future<T> __post_of_arglist_1_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>()>&& task_fn) {
 		return ks_future<ks_future<T>>::post(apartment, context, std::move(task_fn))
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) ->ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) ->ks_future<T> { return value_future; });
 	}
 	static ks_future<T> __post_of_arglist_2_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T(ks_cancel_inspector*)>&& task_fn) {
 		ASSERT(apartment != nullptr);
@@ -571,7 +571,7 @@ private:
 	}
 	static ks_future<T> __post_of_arglist_2_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn) {
 		return ks_future<ks_future<T>>::post(apartment, context, std::move(task_fn))
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) ->ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) ->ks_future<T> { return value_future; });
 	}
 
 	static ks_future<T> __post_delayed_of_arglist_1_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& task_fn, int64_t delay) {
@@ -598,7 +598,7 @@ private:
 	}
 	static ks_future<T> __post_delayed_of_arglist_1_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>()>&& task_fn, int64_t delay) {
 		return ks_future<ks_future<T>>::post_delayed(apartment, context, std::move(task_fn), delay)
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
 	}
 	static ks_future<T> __post_delayed_of_arglist_2_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T(ks_cancel_inspector*)>&& task_fn, int64_t delay) {
 		ASSERT(apartment != nullptr);
@@ -624,7 +624,7 @@ private:
 	}
 	static ks_future<T> __post_delayed_of_arglist_2_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay) {
 		return ks_future<ks_future<T>>::post_delayed(apartment, context, std::move(task_fn), delay)
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
 	}
 
 	static ks_future<T> __post_pending_of_arglist_1_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& task_fn, ks_pending_trigger* trigger) {
@@ -657,7 +657,7 @@ private:
 	}
 	static ks_future<T> __post_pending_of_arglist_1_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>()>&& task_fn, ks_pending_trigger* trigger) {
 		return ks_future<ks_future<T>>::post_pending(apartment, context, std::move(task_fn), trigger)
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
 	}
 	static ks_future<T> __post_pending_of_arglist_2_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger) {
 		ASSERT(apartment != nullptr);
@@ -689,7 +689,7 @@ private:
 	}
 	static ks_future<T> __post_pending_of_arglist_2_ret_3(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger) {
 		return ks_future<ks_future<T>>::post_pending(apartment, context, std::move(task_fn), trigger)
-			.flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
+			.template flat_then<T>(apartment, context, [](const ks_future<T>& value_future) -> ks_future<T> { return value_future; });
 	}
 
 private:

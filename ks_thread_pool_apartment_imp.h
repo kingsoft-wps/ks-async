@@ -24,7 +24,11 @@ limitations under the License.
 
 class ks_thread_pool_apartment_imp final : public ks_apartment {
 public:
-	KS_ASYNC_API explicit ks_thread_pool_apartment_imp(size_t max_thread_count);
+	enum {
+		__all_flags          = 0x00,
+	};
+
+	KS_ASYNC_API explicit ks_thread_pool_apartment_imp(size_t max_thread_count, uint flags = 0);
 	KS_ASYNC_API ~ks_thread_pool_apartment_imp();
 	_DISABLE_COPY_CONSTRUCTOR(ks_thread_pool_apartment_imp);
 
@@ -40,6 +44,13 @@ public:
 	virtual uint64_t schedule_delayed(std::function<void()>&& fn, int priority, int64_t delay) override;
 	virtual void try_unschedule(uint64_t id) override;
 
+	virtual void atfork_prepare() override;
+	virtual void atfork_parent() override;
+	virtual void atfork_child() override;
+
+protected:
+	virtual bool __try_pump_once() override;
+
 private:
 	void _try_start_locked(std::unique_lock<ks_mutex>& lock);
 	void _try_stop_locked(std::unique_lock<ks_mutex>& lock);
@@ -51,9 +62,6 @@ private:
 	void _delaying_trigger_thread_proc();
 
 	bool _debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const;
-
-protected:
-	virtual bool __try_pump_once() override;
 
 private:
 	struct _FN_ITEM {

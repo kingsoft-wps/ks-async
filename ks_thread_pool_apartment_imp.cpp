@@ -19,9 +19,10 @@ limitations under the License.
 void __forcelink_to_ks_thread_pool_apartment_imp_cpp() {}
 
 
-ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(size_t max_thread_count)
+ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(size_t max_thread_count, uint flags)
 	: m_d(new _THREAD_POOL_APARTMENT_DATA()) {
 	ASSERT(max_thread_count >= 1);
+	ASSERT((flags & ~__all_flags) == 0);
 	m_d->max_thread_count = max_thread_count;
 }
 
@@ -434,4 +435,31 @@ bool ks_thread_pool_apartment_imp::__try_pump_once() {
 	//	--m_d->busy_thread_count_for_idle;
 
 	return true;
+}
+
+
+void ks_thread_pool_apartment_imp::atfork_prepare() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+
+	m_d->mutex.lock();
+}
+
+void ks_thread_pool_apartment_imp::atfork_parent() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+
+	m_d->mutex.unlock();
+}
+
+void ks_thread_pool_apartment_imp::atfork_child() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+
+	m_d->thread_pool.clear();
+	m_d->thread_pool_presented_size = 0;
+	m_d->busy_thread_count = 0;
+	m_d->busy_thread_count_for_idle = 0;
+
+	m_d->delaying_trigger_thread.reset();
+	m_d->delaying_trigger_thread_presented_flag = false;
+
+	m_d->mutex.unlock();
 }

@@ -52,6 +52,11 @@ public:
 	//注：try_unschedule方法会尝试取消指定的异步过程，其前提是指定的异步过程还未开始执行，若已开始（甚至已完成）则不会再被取消了。
 	virtual void try_unschedule(uint64_t id) = 0;
 
+public:
+	virtual void atfork_prepare() = 0;
+	virtual void atfork_parent() = 0;
+	virtual void atfork_child() = 0;
+
 protected: 
 	//注：ui_sta和master_sta由APP框架提供。
 	//注意：current_thread_apartment是TLS变量，各色套间线程实现者务必对其进行正确初始化。

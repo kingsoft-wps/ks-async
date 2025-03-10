@@ -19,9 +19,14 @@ limitations under the License.
 void __forcelink_to_ks_single_thread_apartment_imp_cpp() {}
 
 
-ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(bool isolated_thread_mode)
+ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(uint flags)
 	: m_d(new _SINGLE_THREAD_APARTMENT_DATA()) {
-	m_d->isolated_thread_mode = isolated_thread_mode;
+	ASSERT((flags & ~__all_flags) == 0);
+	m_d->inplace_thread_flag = flags & inplace_thread_flag;
+	if (flags & as_ui_sta_flag)
+		ks_apartment::__set_ui_sta(this);
+	if (flags & as_master_sta_flag)
+		ks_apartment::__set_master_sta(this);
 }
 
 ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
@@ -42,7 +47,7 @@ bool ks_single_thread_apartment_imp::start() {
 		return false;
 
 	_try_start_locked(lock);
-	if (!m_d->isolated_thread_mode)
+	if (m_d->inplace_thread_flag)
 		this->_single_thread_proc();
 
 	return true;
@@ -212,7 +217,7 @@ void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>
 
 
 void ks_single_thread_apartment_imp::_prepare_single_thread_locked(std::unique_lock<ks_mutex>& lock) {
-	if (!m_d->isolated_thread_mode)
+	if (m_d->inplace_thread_flag)
 		return;
 	if (m_d->isolated_thread_presented_flag)
 		return;
@@ -385,4 +390,25 @@ bool ks_single_thread_apartment_imp::__try_pump_once() {
 	//lock.lock();
 
 	return true;
+}
+
+
+void ks_single_thread_apartment_imp::atfork_prepare() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+	m_d->mutex.lock();
+}
+
+void ks_single_thread_apartment_imp::atfork_parent() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+
+	m_d->mutex.unlock();
+}
+
+void ks_single_thread_apartment_imp::atfork_child() {
+	ASSERT(m_d->state_v != _STATE::STOPPING);
+
+	m_d->isolated_thread_opt.reset();
+	m_d->isolated_thread_presented_flag = false;
+
+	m_d->mutex.unlock();
 }

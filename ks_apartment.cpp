@@ -37,7 +37,7 @@ ks_apartment* ks_apartment::master_sta() {
 }
 
 ks_apartment* ks_apartment::background_sta() {
-	static ks_single_thread_apartment_imp g_background_sta(true);
+	static ks_single_thread_apartment_imp g_background_sta(0);
 	return &g_background_sta;
 }
 
@@ -52,7 +52,7 @@ ks_apartment* ks_apartment::default_mta() {
 		}
 	};
 
-	static ks_thread_pool_apartment_imp g_default_mta(_default_mta_options::max_thread_count());
+	static ks_thread_pool_apartment_imp g_default_mta(_default_mta_options::max_thread_count(), 0);
 	return &g_default_mta;
 }
 
