@@ -439,19 +439,19 @@ bool ks_thread_pool_apartment_imp::__try_pump_once() {
 
 
 void ks_thread_pool_apartment_imp::atfork_prepare() {
-	ASSERT(m_d->state_v != _STATE::STOPPING);
+	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
 	m_d->mutex.lock();
 }
 
 void ks_thread_pool_apartment_imp::atfork_parent() {
-	ASSERT(m_d->state_v != _STATE::STOPPING);
+	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
 	m_d->mutex.unlock();
 }
 
 void ks_thread_pool_apartment_imp::atfork_child() {
-	ASSERT(m_d->state_v != _STATE::STOPPING);
+	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
 	m_d->thread_pool.clear();
 	m_d->thread_pool_presented_size = 0;
