@@ -45,9 +45,9 @@ ks_apartment* ks_apartment::default_mta() {
 	struct _default_mta_options {
 		static size_t max_thread_count() {
 			size_t cpu_count = (size_t)std::thread::hardware_concurrency();
-			size_t max_thread_count = cpu_count * 2;
-			if (max_thread_count < 4)
-				max_thread_count = 4;
+			size_t max_thread_count = cpu_count + 1;
+			if (max_thread_count < 3)
+				max_thread_count = 3;
 			return max_thread_count;
 		}
 	};
