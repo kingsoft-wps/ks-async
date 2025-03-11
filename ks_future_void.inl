@@ -27,7 +27,7 @@ public:
 	using value_type = void;
 	using this_future_type = ks_future<void>;
 
-public:
+public: //resolved, rejected
 	static ks_future<void> resolved(nothing_t _ = nothing) {
 		return ks_future<nothing_t>::resolved(nothing).template cast<void>();
 	}
@@ -36,7 +36,7 @@ public:
 		return ks_future<nothing_t>::rejected(error).template cast<void>();
 	}
 
-private:
+private: //__wrap_task_fn
 	template <class FN, class _ = std::enable_if_t<
 		(std::is_convertible_v<FN, std::function<void()>> || std::is_convertible_v<FN, std::function<ks_result<void>()>> || std::is_convertible_v<FN, std::function<ks_future<void>()>>) ||
 		(std::is_convertible_v<FN, std::function<void(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<void>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<void>(ks_cancel_inspector*)>>)>>
@@ -106,7 +106,7 @@ private:
 		};
 	}
 
-private:
+private: //__wrap_then_fn
 	template <class R, class FN, class _ = std::enable_if_t<
 		(std::is_convertible_v<FN, std::function<R()>> || std::is_convertible_v<FN, std::function<ks_result<R>()>> || std::is_convertible_v<FN, std::function<ks_future<R>()>>) ||
 		(std::is_convertible_v<FN, std::function<R(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<R>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<R>(ks_cancel_inspector*)>>)>>
@@ -190,6 +190,7 @@ private:
 		};
 	}
 
+private: //__wrap_transform_fn
 	template <class R, class FN, class _ = std::enable_if_t<
 		(std::is_convertible_v<FN, std::function<R(const ks_result<void>&)>> || std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<void>&)>> || std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<void>&)>>) ||
 		(std::is_convertible_v<FN, std::function<R(const ks_result<void>&, ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<void>&, ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<void>&, ks_cancel_inspector*)>>)>>
@@ -273,7 +274,7 @@ private:
 		};
 	}
 
-public:
+public: //post, post_delayed, post_pending
 	static ks_future<void> post(ks_apartment* apartment, std::function<void()>&& task_fn, const ks_async_context& context = {}) {
 		return ks_future<nothing_t>::post(apartment, __wrap_task_fn(std::move(task_fn)), context).template cast<void>();
 	}
@@ -355,7 +356,7 @@ public:
 		return ks_future<nothing_t>::post_pending(apartment, context, __wrap_task_fn(std::forward<FN>(task_fn)), trigger).template cast<void>();
 	}
 
-public:
+public: //then, transform
 	template <class R>
 	ks_future<R> then(ks_apartment* apartment, std::function<R()>&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.then<R>(apartment, __wrap_then_fn<R>(std::move(fn)), context);
@@ -430,7 +431,7 @@ public:
 		return m_nothing_future.transform<R>(apartment, context, __wrap_transform_fn<R>(std::forward<FN>(fn)));
 	}
 
-public:
+public: //flat_then, flat_transform
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, std::function<ks_future<R>()>&& fn, const ks_async_context& context = {}) const { //explicit flat
 		return m_nothing_future.flat_then<R>(
@@ -485,7 +486,7 @@ public:
 			[fn = std::move(fn)](const ks_result<nothing_t>& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result), ks_cancel_inspector::__for_future()); });
 	}
 
-public:
+public: //on_success, on_failure, on_completion
 	ks_future<void> on_success(ks_apartment* apartment, std::function<void()>&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_success(
 			apartment, 
@@ -528,7 +529,7 @@ public:
 		);
 	}
 
-public:
+public: //cast, deliver_to_promise, set_timeout
 	template <class R>
 	ks_future<R> cast() const {
 		return m_nothing_future.cast<R>();
@@ -545,7 +546,7 @@ public:
 		return *this;
 	}
 
-public:
+public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
 	bool is_valid() const {
 		return m_nothing_future.is_valid();
 	}
