@@ -15,6 +15,12 @@ limitations under the License.
 
 #include "ks_thread_pool_apartment_imp.h"
 #include <algorithm>
+#include <sstream>
+#if defined(_WIN32)
+#	include <Windows.h>
+#else
+#	include <pthread.h>
+#endif
 
 void __forcelink_to_ks_thread_pool_apartment_imp_cpp() {}
 
@@ -258,9 +264,9 @@ void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_l
 
 	size_t needed_thread_count = 0;
 	if (m_d->state_v == _STATE::RUNNING)
-		needed_thread_count = std::min(m_d->max_thread_count, m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size() + m_d->now_fn_queue_idle.size());
+		needed_thread_count = (std::min)(m_d->max_thread_count, m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size() + m_d->now_fn_queue_idle.size());
 	else if (m_d->state_v == _STATE::STOPPING)
-		needed_thread_count = std::min(m_d->max_thread_count, m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size());
+		needed_thread_count = (std::min)(m_d->max_thread_count, m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size());
 	else 
 		needed_thread_count = 0;
 
@@ -279,6 +285,18 @@ void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_l
 void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
+
+	std::string thread_name = (std::stringstream() << m_d->name << " (" << thread_sn << ")").str();
+#if defined(_WIN32)
+	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
+	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
+	if (_pfnSetThreadDescription != nullptr)
+		_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
+#elif defined(__APPLE__)
+	pthread_setname_np(thread_name.c_str());
+#else
+	pthread_setname_np(pthread_self(), thread_name.c_str());
+#endif
 
 	while (true) {
 #if __KS_APARTMENT_ATFORK_ENABLED
