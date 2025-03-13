@@ -29,6 +29,14 @@ static ks_apartment* default_mta();
 <br>
 
 ```C++
+static void register_public_apartment(const char* name, ks_apartment* apartment);
+static void unregister_public_apartment(const char* name, ks_apartment* apartment);
+static ks_apartment* find_public_apartment(const char* name);
+```
+#### 描述：全局公开套间注册。
+<br>
+
+```C++
 static ks_apartment* current_thread_apartment();
 static ks_apartment* current_thread_apartment_or_default_mta();
 static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
@@ -40,6 +48,23 @@ static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 
 
 # 一般成员方法
+
+```C++
+const char* name();
+```
+#### 描述：获取套间名称。
+#### 返回值：套间名称。
+<br>
+
+```C++
+const char* features();
+```
+#### 描述：获取套间特征。
+#### 返回值：套间特征。
+#### 特别说明：目前支持的特征只有：sequential_feature。
+<br>
+<br>
+
 
 ```C++
 bool start();
@@ -104,9 +129,18 @@ void try_unschedule(uint64_t id);
 #### 特别说明：如果异步过程已经执行完毕、或正在被执行，则不能成功撤销。
 <br>
 <br>
-<br>
-<br>
 
+
+```C++
+void atfork_prepare();
+void atfork_parent();
+void atfork_child();
+```
+#### 描述：fork辅助支持。
+<br>
+<br>
+<br>
+<br>
 
 
 # 另请参阅

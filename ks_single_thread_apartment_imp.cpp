@@ -19,14 +19,27 @@ limitations under the License.
 void __forcelink_to_ks_single_thread_apartment_imp_cpp() {}
 
 
-ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(uint flags)
-	: m_d(new _SINGLE_THREAD_APARTMENT_DATA()) {
+ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags) {
+	ASSERT(name != nullptr);
 	ASSERT((flags & ~__all_flags) == 0);
-	m_d->inplace_thread_flag = flags & inplace_thread_flag;
-	if (flags & as_ui_sta_flag)
+
+	m_d = new _SINGLE_THREAD_APARTMENT_DATA();
+	m_d->name = name;
+	m_d->flags = flags;
+
+	if ((m_d->flags & dont_register_flag) == 0 && !m_d->name.empty()) {
+		ks_apartment::register_public_apartment(m_d->name.c_str(), this);
+	}
+	if (m_d->flags & be_ui_sta_flag) {
 		ks_apartment::__set_ui_sta(this);
-	if (flags & as_master_sta_flag)
+		if ((m_d->flags & dont_register_flag) == 0 && strcmp(m_d->name.c_str(), "ui") != 0)
+			ks_apartment::register_public_apartment("ui", this);
+	}
+	if (m_d->flags & be_master_sta_flag) {
 		ks_apartment::__set_master_sta(this);
+		if ((m_d->flags & dont_register_flag) == 0 && strcmp(m_d->name.c_str(), "master") != 0)
+			ks_apartment::register_public_apartment("master", this);
+	}
 }
 
 ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
@@ -37,7 +50,32 @@ ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 		this->wait();
 
 	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
+
+	if ((m_d->flags & dont_register_flag) == 0 && !m_d->name.empty()) {
+		ks_apartment::unregister_public_apartment(m_d->name.c_str(), this);
+	}
+	if (m_d->flags & be_ui_sta_flag) {
+		ks_apartment::__set_ui_sta(nullptr);
+		if ((m_d->flags & dont_register_flag) == 0 && strcmp(m_d->name.c_str(), "ui") != 0)
+			ks_apartment::unregister_public_apartment("ui", this);
+	}
+	if (m_d->flags & be_master_sta_flag) {
+		ks_apartment::__set_master_sta(nullptr);
+		if ((m_d->flags & dont_register_flag) == 0 && strcmp(m_d->name.c_str(), "master") != 0)
+			ks_apartment::unregister_public_apartment("master", this);
+	}
+
 	delete m_d;
+}
+
+
+const char* ks_single_thread_apartment_imp::name() {
+	return m_d->name.c_str();
+}
+
+uint ks_single_thread_apartment_imp::features() {
+	uint my_features = sequential_feature;
+	return my_features;
 }
 
 
@@ -47,7 +85,7 @@ bool ks_single_thread_apartment_imp::start() {
 		return false;
 
 	_try_start_locked(lock);
-	if (m_d->inplace_thread_flag)
+	if (m_d->flags & inplace_thread_flag)
 		this->_single_thread_proc();
 
 	return true;
@@ -217,7 +255,7 @@ void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>
 
 
 void ks_single_thread_apartment_imp::_prepare_single_thread_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->inplace_thread_flag)
+	if (m_d->flags & inplace_thread_flag)
 		return;
 	if (m_d->isolated_thread_presented_flag)
 		return;
@@ -393,6 +431,7 @@ bool ks_single_thread_apartment_imp::__try_pump_once() {
 }
 
 
+#ifndef _WIN32
 void ks_single_thread_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
@@ -413,3 +452,4 @@ void ks_single_thread_apartment_imp::atfork_child() {
 
 	m_d->mutex.unlock();
 }
+#endif

@@ -23,18 +23,22 @@ limitations under the License.
 
 class ks_single_thread_apartment_imp final : public ks_apartment {
 public:
-	enum {
+	enum { //flags
 		inplace_thread_flag  = 0x01,
-		as_ui_sta_flag       = 0x10,
-		as_master_sta_flag   = 0x20,
-		__all_flags          = 0x31,
+		dont_register_flag   = 0x10,
+		be_ui_sta_flag       = 0x20,
+		be_master_sta_flag   = 0x40,
+		__all_flags          = 0x71,
 	};
 
-	KS_ASYNC_API explicit ks_single_thread_apartment_imp(uint flags = 0);
+	KS_ASYNC_API explicit ks_single_thread_apartment_imp(const char* name, uint flags = 0);
 	KS_ASYNC_API ~ks_single_thread_apartment_imp();
 	_DISABLE_COPY_CONSTRUCTOR(ks_single_thread_apartment_imp);
 
 public:
+	virtual const char* name() override;
+	virtual uint features() override;
+
 	virtual bool start() override;
 	virtual void async_stop() override;
 	virtual void wait() override;
@@ -46,9 +50,11 @@ public:
 	virtual uint64_t schedule_delayed(std::function<void()>&& fn, int priority, int64_t delay) override;
 	virtual void try_unschedule(uint64_t id) override;
 
+#ifndef _WIN32
 	virtual void atfork_prepare() override;
 	virtual void atfork_parent() override;
 	virtual void atfork_child() override;
+#endif
 
 protected:
 	virtual bool __try_pump_once() override;
@@ -101,9 +107,10 @@ private:
 		std::atomic<uint64_t> atomic_last_fn_id = { 0 };
 
 		//为了使内存布局更紧凑，将部分成员变量集中安置
+		std::string name; //const-like
+		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
 		bool isolated_thread_presented_flag = false;
-		bool inplace_thread_flag; //const-like
 	};
 
 	_SINGLE_THREAD_APARTMENT_DATA* m_d;

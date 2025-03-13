@@ -17,12 +17,17 @@ limitations under the License.
 #include "ks_single_thread_apartment_imp.h"
 #include "ks_thread_pool_apartment_imp.h"
 #include <thread>
+#include <unordered_map>
 
 void __forcelink_to_ks_apartment_cpp() {}
 
 
 static ks_apartment* g_ui_sta = nullptr;
 static ks_apartment* g_master_sta = nullptr;
+
+static ks_mutex g_public_apartment_mutex = {};
+static std::unordered_map<std::string, ks_apartment*> g_public_apartment_map = {};
+
 static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
 
 
@@ -37,7 +42,7 @@ ks_apartment* ks_apartment::master_sta() {
 }
 
 ks_apartment* ks_apartment::background_sta() {
-	static ks_single_thread_apartment_imp g_background_sta(0);
+	static ks_single_thread_apartment_imp g_background_sta("background", 0);
 	return &g_background_sta;
 }
 
@@ -52,9 +57,35 @@ ks_apartment* ks_apartment::default_mta() {
 		}
 	};
 
-	static ks_thread_pool_apartment_imp g_default_mta(_default_mta_options::max_thread_count(), 0);
+	static ks_thread_pool_apartment_imp g_default_mta("default", _default_mta_options::max_thread_count(), 0);
 	return &g_default_mta;
 }
+
+
+void ks_apartment::register_public_apartment(const char* name, ks_apartment* apartment) {
+	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	ASSERT(name != nullptr && apartment != nullptr);
+	ASSERT(g_public_apartment_map.find(name) == g_public_apartment_map.cend());
+	g_public_apartment_map[name] = apartment;
+}
+
+void ks_apartment::unregister_public_apartment(const char* name, ks_apartment* apartment) {
+	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	ASSERT(name != nullptr && apartment != nullptr);
+	auto it = g_public_apartment_map.find(name);
+	if (it != g_public_apartment_map.cend() && it->second == apartment)
+		g_public_apartment_map.erase(it);
+}
+
+ks_apartment* ks_apartment::find_public_apartment(const char* name) {
+	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	ASSERT(name != nullptr);
+	auto it = g_public_apartment_map.find(name);
+	if (it != g_public_apartment_map.end())
+		return it->second;
+	return nullptr;
+}
+
 
 ks_apartment* ks_apartment::current_thread_apartment() {
 	return tls_current_thread_apartment;
@@ -63,7 +94,7 @@ ks_apartment* ks_apartment::current_thread_apartment() {
 ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
 	ks_apartment* cur_apartment = tls_current_thread_apartment;
 	if (cur_apartment == nullptr)
-		cur_apartment = default_mta();
+		cur_apartment = ks_apartment::default_mta();
 	return cur_apartment;
 }
 
@@ -84,12 +115,14 @@ bool ks_apartment::__current_thread_apartment_try_pump_once() {
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
 	ASSERT(g_ui_sta == nullptr || ui_sta == nullptr);
 	ASSERT(g_ui_sta != nullptr || ui_sta != nullptr);
+	ASSERT(ui_sta == nullptr || strcmp(ui_sta->name(), "ui") == 0);
 	g_ui_sta = ui_sta;
 }
 
 void ks_apartment::__set_master_sta(ks_apartment* master_sta) {
 	ASSERT(g_master_sta == nullptr || master_sta == nullptr);
 	ASSERT(g_master_sta != nullptr || master_sta != nullptr);
+	ASSERT(master_sta == nullptr || strcmp(master_sta->name(), "master") == 0);
 	g_master_sta = master_sta;
 }
 
