@@ -137,6 +137,7 @@ void atfork_parent();
 void atfork_child();
 ```
 #### 描述：fork辅助支持。
+#### 特别说明：仅UNIX类系统下有效。
 <br>
 <br>
 <br>
