@@ -286,15 +286,16 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
+	std::string& thread_name = m_d->name;
 #if defined(_WIN32)
 	typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
 	if (_pfnSetThreadDescription != nullptr) 
-		_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(m_d->name.cbegin(), m_d->name.cend()).c_str());
+		_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
 #elif defined(__APPLE__)
-	pthread_setname_np(m_d->name.c_str());
+	pthread_setname_np(thread_name.c_str());
 #else
-	pthread_setname_np(pthread_self(), m_d->name.c_str());
+	pthread_setname_np(pthread_self(), thread_name.c_str());
 #endif
 
 	while (true) {
@@ -364,7 +365,6 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 	}
 
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
-	ks_apartment::__tls_set_current_thread_apartment(nullptr);
 }
 
 bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {

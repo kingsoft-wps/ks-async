@@ -286,7 +286,7 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
-	std::string thread_name = (std::stringstream() << m_d->name << " (" << thread_sn << ")").str();
+	std::string thread_name = (std::stringstream() << m_d->name << "(" << thread_sn << ")").str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
@@ -337,17 +337,18 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			//}
 
 			lock.lock();
-			if (m_d->original_thread_sn <= thread_sn) {
+
+			if ((int64_t)(thread_sn - m_d->original_thread_sn) < 0) {
 				//为了简化，对于fork出的新进程，我们会丢弃所有线程，也包括调用fork的线程，并将original_thread_sn拉高
-				//因此这里可据此if条件断定当前线程是否已是被丢弃状态
-				--m_d->busy_thread_count;
-				if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-					--m_d->busy_thread_count_for_idle;
-			}
-			else {
-				ASSERT(std::find_if(m_d->thread_pool.cbegin(), m_d->thread_pool.cend(), 
+				//因此这里可据此if条件断定当前线程是否已是被丢弃状态，因为sn类型是uint64_t，所以拉高可认为是不会溢出的，即使溢出使用减法也可更好应对
+				ASSERT(std::find_if(m_d->thread_pool.cbegin(), m_d->thread_pool.cend(),
 					[thread_sn](auto& item) { return item.thread_sn == thread_sn; }) == m_d->thread_pool.cend());
+				break; //check stop, end
 			}
+
+			--m_d->busy_thread_count;
+			if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
+				--m_d->busy_thread_count_for_idle;
 
 			continue;
 		}
@@ -362,7 +363,6 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 	}
 
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
-	ks_apartment::__tls_set_current_thread_apartment(nullptr);
 }
 
 void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::unique_lock<ks_mutex>& lock) {
