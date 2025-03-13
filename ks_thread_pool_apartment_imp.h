@@ -91,6 +91,9 @@ private:
 	enum class _STATE { NOT_START, RUNNING, STOPPING, STOPPED };
 
 	struct _THREAD_POOL_APARTMENT_DATA {
+#if __KS_APARTMENT_ATFORK_ENABLED
+		ks_shared_mutex busy_shared_mutex;
+#endif
 		ks_mutex mutex;
 
 		//prior简化为三级：>0为高优先，=0为普通，<0为低且简单地加入到idle队列
@@ -126,6 +129,9 @@ private:
 		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
 		bool delaying_trigger_thread_presented_flag = false;
+#if __KS_APARTMENT_ATFORK_ENABLED
+		bool atfork_prepared_flag_v = false;
+#endif
 	};
 
 	_THREAD_POOL_APARTMENT_DATA* m_d;

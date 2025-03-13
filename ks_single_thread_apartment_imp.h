@@ -85,6 +85,9 @@ private:
 	enum class _STATE { NOT_START, RUNNING, STOPPING, STOPPED };
 
 	struct _SINGLE_THREAD_APARTMENT_DATA {
+#if __KS_APARTMENT_ATFORK_ENABLED
+		ks_mutex busy_unique_mutex; //因为是sta，所以这里不必使用ks_shared_mutex
+#endif
 		ks_mutex mutex;
 
 		//prior简化为三级：>0为高优先，=0为普通，<0为低且简单地加入到idle队列
@@ -93,8 +96,6 @@ private:
 		std::deque<_FN_ITEM> now_fn_queue_idle; //idle任务地位低下，与prior和normal不是同等对待
 		std::deque<_FN_ITEM> delaying_fn_queue;
 		ks_condition_variable any_fn_queue_cv{};
-
-		//bool isolated_thread_flag;  //const-like  //被移动位置，使内存更紧凑
 
 		std::shared_ptr<std::thread> isolated_thread_opt; //only when isolated_thread_flag
 		//bool isolated_thread_presented_flag = false;  //被移动位置，使内存更紧凑
@@ -111,6 +112,9 @@ private:
 		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
 		bool isolated_thread_presented_flag = false;
+#if __KS_APARTMENT_ATFORK_ENABLED
+		volatile bool atfork_prepared_flag_v = false;
+#endif
 	};
 
 	_SINGLE_THREAD_APARTMENT_DATA* m_d;

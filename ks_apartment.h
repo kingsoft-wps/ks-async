@@ -37,7 +37,7 @@ public:
 	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name);
 
 public:
-	KS_ASYNC_API static ks_apartment* current_thread_apartment(); 
+	KS_ASYNC_API static ks_apartment* current_thread_apartment();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 

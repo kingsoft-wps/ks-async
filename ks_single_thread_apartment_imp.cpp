@@ -281,8 +281,12 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
-	std::unique_lock<ks_mutex> lock(m_d->mutex);
 	while (true) {
+#if __KS_APARTMENT_ATFORK_ENABLED
+		std::unique_lock<ks_mutex> busy_unique_lock(m_d->busy_unique_mutex);
+#endif
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
+
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !m_d->now_fn_queue_prior.empty() ? &m_d->now_fn_queue_prior : &m_d->now_fn_queue_normal;
@@ -311,7 +315,6 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 				//	throw;
 				//}
 
-				lock.lock();
 				continue;
 			}
 		}
@@ -322,11 +325,17 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 
 		if (m_d->delaying_fn_queue.empty()) {
 			//wait
+#if __KS_APARTMENT_ATFORK_ENABLED
+			busy_unique_lock.unlock();
+#endif
 			m_d->any_fn_queue_cv.wait(lock);
 			continue;
 		}
 		else if (m_d->delaying_fn_queue.front().until_time > std::chrono::steady_clock::now()) {
 			//wait until
+#if __KS_APARTMENT_ATFORK_ENABLED
+			busy_unique_lock.unlock();
+#endif
 			m_d->any_fn_queue_cv.wait_until(lock, m_d->delaying_fn_queue.front().until_time);
 			continue;
 		}
@@ -435,21 +444,53 @@ bool ks_single_thread_apartment_imp::__try_pump_once() {
 void ks_single_thread_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
-	m_d->mutex.lock();
+	if (m_d->atfork_prepared_flag_v) 
+		return; //重复prepare
+
+	if (ks_apartment::__tls_get_current_thread_apartment() == this) {
+		//busy_unique_mutex已锁，保持即可...
+	}
+	else {
+		m_d->busy_unique_mutex.lock();
+	}
+
+	//unlock不保证时序，所以这里需要对mutex加锁，已保证一致性
+	std::unique_lock<ks_mutex> lock(m_d->mutex);
+
+	ASSERT(!m_d->atfork_prepared_flag_v);
+	m_d->atfork_prepared_flag_v = true;
 }
 
 void ks_single_thread_apartment_imp::atfork_parent() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
-	m_d->mutex.unlock();
+	if (!m_d->atfork_prepared_flag_v)
+		return;
+
+	//没有竞争者，这里无需对mutex加锁，但加锁也没问题
+	std::unique_lock<ks_mutex> lock(m_d->mutex);
+
+	m_d->atfork_prepared_flag_v = false;
+	if (ks_apartment::__tls_get_current_thread_apartment() != this) {
+		m_d->busy_unique_mutex.unlock();
+	}
 }
 
 void ks_single_thread_apartment_imp::atfork_child() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 
+	if (!m_d->atfork_prepared_flag_v)
+		return;
+
+	//没有竞争者，这里无需对mutex加锁，但加锁也没问题
+	std::unique_lock<ks_mutex> lock(m_d->mutex);
+
 	m_d->isolated_thread_opt.reset();
 	m_d->isolated_thread_presented_flag = false;
 
-	m_d->mutex.unlock();
+	m_d->atfork_prepared_flag_v = false;
+	if (ks_apartment::__tls_get_current_thread_apartment() != this) {
+		m_d->busy_unique_mutex.unlock();
+	}
 }
 #endif

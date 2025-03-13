@@ -38,5 +38,5 @@ limitations under the License.
 #ifdef _POSIX_VERSION
 #   define __KS_APARTMENT_ATFORK_ENABLED  1
 #else
-#   define __KS_APARTMENT_ATFORK_ENABLED  0
+#   define __KS_APARTMENT_ATFORK_ENABLED  1
 #endif
