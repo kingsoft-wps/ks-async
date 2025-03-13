@@ -44,12 +44,13 @@ public:
 	KS_ASYNC_API static bool __current_thread_apartment_try_pump_once();
 
 public:
-	virtual const char* name() = 0;
-	virtual uint features() = 0;
-
 	enum { //features
 		sequential_feature = 0x01,
 	};
+
+public:
+	virtual const char* name() = 0;
+	virtual uint features() = 0;
 
 public:
 	virtual bool start() = 0;

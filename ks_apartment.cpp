@@ -80,9 +80,24 @@ void ks_apartment::unregister_public_apartment(const char* name, ks_apartment* a
 ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr);
+
 	auto it = g_public_apartment_map.find(name);
-	if (it != g_public_apartment_map.end())
+	if (it != g_public_apartment_map.cend())
 		return it->second;
+
+	if (name[0] == '#') {
+		int ord = atoi(name + 1);
+		if (ord != 0) {
+			int index = ord > 0 ? ord - 1 : (int)g_public_apartment_map.size() + ord;
+			if (index >= 0 && index < g_public_apartment_map.size()) {
+				if (index <= g_public_apartment_map.size() / 2)
+					return std::next(g_public_apartment_map.cbegin(), index)->second;
+				else
+					return std::prev(g_public_apartment_map.cend(), g_public_apartment_map.size() - index)->second;
+			}
+		}
+	}
+
 	return nullptr;
 }
 
