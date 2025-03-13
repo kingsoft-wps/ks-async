@@ -71,6 +71,10 @@ public:
 	virtual void atfork_prepare() = 0;
 	virtual void atfork_parent() = 0;
 	virtual void atfork_child() = 0;
+#else
+	virtual void atfork_prepare() { ASSERT(false); }
+	virtual void atfork_parent() { ASSERT(false); }
+	virtual void atfork_child() { ASSERT(false); }
 #endif
 
 protected:
