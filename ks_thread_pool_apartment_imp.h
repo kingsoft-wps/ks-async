@@ -24,8 +24,8 @@ limitations under the License.
 
 class ks_thread_pool_apartment_imp final : public ks_apartment {
 public:
-	enum { //flags
-		dont_register_flag   = 0x10,
+	enum { //flag consts
+		auto_register_flag   = 0x10,
 		__all_flags          = 0x10,
 	};
 

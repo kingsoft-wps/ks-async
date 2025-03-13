@@ -44,7 +44,7 @@ public:
 	KS_ASYNC_API static bool __current_thread_apartment_try_pump_once();
 
 public:
-	enum { //features
+	enum { //feature consts
 		sequential_feature = 0x01,
 	};
 

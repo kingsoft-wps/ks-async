@@ -23,9 +23,9 @@ limitations under the License.
 
 class ks_single_thread_apartment_imp final : public ks_apartment {
 public:
-	enum { //flags
+	enum { //flag consts
 		inplace_thread_flag  = 0x01,
-		dont_register_flag   = 0x10,
+		auto_register_flag   = 0x10,
 		be_ui_sta_flag       = 0x20,
 		be_master_sta_flag   = 0x40,
 		__all_flags          = 0x71,
