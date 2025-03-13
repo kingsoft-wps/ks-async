@@ -464,7 +464,7 @@ bool ks_thread_pool_apartment_imp::__try_pump_once() {
 }
 
 
-#ifndef _WIN32
+#if __KS_APARTMENT_ATFORK_ENABLED
 void ks_thread_pool_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
 

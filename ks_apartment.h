@@ -66,7 +66,7 @@ public:
 	//注：try_unschedule方法会尝试取消指定的异步过程，其前提是指定的异步过程还未开始执行，若已开始（甚至已完成）则不会再被取消了。
 	virtual void try_unschedule(uint64_t id) = 0;
 
-#ifndef _WIN32
+#if __KS_APARTMENT_ATFORK_ENABLED
 public:
 	virtual void atfork_prepare() = 0;
 	virtual void atfork_parent() = 0;

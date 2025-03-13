@@ -48,7 +48,7 @@ public:
 	virtual uint64_t schedule_delayed(std::function<void()>&& fn, int priority, int64_t delay) override;
 	virtual void try_unschedule(uint64_t id) override;
 
-#ifndef _WIN32
+#if __KS_APARTMENT_ATFORK_ENABLED
 	virtual void atfork_prepare() override;
 	virtual void atfork_parent() override;
 	virtual void atfork_child() override;

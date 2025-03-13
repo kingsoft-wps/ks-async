@@ -33,4 +33,10 @@ limitations under the License.
 #define __KS_ASYNC_RAW_END    }
 
 
-#define __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED  (false)
+#define __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED  0
+
+#ifdef _POSIX_VERSION
+#   define __KS_APARTMENT_ATFORK_ENABLED  1
+#else
+#   define __KS_APARTMENT_ATFORK_ENABLED  0
+#endif
