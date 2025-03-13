@@ -122,6 +122,7 @@ private:
 
 		std::atomic<uint64_t> atomic_last_fn_id = { 0 };
 		std::atomic<uint64_t> atomic_last_thread_sn = { 0 };
+		uint64_t original_thread_sn = 0;
 
 		//为了使内存布局更紧凑，将部分成员变量集中安置
 		std::string name; //const-like

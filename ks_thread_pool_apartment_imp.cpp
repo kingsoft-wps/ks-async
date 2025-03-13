@@ -319,9 +319,18 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			//}
 
 			lock.lock();
-			--m_d->busy_thread_count;
-			if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-				--m_d->busy_thread_count_for_idle;
+			if (m_d->original_thread_sn <= thread_sn) {
+				//为了简化，对于fork出的新进程，我们会丢弃所有线程，也包括调用fork的线程，并将original_thread_sn拉高
+				//因此这里可据此if条件断定当前线程是否已是被丢弃状态
+				--m_d->busy_thread_count;
+				if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
+					--m_d->busy_thread_count_for_idle;
+			}
+			else {
+				ASSERT(std::find_if(m_d->thread_pool.cbegin(), m_d->thread_pool.cend(), 
+					[thread_sn](auto& item) { return item.thread_sn == thread_sn; }) == m_d->thread_pool.cend());
+			}
+
 			continue;
 		}
 		else {
@@ -531,6 +540,11 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 
 	//没有竞争者，这里无需对mutex加锁，但加锁也没问题
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
+
+	//为了简化，对于fork出的新进程，我们会丢弃所有线程，也包括调用fork的线程，并将original_thread_sn拉高
+	//如果恰好是调用fork的线程，那么此线程仍将短暂存活，不过我们在_now_thread_proc中已做了应对处理，最终状态将是正确的
+	m_d->atomic_last_thread_sn = (m_d->atomic_last_thread_sn + 10) / 10 * 10; //为方便观察，拉高至整十数
+	m_d->original_thread_sn = m_d->atomic_last_thread_sn;
 
 	m_d->thread_pool.clear();
 	m_d->thread_pool_presented_size = 0;
