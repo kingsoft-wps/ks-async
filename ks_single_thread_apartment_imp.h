@@ -98,7 +98,6 @@ private:
 		ks_condition_variable any_fn_queue_cv{};
 
 		std::shared_ptr<std::thread> isolated_thread_opt; //only when isolated_thread_flag
-		//bool isolated_thread_presented_flag = false;  //被移动位置，使内存更紧凑
 
 		//volatile _STATE state_v = _STATE::NOT_START;  //被移动位置，使内存更紧凑
 		ks_condition_variable stopped_state_cv{};

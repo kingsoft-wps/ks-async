@@ -102,10 +102,8 @@ private:
 		std::deque<_FN_ITEM> now_fn_queue_idle; //idle任务地位低下，与prior和normal不是同等对待
 		ks_condition_variable now_fn_queue_cv{};
 
-		//size_t max_thread_count = 0; //const-like  //被移动位置，使内存更紧凑
-
 		std::deque<_THREAD_ITEM> thread_pool;
-		size_t thread_pool_presented_size = 0;
+		size_t max_thread_count = 0; //const-like  //被移动位置，使内存更紧凑
 		size_t busy_thread_count = 0;
 		size_t busy_thread_count_for_idle = 0;
 
@@ -113,7 +111,7 @@ private:
 		ks_condition_variable delaying_fn_queue_cv{};
 
 		std::shared_ptr<std::thread> delaying_trigger_thread;
-		//bool delaying_trigger_thread_presented_flag = false;  //被移动位置，使内存更紧凑
+		size_t living_any_thread_count = 0; //now和delaying存活线程的总个数
 
 		//volatile _STATE state_v = _STATE::NOT_START;  //被移动位置，使内存更紧凑
 		ks_condition_variable stopped_state_cv{};
@@ -123,7 +121,6 @@ private:
 
 		//为了使内存布局更紧凑，将部分成员变量集中安置
 		std::string name; //const-like
-		size_t max_thread_count; //const-like
 		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
 #if __KS_APARTMENT_ATFORK_ENABLED

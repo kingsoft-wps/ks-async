@@ -188,7 +188,6 @@ uint64_t ks_thread_pool_apartment_imp::schedule_delayed(std::function<void()>&& 
 	else {
 		_do_put_fn_item_into_delaying_list_locked(std::move(fn_item), lock);
 		_prepare_delaying_trigger_thread_locked(lock);
-		_prepare_now_thread_pool_locked(lock); //确保至少有一个now-thread存在，负责stopping清理动作
 	}
 
 	return id;
@@ -250,35 +249,33 @@ void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& 
 
 
 void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->thread_pool_presented_size >= m_d->max_thread_count)
+	if (m_d->thread_pool.size() >= m_d->max_thread_count)
 		return;
-
-	ASSERT(m_d->thread_pool.size() <= m_d->max_thread_count);
 
 	size_t needed_thread_count = 0;
 	if (m_d->state_v == _STATE::RUNNING) {
-		needed_thread_count = m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size() + m_d->now_fn_queue_idle.size();
+		needed_thread_count = m_d->thread_pool.size() + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size() + m_d->now_fn_queue_idle.size();
 		if (needed_thread_count > m_d->max_thread_count)
 			needed_thread_count = m_d->max_thread_count;
 		if (needed_thread_count == 0)
 			needed_thread_count = 1;
 	}
 	else if (m_d->state_v == _STATE::STOPPING) {
-		needed_thread_count = m_d->thread_pool_presented_size + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size();
+		needed_thread_count = m_d->thread_pool.size() + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size();
 		if (needed_thread_count > m_d->max_thread_count)
 			needed_thread_count = m_d->max_thread_count;
 		if (needed_thread_count == 0)
 			needed_thread_count = 1;
 	}
 
-	if (m_d->thread_pool_presented_size < needed_thread_count) {
-		for (size_t i = m_d->thread_pool_presented_size; i < needed_thread_count; ++i) {
+	if (m_d->thread_pool.size() < needed_thread_count) {
+		for (size_t i = m_d->thread_pool.size(); i < needed_thread_count; ++i) {
 			_THREAD_ITEM thread_item;
 			thread_item.thread_sn = ++m_d->atomic_last_thread_sn;
 			thread_item.thread = std::make_shared<std::thread>(
 				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
 			m_d->thread_pool.push_back(thread_item);
-			m_d->thread_pool_presented_size++;
+			m_d->living_any_thread_count++;
 		}
 	}
 }
@@ -358,11 +355,11 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 
 	if (true) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
-		if (m_d->state_v == _STATE::STOPPING) {
-			if (m_d->state_v == _STATE::STOPPING && !m_d->thread_pool.empty() && tls_current_now_thread_sn == m_d->thread_pool.front().thread_sn) {
-				m_d->state_v = _STATE::STOPPED;
-				m_d->stopped_state_cv.notify_all();
-			}
+		ASSERT(m_d->living_any_thread_count > 0);
+		m_d->living_any_thread_count--;
+		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_count == 0) {
+			m_d->state_v = _STATE::STOPPED;
+			m_d->stopped_state_cv.notify_all();
 		}
 	}
 
@@ -376,6 +373,7 @@ void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::
 	if (m_d->state_v == _STATE::RUNNING) {
 		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
 			[this]() { this->_delaying_trigger_thread_proc(); });
+		m_d->living_any_thread_count++;
 	}
 }
 
@@ -414,6 +412,17 @@ void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
 			continue;
 		}
 	}
+
+	if (true) {
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
+		ASSERT(m_d->living_any_thread_count > 0);
+		m_d->living_any_thread_count--;
+		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_count == 0) {
+			m_d->state_v = _STATE::STOPPED;
+			m_d->stopped_state_cv.notify_all();
+		}
+	}
+
 }
 
 bool ks_thread_pool_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {
