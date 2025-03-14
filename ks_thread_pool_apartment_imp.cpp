@@ -275,7 +275,7 @@ void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_l
 			thread_item.thread = std::make_shared<std::thread>(
 				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
 			m_d->thread_pool.push_back(thread_item);
-			m_d->living_any_thread_count++;
+			m_d->living_any_thread_total++;
 		}
 	}
 }
@@ -355,9 +355,9 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 
 	if (true) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
-		ASSERT(m_d->living_any_thread_count > 0);
-		m_d->living_any_thread_count--;
-		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_count == 0) {
+		ASSERT(m_d->living_any_thread_total > 0);
+		m_d->living_any_thread_total--;
+		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_total == 0) {
 			m_d->state_v = _STATE::STOPPED;
 			m_d->stopped_state_cv.notify_all();
 		}
@@ -373,7 +373,7 @@ void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::
 	if (m_d->state_v == _STATE::RUNNING) {
 		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
 			[this]() { this->_delaying_trigger_thread_proc(); });
-		m_d->living_any_thread_count++;
+		m_d->living_any_thread_total++;
 	}
 }
 
@@ -415,9 +415,9 @@ void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
 
 	if (true) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
-		ASSERT(m_d->living_any_thread_count > 0);
-		m_d->living_any_thread_count--;
-		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_count == 0) {
+		ASSERT(m_d->living_any_thread_total > 0);
+		m_d->living_any_thread_total--;
+		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_total == 0) {
 			m_d->state_v = _STATE::STOPPED;
 			m_d->stopped_state_cv.notify_all();
 		}
@@ -585,13 +585,15 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 
 	//重建线程
 	for (auto& thread_item : m_d->thread_pool) {
-		if (!(atfork_calling_in_my_thread_flag && thread_item.thread_sn == tls_current_now_thread_sn)) {
+		if (!atfork_calling_in_my_thread_flag || thread_item.thread_sn != tls_current_now_thread_sn) {
+			thread_item.thread->detach();
 			thread_item.thread = std::make_shared<std::thread>(
 				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
 		}
 	}
 
 	if (m_d->delaying_trigger_thread) {
+		m_d->delaying_trigger_thread->detach();
 		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
 			[this]() { this->_delaying_trigger_thread_proc(); });
 	}

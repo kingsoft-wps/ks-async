@@ -103,15 +103,14 @@ private:
 		ks_condition_variable now_fn_queue_cv{};
 
 		std::deque<_THREAD_ITEM> thread_pool;
-		size_t max_thread_count = 0; //const-like  //被移动位置，使内存更紧凑
+		std::shared_ptr<std::thread> delaying_trigger_thread;
+		size_t living_any_thread_total = 0; //now和delaying存活线程的总个数
+		size_t max_thread_count = 0; //const-like
 		size_t busy_thread_count = 0;
 		size_t busy_thread_count_for_idle = 0;
 
 		std::deque<_FN_ITEM> delaying_fn_queue;
 		ks_condition_variable delaying_fn_queue_cv{};
-
-		std::shared_ptr<std::thread> delaying_trigger_thread;
-		size_t living_any_thread_count = 0; //now和delaying存活线程的总个数
 
 		//volatile _STATE state_v = _STATE::NOT_START;  //被移动位置，使内存更紧凑
 		ks_condition_variable stopped_state_cv{};

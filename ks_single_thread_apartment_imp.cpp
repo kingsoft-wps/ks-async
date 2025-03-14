@@ -508,6 +508,7 @@ void ks_single_thread_apartment_imp::atfork_child() {
 
 	//重建线程
 	if (!atfork_calling_in_my_thread_flag && m_d->isolated_thread_opt) {
+		m_d->isolated_thread_opt->detach();
 		m_d->isolated_thread_opt = std::make_shared<std::thread>(
 			[this]() { this->_single_thread_proc(); });
 	}
