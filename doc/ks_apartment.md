@@ -29,11 +29,9 @@ static ks_apartment* default_mta();
 <br>
 
 ```C++
-static void register_public_apartment(const char* name, ks_apartment* apartment);
-static void unregister_public_apartment(const char* name, ks_apartment* apartment);
 static ks_apartment* find_public_apartment(const char* name);
 ```
-#### 描述：全局公开套间注册。
+#### 描述：获取已注册的公开套间。
 <br>
 
 ```C++

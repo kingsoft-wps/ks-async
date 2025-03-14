@@ -33,17 +33,17 @@ ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name,
 	m_d->flags = flags;
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
-		ks_apartment::register_public_apartment(m_d->name.c_str(), this);
+		ks_apartment::__register_public_apartment(m_d->name.c_str(), this);
 	}
 	if (m_d->flags & be_ui_sta_flag) {
 		ks_apartment::__set_ui_sta(this);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui") != 0)
-			ks_apartment::register_public_apartment("ui", this);
+			ks_apartment::__register_public_apartment("ui", this);
 	}
 	if (m_d->flags & be_master_sta_flag) {
 		ks_apartment::__set_master_sta(this);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master") != 0)
-			ks_apartment::register_public_apartment("master", this);
+			ks_apartment::__register_public_apartment("master", this);
 	}
 }
 
@@ -67,17 +67,17 @@ ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 	}
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
-		ks_apartment::unregister_public_apartment(m_d->name.c_str(), this);
+		ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
 	}
 	if (m_d->flags & be_ui_sta_flag) {
 		ks_apartment::__set_ui_sta(nullptr);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui") != 0)
-			ks_apartment::unregister_public_apartment("ui", this);
+			ks_apartment::__unregister_public_apartment("ui", this);
 	}
 	if (m_d->flags & be_master_sta_flag) {
 		ks_apartment::__set_master_sta(nullptr);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master") != 0)
-			ks_apartment::unregister_public_apartment("master", this);
+			ks_apartment::__unregister_public_apartment("master", this);
 	}
 
 	delete m_d;

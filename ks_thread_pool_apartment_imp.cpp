@@ -38,7 +38,7 @@ ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, siz
 	m_d->flags = flags;
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
-		ks_apartment::register_public_apartment(m_d->name.c_str(), this);
+		ks_apartment::__register_public_apartment(m_d->name.c_str(), this);
 	}
 }
 
@@ -71,7 +71,7 @@ ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 	}
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
-		ks_apartment::unregister_public_apartment(m_d->name.c_str(), this);
+		ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
 	}
 
 	delete m_d;
