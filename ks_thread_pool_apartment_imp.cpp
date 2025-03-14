@@ -47,7 +47,7 @@ ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 
 	if (m_d->state_v != _STATE::STOPPED) {
 		this->async_stop();
-		this->wait_for_stopped();
+		this->wait();
 	}
 
 	if (true) {
@@ -107,7 +107,7 @@ void ks_thread_pool_apartment_imp::async_stop() {
 }
 
 //注：目前的wait实现暂不支持并发重入
-void ks_thread_pool_apartment_imp::wait_for_stopped() {
+void ks_thread_pool_apartment_imp::wait() {
 	ASSERT(this != ks_apartment::__tls_get_current_thread_apartment());
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);

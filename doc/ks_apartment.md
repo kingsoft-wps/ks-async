@@ -80,7 +80,7 @@ void async_stop();
 <br>
 
 ```C++
-void wait_for_stopped();
+void wait();
 ```
 #### 描述：等待（要求先async_stop）。
 <br>

@@ -346,8 +346,8 @@ int main() {
     g_exit_latch.wait();
     ks_apartment::default_mta()->async_stop();
     ks_apartment::background_sta()->async_stop();
-    ks_apartment::default_mta()->wait_for_stopped();
-    ks_apartment::background_sta()->wait_for_stopped();
+    ks_apartment::default_mta()->wait();
+    ks_apartment::background_sta()->wait();
     std::cout << "end.\n";
     return 0;
 }

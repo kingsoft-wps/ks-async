@@ -55,7 +55,7 @@ public:
 public:
 	virtual bool start() = 0;
 	virtual void async_stop() = 0;
-	virtual void wait_for_stopped() = 0;
+	virtual void wait() = 0;
 
 	virtual bool is_stopped() = 0;
 	virtual bool is_stopping_or_stopped() = 0;

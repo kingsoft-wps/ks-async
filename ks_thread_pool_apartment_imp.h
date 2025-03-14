@@ -39,7 +39,7 @@ public:
 
 	virtual bool start() override;
 	virtual void async_stop() override;
-	virtual void wait_for_stopped() override;
+	virtual void wait() override;
 
 	virtual bool is_stopped() override;
 	virtual bool is_stopping_or_stopped() override;
