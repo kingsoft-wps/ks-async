@@ -78,13 +78,9 @@ public:
 	//注意：current_thread_apartment是TLS变量，各色套间线程实现者务必对其进行正确初始化。
 	KS_ASYNC_API static void __set_ui_sta(ks_apartment* ui_sta);
 	KS_ASYNC_API static void __set_master_sta(ks_apartment* master_sta);
+
 	KS_ASYNC_API static void __register_public_apartment(const char* name, ks_apartment* apartment);
 	KS_ASYNC_API static void __unregister_public_apartment(const char* name, ks_apartment* apartment);
-	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
 
-public:
-	KS_ASYNC_API static ks_apartment* __get_ui_sta();
-	KS_ASYNC_API static ks_apartment* __get_master_sta();
-	KS_ASYNC_API static ks_apartment* __find_public_apartment(const char* name);
-	KS_ASYNC_API static ks_apartment* __tls_get_current_thread_apartment();
+	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
 };

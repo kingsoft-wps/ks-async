@@ -32,12 +32,10 @@ static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
 
 
 ks_apartment* ks_apartment::ui_sta() {
-	ASSERT(g_ui_sta != nullptr);
 	return g_ui_sta;
 }
 
 ks_apartment* ks_apartment::master_sta() {
-	ASSERT(g_master_sta != nullptr);
 	return g_master_sta;
 }
 
@@ -63,9 +61,27 @@ ks_apartment* ks_apartment::default_mta() {
 
 
 ks_apartment* ks_apartment::find_public_apartment(const char* name) {
-	ks_apartment* public_apartment = __find_public_apartment(name);
-	ASSERT(public_apartment != nullptr);
-	return public_apartment;
+	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	ASSERT(name != nullptr);
+
+	auto it = g_public_apartment_map.find(name);
+	if (it != g_public_apartment_map.cend())
+		return it->second;
+
+	if (name[0] == '#') {
+		int ord = atoi(name + 1);
+		if (ord != 0) {
+			int index = ord > 0 ? ord - 1 : (int)g_public_apartment_map.size() + ord;
+			if (index >= 0 && index < g_public_apartment_map.size()) {
+				if (index <= g_public_apartment_map.size() / 2)
+					return std::next(g_public_apartment_map.cbegin(), index)->second;
+				else
+					return std::prev(g_public_apartment_map.cend(), g_public_apartment_map.size() - index)->second;
+			}
+		}
+	}
+
+	return nullptr;
 }
 
 
@@ -127,40 +143,4 @@ void ks_apartment::__tls_set_current_thread_apartment(ks_apartment* current_thre
 	ASSERT(tls_current_thread_apartment == nullptr || current_thread_apartment == nullptr);
 	ASSERT(tls_current_thread_apartment != nullptr || current_thread_apartment != nullptr);
 	tls_current_thread_apartment = current_thread_apartment;
-}
-
-ks_apartment* ks_apartment::__get_ui_sta() {
-	return g_ui_sta;
-}
-
-ks_apartment* ks_apartment::__get_master_sta() {
-	return g_master_sta;
-}
-
-ks_apartment* ks_apartment::__find_public_apartment(const char* name) {
-	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
-	ASSERT(name != nullptr);
-
-	auto it = g_public_apartment_map.find(name);
-	if (it != g_public_apartment_map.cend())
-		return it->second;
-
-	if (name[0] == '#') {
-		int ord = atoi(name + 1);
-		if (ord != 0) {
-			int index = ord > 0 ? ord - 1 : (int)g_public_apartment_map.size() + ord;
-			if (index >= 0 && index < g_public_apartment_map.size()) {
-				if (index <= g_public_apartment_map.size() / 2)
-					return std::next(g_public_apartment_map.cbegin(), index)->second;
-				else
-					return std::prev(g_public_apartment_map.cend(), g_public_apartment_map.size() - index)->second;
-			}
-		}
-	}
-
-	return nullptr;
-}
-
-ks_apartment* ks_apartment::__tls_get_current_thread_apartment() {
-	return tls_current_thread_apartment;
 }

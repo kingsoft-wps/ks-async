@@ -113,7 +113,7 @@ void ks_single_thread_apartment_imp::async_stop() {
 
 //注：目前的wait实现暂不支持并发重入
 void ks_single_thread_apartment_imp::wait() {
-	ASSERT(this != ks_apartment::__tls_get_current_thread_apartment());
+	ASSERT(this != ks_apartment::current_thread_apartment());
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 	this->_try_stop_locked(lock); //ensure stop
@@ -271,7 +271,7 @@ void ks_single_thread_apartment_imp::_prepare_single_thread_locked(std::unique_l
 }
 
 void ks_single_thread_apartment_imp::_single_thread_proc() {
-	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
+	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
 	std::string& thread_name = m_d->name;
@@ -360,7 +360,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 		}
 	}
 
-	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
+	ASSERT(ks_apartment::current_thread_apartment() == this);
 }
 
 bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {
@@ -419,7 +419,7 @@ void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(_
 
 
 bool ks_single_thread_apartment_imp::__try_pump_once() {
-	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
+	ASSERT(ks_apartment::current_thread_apartment() == this);
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
@@ -459,7 +459,7 @@ void ks_single_thread_apartment_imp::atfork_prepare() {
 	if (m_d->atfork_prepared_flag_v) 
 		return; //重复prepare
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 
 	//若是在本套间线程中调用fork，则busy_unique_mutex已锁，继续保持即可...
 	if (!atfork_calling_in_my_thread_flag) {
@@ -480,7 +480,7 @@ void ks_single_thread_apartment_imp::atfork_parent() {
 	if (!m_d->atfork_prepared_flag_v)
 		return;
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
@@ -500,7 +500,7 @@ void ks_single_thread_apartment_imp::atfork_child() {
 	if (!m_d->atfork_prepared_flag_v)
 		return;
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
