@@ -41,7 +41,7 @@ public:
 
 	virtual bool start() override;
 	virtual void async_stop() override;
-	virtual void wait() override;
+	virtual void wait_for_stopped() override;
 
 	virtual bool is_stopped() override;
 	virtual bool is_stopping_or_stopped() override;
@@ -101,9 +101,7 @@ private:
 		//bool isolated_thread_presented_flag = false;  //被移动位置，使内存更紧凑
 
 		//volatile _STATE state_v = _STATE::NOT_START;  //被移动位置，使内存更紧凑
-
-		std::thread::id prime_waiting_thread_id{};
-		ks_condition_variable prime_waiting_thread_cv{};
+		ks_condition_variable stopped_state_cv{};
 
 		std::atomic<uint64_t> atomic_last_fn_id = { 0 };
 
@@ -111,9 +109,9 @@ private:
 		std::string name; //const-like
 		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
-		bool isolated_thread_presented_flag = false;
 #if __KS_APARTMENT_ATFORK_ENABLED
 		volatile bool atfork_prepared_flag_v = false;
+		bool atfork_calling_in_my_thread_flag = false;
 #endif
 	};
 

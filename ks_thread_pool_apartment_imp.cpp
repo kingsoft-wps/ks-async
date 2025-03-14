@@ -24,6 +24,8 @@ limitations under the License.
 
 void __forcelink_to_ks_thread_pool_apartment_imp_cpp() {}
 
+static thread_local uint64_t tls_current_now_thread_sn = 0;
+
 
 ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags) {
 	ASSERT(name != nullptr);
@@ -42,12 +44,31 @@ ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, siz
 
 ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
-	if (m_d->state_v == _STATE::RUNNING)
-		this->async_stop();
-	if (m_d->state_v == _STATE::STOPPING)
-		this->wait();
 
-	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
+	if (m_d->state_v != _STATE::STOPPED) {
+		this->async_stop();
+		this->wait_for_stopped();
+	}
+
+	if (true) {
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
+
+		while (m_d->delaying_trigger_thread != nullptr) {
+			auto t_delaying_trigger_thread = std::move(m_d->delaying_trigger_thread);
+			m_d->delaying_trigger_thread = nullptr;
+			lock.unlock();
+			t_delaying_trigger_thread->join();
+			lock.lock();
+		}
+
+		while (!m_d->thread_pool.empty()) {
+			auto t_last_thread_item = std::move(m_d->thread_pool.back());
+			m_d->thread_pool.pop_back();
+			lock.unlock();
+			t_last_thread_item.thread->join();
+			lock.lock();
+		}
+	}
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
 		ks_apartment::unregister_public_apartment(m_d->name.c_str(), this);
@@ -86,55 +107,19 @@ void ks_thread_pool_apartment_imp::async_stop() {
 }
 
 //注：目前的wait实现暂不支持并发重入
-void ks_thread_pool_apartment_imp::wait() {
+void ks_thread_pool_apartment_imp::wait_for_stopped() {
 	ASSERT(this != ks_apartment::__tls_get_current_thread_apartment());
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 	this->_try_stop_locked(lock); //ensure stop
+	ASSERT(m_d->state_v == _STATE::STOPPING || m_d->state_v == _STATE::STOPPED);
 
-	if (m_d->state_v == _STATE::STOPPING) {
-		if (m_d->prime_waiting_thread_id == std::thread::id{}) {
-			m_d->prime_waiting_thread_id = std::this_thread::get_id();
-
-			m_d->delaying_trigger_thread_presented_flag = true; //disable more threads presented
-			if (m_d->delaying_trigger_thread != nullptr) {
-				std::shared_ptr<std::thread> t_delaying_trigger_thread;
-				t_delaying_trigger_thread.swap(m_d->delaying_trigger_thread);
-				m_d->delaying_trigger_thread = nullptr;
-
-				lock.unlock();
-				t_delaying_trigger_thread->join();
-				lock.lock();
-			}
-
-			m_d->thread_pool_presented_size = m_d->max_thread_count; //disable more threads presented
-			while (!m_d->thread_pool.empty()) {
-				std::deque<_THREAD_ITEM> t_now_thread_pool;
-				t_now_thread_pool.swap(m_d->thread_pool);
-				m_d->thread_pool.clear();
-
-				lock.unlock();
-				for (auto& thread_item : t_now_thread_pool)
-					thread_item.thread->join();
-				lock.lock();
-			}
-
-			ASSERT(m_d->state_v == _STATE::STOPPING);
-			ASSERT(m_d->now_fn_queue_prior.empty() && m_d->now_fn_queue_normal.empty());
-			ASSERT(m_d->prime_waiting_thread_id == std::this_thread::get_id());
-			m_d->state_v = _STATE::STOPPED;
-
-			m_d->prime_waiting_thread_id = std::thread::id{};
-			m_d->prime_waiting_thread_cv.notify_all();
-		}
-		else {
-			while (m_d->prime_waiting_thread_id != std::thread::id{}) {
-				m_d->prime_waiting_thread_cv.wait(lock);
-			}
-
-			ASSERT(m_d->state_v == _STATE::STOPPED);
-		}
+	while (m_d->state_v == _STATE::STOPPING) {
+		m_d->stopped_state_cv.wait(lock);
 	}
+
+	ASSERT(m_d->state_v == _STATE::STOPPED);
+	ASSERT(m_d->now_fn_queue_prior.empty() && m_d->now_fn_queue_normal.empty());
 }
 
 bool ks_thread_pool_apartment_imp::is_stopped() {
@@ -246,12 +231,15 @@ void ks_thread_pool_apartment_imp::_try_start_locked(std::unique_lock<ks_mutex>&
 
 void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& lock) {
 	if (m_d->state_v == _STATE::RUNNING) {
-		m_d->state_v = _STATE::STOPPING;
-		m_d->now_fn_queue_cv.notify_all();
-		m_d->delaying_fn_queue_cv.notify_all();
+		if (!m_d->thread_pool.empty() || m_d->delaying_trigger_thread != nullptr) {
+			m_d->state_v = _STATE::STOPPING;
+			m_d->now_fn_queue_cv.notify_all();
+			m_d->delaying_fn_queue_cv.notify_all();
+		}
 	}
 	else if (m_d->state_v == _STATE::NOT_START) {
 		m_d->state_v = _STATE::STOPPED;
+		m_d->stopped_state_cv.notify_all();
 	}
 }
 
@@ -285,6 +273,8 @@ void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_l
 void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
+
+	tls_current_now_thread_sn = thread_sn;
 
 	std::string thread_name = (std::stringstream() << m_d->name << "(" << thread_sn << ")").str();
 #if defined(_WIN32)
@@ -337,15 +327,6 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			//}
 
 			lock.lock();
-
-			if ((int64_t)(thread_sn - m_d->original_thread_sn) < 0) {
-				//为了简化，对于fork出的新进程，我们会丢弃所有线程，也包括调用fork的线程，并将original_thread_sn拉高
-				//因此这里可据此if条件断定当前线程是否已是被丢弃状态，因为sn类型是uint64_t，所以拉高可认为是不会溢出的，即使溢出使用减法也可更好应对
-				ASSERT(std::find_if(m_d->thread_pool.cbegin(), m_d->thread_pool.cend(),
-					[thread_sn](auto& item) { return item.thread_sn == thread_sn; }) == m_d->thread_pool.cend());
-				break; //check stop, end
-			}
-
 			--m_d->busy_thread_count;
 			if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
 				--m_d->busy_thread_count_for_idle;
@@ -362,19 +343,26 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 		}
 	}
 
+	if (true) {
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
+		if (m_d->state_v == _STATE::STOPPING) {
+			if (m_d->state_v == _STATE::STOPPING && !m_d->thread_pool.empty() && tls_current_now_thread_sn == m_d->thread_pool.front().thread_sn) {
+				m_d->state_v = _STATE::STOPPED;
+				m_d->stopped_state_cv.notify_all();
+			}
+		}
+	}
+
 	ASSERT(ks_apartment::__tls_get_current_thread_apartment() == this);
 }
 
 void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->delaying_trigger_thread_presented_flag)
+	if (m_d->delaying_trigger_thread != nullptr)
 		return;
-
-	ASSERT(m_d->delaying_trigger_thread == nullptr);
 
 	if (m_d->state_v == _STATE::RUNNING) {
 		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
 			[this]() { this->_delaying_trigger_thread_proc(); });
-		m_d->delaying_trigger_thread_presented_flag = true;
 	}
 }
 
@@ -515,8 +503,10 @@ void ks_thread_pool_apartment_imp::atfork_prepare() {
 	if (m_d->atfork_prepared_flag_v)
 		return; //重复prepare
 
-	if (ks_apartment::__tls_get_current_thread_apartment() == this) {
-		//busy_shared_mutex共享锁升级为独占锁状态
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+
+	if (atfork_calling_in_my_thread_flag) {
+		//若是在本套间线程中调用fork，busy_shared_mutex共享锁升级为独占锁状态
 		m_d->busy_shared_mutex.unlock_shared();
 		m_d->busy_shared_mutex.lock();
 	}
@@ -527,8 +517,10 @@ void ks_thread_pool_apartment_imp::atfork_prepare() {
 	//unlock不保证时序，所以这里需要对mutex加锁，已保证一致性
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
-	ASSERT(!m_d->atfork_prepared_flag_v);
 	m_d->atfork_prepared_flag_v = true;
+	m_d->atfork_calling_in_my_thread_flag = atfork_calling_in_my_thread_flag;
+	if (atfork_calling_in_my_thread_flag)
+		m_d->atfork_calling_in_my_thread_sn = tls_current_now_thread_sn;
 }
 
 void ks_thread_pool_apartment_imp::atfork_parent() {
@@ -537,16 +529,23 @@ void ks_thread_pool_apartment_imp::atfork_parent() {
 	if (!m_d->atfork_prepared_flag_v)
 		return;
 
-	//没有竞争者，这里无需对mutex加锁，但加锁也没问题
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
+
+	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->busy_shared_mutex.unlock();
+	m_d->atfork_calling_in_my_thread_flag = false;
+	m_d->atfork_calling_in_my_thread_sn = 0;
 
-	if (ks_apartment::__tls_get_current_thread_apartment() == this) {
-		//busy_shared_mutex恢复为共享锁状态
-		lock.unlock();
+	if (atfork_calling_in_my_thread_flag) {
+		//若是在本套间线程中调用fork，busy_shared_mutex恢复为共享锁状态
+		m_d->busy_shared_mutex.unlock();
 		m_d->busy_shared_mutex.lock_shared();
+	}
+	else {
+		m_d->busy_shared_mutex.unlock();
 	}
 }
 
@@ -556,29 +555,36 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 	if (!m_d->atfork_prepared_flag_v)
 		return;
 
-	//没有竞争者，这里无需对mutex加锁，但加锁也没问题
+	bool atfork_calling_in_my_thread_flag = (ks_apartment::__tls_get_current_thread_apartment() == this);
+	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
+
+	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
-	//为了简化，对于fork出的新进程，我们会丢弃所有线程，也包括调用fork的线程，并将original_thread_sn拉高
-	//如果恰好是调用fork的线程，那么此线程仍将短暂存活，不过我们在_now_thread_proc中已做了应对处理，最终状态将是正确的
-	m_d->atomic_last_thread_sn = (m_d->atomic_last_thread_sn + 10) / 10 * 10; //为方便观察，拉高至整十数
-	m_d->original_thread_sn = m_d->atomic_last_thread_sn;
+	//重建线程
+	for (auto& thread_item : m_d->thread_pool) {
+		if (!(atfork_calling_in_my_thread_flag && thread_item.thread_sn == tls_current_now_thread_sn)) {
+			thread_item.thread = std::make_shared<std::thread>(
+				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
+		}
+	}
 
-	m_d->thread_pool.clear();
-	m_d->thread_pool_presented_size = 0;
-	m_d->busy_thread_count = 0;
-	m_d->busy_thread_count_for_idle = 0;
-
-	m_d->delaying_trigger_thread.reset();
-	m_d->delaying_trigger_thread_presented_flag = false;
+	if (m_d->delaying_trigger_thread) {
+		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
+			[this]() { this->_delaying_trigger_thread_proc(); });
+	}
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->busy_shared_mutex.unlock();
+	m_d->atfork_calling_in_my_thread_flag = false;
+	m_d->atfork_calling_in_my_thread_sn = 0;
 
-	if (ks_apartment::__tls_get_current_thread_apartment() == this) {
-		//busy_shared_mutex恢复为共享锁状态
-		lock.unlock();
+	if (atfork_calling_in_my_thread_flag) {
+		//若是在本套间线程中调用fork，busy_shared_mutex恢复为共享锁状态
+		m_d->busy_shared_mutex.unlock();
 		m_d->busy_shared_mutex.lock_shared();
+	}
+	else {
+		m_d->busy_shared_mutex.unlock();
 	}
 }
 #endif
