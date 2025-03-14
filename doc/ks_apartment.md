@@ -80,10 +80,9 @@ void async_stop();
 <br>
 
 ```C++
-void wait();
+void wait_for_stopped();
 ```
 #### 描述：等待（要求先async_stop）。
-#### 特别说明：目前的wait实现暂不支持并发重入（即同一时刻至多只允许有一个线程调用wait）。
 <br>
 
 ```C++
