@@ -286,7 +286,7 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 
 	tls_current_now_thread_sn = thread_sn;
 
-	std::string thread_name = (std::stringstream() << m_d->name << "(" << thread_sn << ")").str();
+	std::string thread_name = (std::stringstream() << "task-thread of: " << m_d->name << " (mta[" << thread_sn << "]: " << m_d->max_thread_count << ")").str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
@@ -378,6 +378,18 @@ void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::
 }
 
 void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
+	std::string thread_name = (std::stringstream() << "timer-thread of: " << m_d->name << " (mta[" << m_d->max_thread_count << "])").str();
+#if defined(_WIN32)
+	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
+	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
+	if (_pfnSetThreadDescription != nullptr)
+		_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
+#elif defined(__APPLE__)
+	pthread_setname_np(thread_name.c_str());
+#else
+	pthread_setname_np(pthread_self(), thread_name.c_str());
+#endif
+
 	while (true) {
 #if __KS_APARTMENT_ATFORK_ENABLED
 		std::shared_lock<ks_shared_mutex> busy_shared_lock(m_d->busy_shared_mutex);
@@ -422,7 +434,6 @@ void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
 			m_d->stopped_state_cv.notify_all();
 		}
 	}
-
 }
 
 bool ks_thread_pool_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {

@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "ks_single_thread_apartment_imp.h"
 #include <algorithm>
+#include <sstream>
 #if defined(_WIN32)
 #	include <Windows.h>
 #else
@@ -37,13 +38,13 @@ ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name,
 	}
 	if (m_d->flags & be_ui_sta_flag) {
 		ks_apartment::__set_ui_sta(this);
-		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui") != 0)
-			ks_apartment::__register_public_apartment("ui", this);
+		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui_sta") != 0)
+			ks_apartment::__register_public_apartment("ui_sta", this);
 	}
 	if (m_d->flags & be_master_sta_flag) {
 		ks_apartment::__set_master_sta(this);
-		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master") != 0)
-			ks_apartment::__register_public_apartment("master", this);
+		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master_sta") != 0)
+			ks_apartment::__register_public_apartment("master_sta", this);
 	}
 }
 
@@ -71,13 +72,13 @@ ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 	}
 	if (m_d->flags & be_ui_sta_flag) {
 		ks_apartment::__set_ui_sta(nullptr);
-		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui") != 0)
-			ks_apartment::__unregister_public_apartment("ui", this);
+		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui_sta") != 0)
+			ks_apartment::__unregister_public_apartment("ui_sta", this);
 	}
 	if (m_d->flags & be_master_sta_flag) {
 		ks_apartment::__set_master_sta(nullptr);
-		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master") != 0)
-			ks_apartment::__unregister_public_apartment("master", this);
+		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master_sta") != 0)
+			ks_apartment::__unregister_public_apartment("master_sta", this);
 	}
 
 	delete m_d;
@@ -274,7 +275,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
-	std::string& thread_name = m_d->name;
+	std::string thread_name = (std::stringstream() << "solo-thread of: " << m_d->name << " (sta)").str();
 #if defined(_WIN32)
 	typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");

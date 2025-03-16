@@ -40,7 +40,7 @@ ks_apartment* ks_apartment::master_sta() {
 }
 
 ks_apartment* ks_apartment::background_sta() {
-	static ks_single_thread_apartment_imp g_background_sta("background", 0);
+	static ks_single_thread_apartment_imp g_background_sta("background_sta", 0);
 	return &g_background_sta;
 }
 
@@ -55,7 +55,7 @@ ks_apartment* ks_apartment::default_mta() {
 		}
 	};
 
-	static ks_thread_pool_apartment_imp g_default_mta("default", _default_mta_options::max_thread_count(), 0);
+	static ks_thread_pool_apartment_imp g_default_mta("default_mta", _default_mta_options::max_thread_count(), 0);
 	return &g_default_mta;
 }
 
@@ -113,14 +113,14 @@ bool ks_apartment::__current_thread_apartment_try_pump_once() {
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
 	ASSERT(g_ui_sta == nullptr || ui_sta == nullptr);
 	ASSERT(g_ui_sta != nullptr || ui_sta != nullptr);
-	ASSERT(ui_sta == nullptr || strcmp(ui_sta->name(), "ui") == 0);
+	ASSERT(ui_sta == nullptr || strcmp(ui_sta->name(), "ui_sta") == 0);
 	g_ui_sta = ui_sta;
 }
 
 void ks_apartment::__set_master_sta(ks_apartment* master_sta) {
 	ASSERT(g_master_sta == nullptr || master_sta == nullptr);
 	ASSERT(g_master_sta != nullptr || master_sta != nullptr);
-	ASSERT(master_sta == nullptr || strcmp(master_sta->name(), "master") == 0);
+	ASSERT(master_sta == nullptr || strcmp(master_sta->name(), "master_sta") == 0);
 	g_master_sta = master_sta;
 }
 
