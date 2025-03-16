@@ -275,7 +275,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
 
-	std::string thread_name = (std::stringstream() << "solo-thread of: " << m_d->name << " (sta)").str();
+	std::string thread_name = (std::stringstream() << "sta-thread of: " << m_d->name << " (sole)").str();
 #if defined(_WIN32)
 	typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
