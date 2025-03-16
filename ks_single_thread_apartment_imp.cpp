@@ -100,7 +100,7 @@ bool ks_single_thread_apartment_imp::start() {
 		return false;
 
 	_try_start_locked(lock);
-	if (m_d->flags & inplace_thread_flag)
+	if (m_d->flags & no_isolated_thread_flag)
 		this->_single_thread_proc();
 
 	return true;
@@ -234,7 +234,7 @@ void ks_single_thread_apartment_imp::_try_start_locked(std::unique_lock<ks_mutex
 
 void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& lock) {
 	if (m_d->state_v == _STATE::RUNNING) {
-		if ((m_d->flags & inplace_thread_flag) || m_d->isolated_thread_opt != nullptr) {
+		if ((m_d->flags & no_isolated_thread_flag) || m_d->isolated_thread_opt != nullptr) {
 			m_d->state_v = _STATE::STOPPING;
 			m_d->any_fn_queue_cv.notify_all();
 		}
@@ -251,7 +251,7 @@ void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>
 
 
 void ks_single_thread_apartment_imp::_prepare_single_thread_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->flags & inplace_thread_flag)
+	if (m_d->flags & no_isolated_thread_flag)
 		return;
 	if (m_d->isolated_thread_opt != nullptr)
 		return;
@@ -419,9 +419,8 @@ void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(_
 
 
 bool ks_single_thread_apartment_imp::__try_pump_once() {
-	ASSERT(ks_apartment::current_thread_apartment() == this);
-
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
+	ASSERT(ks_apartment::current_thread_apartment() == this);
 
 	//try next now_fn
 	//注：主动泵不必去执行idle任务
