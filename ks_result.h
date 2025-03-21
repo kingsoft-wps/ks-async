@@ -22,6 +22,8 @@ limitations under the License.
 template <class T>
 class ks_result final {
 public:
+	ks_result() : m_raw_result() {}
+
 	ks_result(const T& value) : m_raw_result(ks_raw_value::of(value)) {}
 	ks_result(T&& value) : m_raw_result(ks_raw_value::of(std::move(value))) {}
 

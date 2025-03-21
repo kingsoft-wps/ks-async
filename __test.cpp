@@ -18,7 +18,7 @@ limitations under the License.
 
 #include "ks_future.h"
 #include "ks_promise.h"
-#include "ks_async_task.h"
+#include "ks_async_flow.h"
 #include "ks_notification_center.h"
 #include <iostream>
 #include <sstream>
@@ -241,28 +241,35 @@ void test_future_methods() {
 }
 
 
-//void test_async_task() {
-//    g_exit_latch.add(1);
-//    std::cout << "test async-task ... ";
-//
-//    auto a = ks_async_task<nothing_t>(nothing);
-//    auto b = ks_async_task<int>(1);
-//    auto c = ks_async_task<long, int>(ks_apartment::default_mta(), make_async_context(), [](int) -> long {return 2; });
-//    auto d = ks_async_task<double, int, long>(ks_apartment::default_mta(), make_async_context(), [](int, long) -> double {return 3; });
-//    auto e = ks_async_task<std::string, int, long, double>(ks_apartment::default_mta(), make_async_context(), [](int, long, double) -> std::string {return "done"; });
-//
-//    c.connect(b);
-//    d.connect(b, c);
-//    e.connect(b, c, d);
-//
-//    e.get_future()
-//        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
-//            _output_result("completion: ", result);
-//            g_exit_latch.count_down();
-//        });
-//
-//    g_exit_latch.wait();
-//}
+void test_async_flow() {
+    g_exit_latch.add(1);
+    std::cout << "test async-flow ... \n";
+
+    ks_async_flow_ptr flow = ks_async_flow::create();
+    flow->add_task<std::string>("a1", nullptr, ks_apartment::default_mta(), [](auto& flow) {
+        return "a1-tasktask";
+        });
+    flow->add_task<std::string>("a2", nullptr, ks_apartment::default_mta(), [](auto& flow) {
+        return "a2-tasktask";
+        });
+    flow->add_task<std::string>("b1", "a1", ks_apartment::default_mta(), [](auto& flow) {
+        return "b1-tasktask";
+        });
+
+    flow->add_task_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name, ks_async_flow::status_t task_status) {
+        std::cout << (std::stringstream() << "task_name: " << task_name << ", task_status: " << (int)task_status << "\n").str();
+    }, ks_async_context());
+    flow->add_flow_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, ks_async_flow::status_t flow_status) {
+        std::cout << (std::stringstream() << "flow_status: " << (int)flow_status << "\n").str();
+    }, ks_async_context());
+    flow->get_flow_future().on_completion(ks_apartment::background_sta(), [](auto&) {
+        g_exit_latch.count_down();
+    }, ks_async_context());
+
+    flow->start();
+
+    g_exit_latch.wait();
+}
 
 void test_alive() {
     g_exit_latch.add(1);
@@ -338,7 +345,7 @@ int main() {
     test_future_methods();
     test_post_delayed();
 
-    //test_async_task();
+    test_async_flow();
     test_alive();
 
     test_notification_center();

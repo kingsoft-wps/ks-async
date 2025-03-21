@@ -18,6 +18,8 @@ limitations under the License.
 template <>
 class ks_result<void> final {
 public:
+	ks_result() : m_nothing_result() {}
+
 	ks_result(nothing_t) : m_nothing_result(nothing) {}
 
 	ks_result(const ks_error& error) : m_nothing_result(error) {}

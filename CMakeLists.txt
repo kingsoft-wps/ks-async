@@ -42,11 +42,9 @@ set(MY_SOURCE_FILES
 	ks_async_context.h
 	ks_async_controller.h
 
-	#about async-task
-	ks_async_task.h
-	ks_async_task_0_arg.inl
-	ks_async_task_1_arg.inl
-	ks_async_task_n_args.inl
+	#about async-flow
+	ks_async_flow.h
+	ks_async_flow.cpp
 
 	#about notificiation-center
 	ks_notification_center.h
@@ -104,11 +102,8 @@ set(PUBLIC_HEADER_FILES
 	ks_async_context.h
 	ks_async_controller.h
 
-	#about async-task
-	ks_async_task.h
-	ks_async_task_0_arg.inl
-	ks_async_task_1_arg.inl
-	ks_async_task_n_args.inl
+	#about async-flow
+	ks_async_flow.h
 
 	#about notificiation-center
 	ks_notification_center.h
@@ -182,6 +177,6 @@ install(TARGETS ${MY_LIB_NAME})
 install(FILES ${PUBLIC_HEADER_FILES} DESTINATION include/ks-async)
 install(FILES ${PUBLIC_ASYNC_RAW_HEADER_FILES} DESTINATION include/ks-async/ks-async-raw)
 install(FILES ${PUBLIC_KTL_HEADER_FILES} DESTINATION include/ks-async/ktl)
-install(FILES "LICENSE" DESTINATION include/ks-async)
 install(FILES "README.md" DESTINATION include/ks-async)
+install(FILES "LICENSE" DESTINATION include/ks-async)
 install(DIRECTORY "doc" DESTINATION include/ks-async)

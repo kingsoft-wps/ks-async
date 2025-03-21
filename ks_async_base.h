@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "ktl/ks_functional.h"
 #include "ktl/ks_type_traits.h"
+#include <string>
 #include <memory>
 
 
@@ -40,3 +41,7 @@ limitations under the License.
 #else
 #   define __KS_APARTMENT_ATFORK_ENABLED  1
 #endif
+
+
+//若启用此宏则为自定义default-mta线程数
+//#define __KS_DEFAULT_MTA_MAX_THREAD_COUNT_CUSTOM  4
