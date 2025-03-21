@@ -124,8 +124,6 @@ private:
 		volatile _STATE state_v = _STATE::NOT_START;
 #if __KS_APARTMENT_ATFORK_ENABLED
 		volatile bool atfork_prepared_flag_v = false;
-		bool atfork_calling_in_my_thread_flag = false;
-		uint64_t atfork_calling_in_my_thread_sn = 0;
 #endif
 	};
 

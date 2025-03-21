@@ -471,7 +471,6 @@ void ks_single_thread_apartment_imp::atfork_prepare() {
 
 	ASSERT(!m_d->atfork_prepared_flag_v);
 	m_d->atfork_prepared_flag_v = true;
-	m_d->atfork_calling_in_my_thread_flag = atfork_calling_in_my_thread_flag;
 }
 
 void ks_single_thread_apartment_imp::atfork_parent() {
@@ -481,13 +480,11 @@ void ks_single_thread_apartment_imp::atfork_parent() {
 		return;
 
 	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
-	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->atfork_calling_in_my_thread_flag = false;
 
 	if (!atfork_calling_in_my_thread_flag) {
 		m_d->busy_unique_mutex.unlock();
@@ -501,7 +498,6 @@ void ks_single_thread_apartment_imp::atfork_child() {
 		return;
 
 	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
-	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
@@ -514,7 +510,6 @@ void ks_single_thread_apartment_imp::atfork_child() {
 	}
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->atfork_calling_in_my_thread_flag = false;
 
 	if (!atfork_calling_in_my_thread_flag) {
 		m_d->busy_unique_mutex.unlock();

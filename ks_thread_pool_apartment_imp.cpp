@@ -551,9 +551,6 @@ void ks_thread_pool_apartment_imp::atfork_prepare() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	m_d->atfork_prepared_flag_v = true;
-	m_d->atfork_calling_in_my_thread_flag = atfork_calling_in_my_thread_flag;
-	if (atfork_calling_in_my_thread_flag)
-		m_d->atfork_calling_in_my_thread_sn = tls_current_now_thread_sn;
 }
 
 void ks_thread_pool_apartment_imp::atfork_parent() {
@@ -563,14 +560,11 @@ void ks_thread_pool_apartment_imp::atfork_parent() {
 		return;
 
 	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
-	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->atfork_calling_in_my_thread_flag = false;
-	m_d->atfork_calling_in_my_thread_sn = 0;
 
 	if (atfork_calling_in_my_thread_flag) {
 		//若是在本套间线程中调用fork，busy_shared_mutex恢复为共享锁状态
@@ -589,17 +583,19 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 		return;
 
 	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
-	ASSERT(atfork_calling_in_my_thread_flag == m_d->atfork_calling_in_my_thread_flag);
 
 	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	//重建线程
-	for (auto& thread_item : m_d->thread_pool) {
-		if (!atfork_calling_in_my_thread_flag || thread_item.thread_sn != tls_current_now_thread_sn) {
-			thread_item.thread->detach();
-			thread_item.thread = std::make_shared<std::thread>(
-				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
+	if (!m_d->thread_pool.empty()) {
+		uint64_t current_now_thread_sn = atfork_calling_in_my_thread_flag ? tls_current_now_thread_sn : 0;
+		for (auto& thread_item : m_d->thread_pool) {
+			if (!atfork_calling_in_my_thread_flag || thread_item.thread_sn != current_now_thread_sn) {
+				thread_item.thread->detach();
+				thread_item.thread = std::make_shared<std::thread>(
+					[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
+			}
 		}
 	}
 
@@ -610,8 +606,6 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 	}
 
 	m_d->atfork_prepared_flag_v = false;
-	m_d->atfork_calling_in_my_thread_flag = false;
-	m_d->atfork_calling_in_my_thread_sn = 0;
 
 	if (atfork_calling_in_my_thread_flag) {
 		//若是在本套间线程中调用fork，busy_shared_mutex恢复为共享锁状态
