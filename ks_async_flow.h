@@ -16,10 +16,10 @@ using ks_async_flow_ptr = std::shared_ptr<ks_async_flow>;
 class ks_async_flow : public std::enable_shared_from_this<ks_async_flow> {
 public:
 	enum class status_t {
-		not_start = -1,
-		running = 0, 
-		succeeded = 1, 
-		failed = 2 
+		not_start = -1,  //未开始
+		running   =  0,  //正在执行
+		succeeded =  1,  //成功
+		failed    =  2,  //失败
 	};
 
 private:
@@ -35,23 +35,39 @@ public:
 	KS_ASYNC_API void set_j(size_t j);
 
 public:
-	template <class T>
+	template <class T, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<T(const ks_async_flow_ptr& flow)>> ||
+		std::is_convertible_v<FN, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>> ||
+		std::is_convertible_v<FN, std::function<ks_future<T>(const ks_async_flow_ptr& flow)>>>>
 	KS_ASYNC_INLINE_API bool add_task(
-		const char* task_name, const char* task_dependencies,
-		ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context = {});
-	template <class T>
-	KS_ASYNC_INLINE_API bool add_task(
-		const char* task_name, const char* task_dependencies,
-		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context = {});
-	template <class T>
-	KS_ASYNC_INLINE_API bool add_task(
-		const char* task_name, const char* task_dependencies,
-		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)> fn, const ks_async_context& context = {});
+		const char* name_and_dependencies,
+		ks_apartment* apartment, FN&& fn, const ks_async_context& context = {});
 
 private:
-	KS_ASYNC_API bool do_add_task(
-		const char* task_name, const char* task_dependencies, const std::type_info* task_result_value_typeinfo,
-		ks_apartment* apartment, const std::function<ks_future<ks_raw_value>()>& eval_fn, const ks_async_context& context); //called in add_task<T>, so need export
+	template <class T>
+	bool do_add_task_choose(
+		std::integral_constant<int, -1>,
+		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+	template <class T>
+	bool do_add_task_choose(
+		std::integral_constant<int, 1>,
+		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+	template <class T>
+	bool do_add_task_choose(
+		std::integral_constant<int, 2>,
+		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+	template <class T>
+	bool do_add_task_choose(
+		std::integral_constant<int, 3>,
+		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+
+	KS_ASYNC_API bool do_add_task_raw(
+		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment, std::function<ks_future<ks_raw_value>()>&& eval_fn, const ks_async_context& context); //called in add_task<T>, so need export
 
 public:
 	KS_ASYNC_API uint64_t add_flow_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, status_t flow_status)>&& observer_fn, const ks_async_context& context);
@@ -176,56 +192,95 @@ private:
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 //ks_async_flow::模板方法实现...
-template <class T>
+template <class T, class FN, class _>
 bool ks_async_flow::add_task(
-	const char* task_name, const char* task_dependencies,
-	ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+	const char* name_and_dependencies,
+	ks_apartment* apartment, FN&& fn, const ks_async_context& context) {
+
+	constexpr int ret_mode =
+		std::is_void_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>> ? -1 :
+		std::is_same_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_future<T>> ? 3 :
+		std::is_same_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_result<T>> ? 2 :
+		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, T> ? 1 : 0;
+	static_assert(ret_mode != 0, "illegal task_fn's ret");
 
 #ifdef _DEBUG
-	const std::type_info* task_result_value_typeinfo = &typeid(T);
+	const std::type_info* result_value_typeinfo = &typeid(T);
 #else
-	const std::type_info* task_result_value_typeinfo = nullptr;
+	const std::type_info* result_value_typeinfo = nullptr;
 #endif
 
-	return do_add_task(
-		task_name, task_dependencies, task_result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() -> ks_future<ks_raw_value> {
+	return do_add_task_choose<T>(
+		std::integral_constant<int, ret_mode>(),
+		name_and_dependencies, result_value_typeinfo,
+		apartment, std::forward<FN>(fn), context);
+}
 
-		if (m_flow_cancelled_flag_v) 
+template <class T>
+bool ks_async_flow::do_add_task_choose(
+	std::integral_constant<int, -1>,
+	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+
+	return do_add_task_raw(
+		name_and_dependencies, result_value_typeinfo, apartment,
+		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+
+		if (m_flow_cancelled_flag_v)
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		ks_raw_living_context_rtstt context_rtstt;
 		context_rtstt.apply(context);
 
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired()) 
+		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
-		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<T>(fn(this_ptr)));
+		fn(this_ptr);
+		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<nothing_t>(nothing));
 	}, context);
 }
 
 template <class T>
-bool ks_async_flow::add_task(
-	const char* task_name, const char* task_dependencies,
-	ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+bool ks_async_flow::do_add_task_choose(
+	std::integral_constant<int, 1>,
+	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 
-#ifdef _DEBUG
-	const std::type_info* task_result_value_typeinfo = &typeid(T);
-#else
-	const std::type_info* task_result_value_typeinfo = nullptr;
-#endif
+	return do_add_task_raw(
+		name_and_dependencies, result_value_typeinfo, apartment,
+		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
 
-	return do_add_task(
-		task_name, task_dependencies, task_result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() -> ks_future<ks_raw_value> {
-
-		if (m_flow_cancelled_flag_v) 
+		if (m_flow_cancelled_flag_v)
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		ks_raw_living_context_rtstt context_rtstt;
 		context_rtstt.apply(context);
 
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired()) 
+		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
+			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
+
+		T typed_task_result_value = fn(this_ptr);
+		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<T>(typed_task_result_value));
+	}, context);
+}
+
+template <class T>
+bool ks_async_flow::do_add_task_choose(
+	std::integral_constant<int, 2>,
+	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+
+	return do_add_task_raw(
+		name_and_dependencies, result_value_typeinfo, apartment,
+		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+
+		if (m_flow_cancelled_flag_v)
+			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
+
+		ks_raw_living_context_rtstt context_rtstt;
+		context_rtstt.apply(context);
+
+		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		ks_result<T> typed_task_result = fn(this_ptr);
@@ -237,27 +292,22 @@ bool ks_async_flow::add_task(
 }
 
 template <class T>
-bool ks_async_flow::add_task(
-	const char* task_name, const char* task_dependencies,
-	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)> fn, const ks_async_context& context) {
+bool ks_async_flow::do_add_task_choose(
+	std::integral_constant<int, 3>,
+	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 
-#ifdef _DEBUG
-	const std::type_info* task_result_value_typeinfo = &typeid(T);
-#else
-	const std::type_info* task_result_value_typeinfo = nullptr;
-#endif
+	return do_add_task_raw(
+		name_and_dependencies, result_value_typeinfo, apartment,
+		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
 
-	return do_add_task(
-		task_name, task_dependencies, task_result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() ->ks_future<ks_raw_value> {
-
-		if (m_flow_cancelled_flag_v) 
+		if (m_flow_cancelled_flag_v)
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		ks_raw_living_context_rtstt context_rtstt;
 		context_rtstt.apply(context);
 
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired()) 
+		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		return fn(this_ptr).then<ks_raw_value>(
@@ -275,24 +325,56 @@ ks_result<T> ks_async_flow::get_task_result(const char* task_name) {
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
-		throw std::runtime_error("task result not found");
+		return ks_result<T>();
 	}
 
-	ASSERT(it->second->task_result_value_typeinfo != nullptr && (*it->second->task_result_value_typeinfo == typeid(XT) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(XT).name()) == 0));
+	ASSERT(it->second->task_result_value_typeinfo != nullptr);
+	ASSERT(*it->second->task_result_value_typeinfo == typeid(T) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(T).name()) == 0);
 
 	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
 		ASSERT(false);
-		throw std::runtime_error("task result not available");
+		return ks_result<T>();
 	}
 
 	const ks_result<ks_raw_value>& task_result = it->second->task_result;
 	if (!task_result.is_completed()) {
 		ASSERT(false);
-		throw std::runtime_error("task result not available");
+		return ks_result<T>();
 	}
 
 	if (task_result.is_value())
 		return task_result.to_value().get<T>();
+	else
+		return task_result.to_error();
+}
+
+template <>
+ks_result<void> ks_async_flow::get_task_result<void>(const char* task_name) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+	using T = void;
+
+	auto it = m_task_map.find(task_name);
+	if (it == m_task_map.cend()) {
+		ASSERT(false);
+		return ks_result<void>();
+	}
+
+	ASSERT(it->second->task_result_value_typeinfo != nullptr);
+	ASSERT(*it->second->task_result_value_typeinfo == typeid(T) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(T).name()) == 0);
+
+	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
+		ASSERT(false);
+		return ks_result<void>();
+	}
+
+	const ks_result<ks_raw_value>& task_result = it->second->task_result;
+	if (!task_result.is_completed()) {
+		ASSERT(false);
+		return ks_result<void>();
+	}
+
+	if (task_result.is_value())
+		return nothing;
 	else
 		return task_result.to_error();
 }

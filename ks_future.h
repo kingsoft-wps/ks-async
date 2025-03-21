@@ -369,18 +369,18 @@ private:
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T()>> || std::is_convertible_v<FN, std::function<ks_result<T>()>> || std::is_convertible_v<FN, std::function<ks_future<T>()>>>>
 	static ks_future<T> __choose_post_by_arglist(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
-			std::is_same_v<ks_future<T>, std::invoke_result_t<FN>> ? 3 :
-			std::is_same_v<ks_result<T>, std::invoke_result_t<FN>> ? 2 :
-			std::is_convertible_v<T, std::invoke_result_t<FN>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN>, ks_future<T>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN>, T> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal post's ret");
 		return ks_future<T>::__choose_post_by_arglist_ret(apartment, context, std::forward<FN>(task_fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_by_arglist(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
-			std::is_same_v<ks_future<T>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 3 :
-			std::is_same_v<ks_result<T>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 2 :
-			std::is_convertible_v<T, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<T>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, ks_cancel_inspector*>, T> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal post's ret");
 		return ks_future<T>::__choose_post_by_arglist_ret(apartment, context, std::forward<FN>(task_fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
@@ -424,18 +424,18 @@ private:
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T()>> || std::is_convertible_v<FN, std::function<ks_result<T>()>> || std::is_convertible_v<FN, std::function<ks_future<T>()>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
-			std::is_same_v<ks_future<T>, std::invoke_result_t<FN>> ? 3 :
-			std::is_same_v<ks_result<T>, std::invoke_result_t<FN>> ? 2 :
-			std::is_convertible_v<T, std::invoke_result_t<FN>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN>, ks_future<T>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN>, T> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal post_delayed's ret");
 		return ks_future<T>::__choose_post_delayed_by_arglist_ret(apartment, context, std::forward<FN>(task_fn), delay, std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
-			std::is_same_v<ks_future<T>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 3 :
-			std::is_same_v<ks_result<T>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 2 :
-			std::is_convertible_v<T, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<T>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, ks_cancel_inspector*>, T> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal post_delayed's ret");
 		return ks_future<T>::__choose_post_delayed_by_arglist_ret(apartment, context, std::forward<FN>(task_fn), delay, std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
@@ -773,9 +773,9 @@ private:
 	ks_future<R> __choose_transform_by_arglist(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>) const {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, const ks_result<T>&>> ? -1 :
-			std::is_same_v<ks_future<R>, std::invoke_result_t<FN, const ks_result<T>&>> ? 3 :
-			std::is_same_v<ks_result<R>, std::invoke_result_t<FN, const ks_result<T>&>> ? 2 :
-			std::is_convertible_v<R, std::invoke_result_t<FN, const ks_result<T>&>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<T>&>, ks_future<R>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<T>&>, ks_result<R>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_result<T>&>, R> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal transform's ret");
 		return this->__choose_transform_by_arglist_ret<R>(apartment, context, std::forward<FN>(fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}

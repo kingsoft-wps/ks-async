@@ -2,19 +2,56 @@
 #include "ks-async-raw/ks_raw_internal_helper.h"
 
 
-static void __do_string_split(const char* str, std::vector<std::string>* out) {
+static bool __do_check_name_legal(const char* name, bool allow_wild) {
+	if (name == nullptr || name[0] == 0)
+		return false;
+
+	const char* illegal_chars = allow_wild
+		? " \t,;:|"
+		: " \t,;:|*?";
+
+	for (char c = *name; c != 0; c = *name++) {
+		if (strchr(illegal_chars, c) != nullptr)
+			return false;
+	}
+
+	return true;
+}
+
+static void __do_string_trim(std::string* str) {
+	if (str->empty())
+		return;
+
+	const char* space_chars = " \t\r\n";
+
+	size_t pos_right = str->find_last_not_of(space_chars);
+	if (pos_right != size_t(-1))
+		str->resize(pos_right + 1);
+
+	size_t pos_left = str->find_first_not_of(space_chars);
+	if (pos_left != 0)
+		str->erase(0, pos_left);
+}
+
+static void __do_string_split(const char* str, const char* seps, bool skip_empty, std::vector<std::string>* out) {
 	size_t len = str != nullptr ? strlen(str) : 0;
 	if (len == 0)
 		return;
 
+	if (seps == nullptr || seps[0] == 0)
+		seps = " \t";
+
 	size_t pos = 0;
 	while (pos < len) {
 		size_t pos_end = pos;
-		while (pos_end < len && strchr(",; \t", str[pos_end]) == nullptr)
+		while (pos_end < len && strchr(seps, str[pos_end]) == nullptr)
 			pos_end++;
 
-		if (pos < pos_end) {
-			out->push_back(std::string(str + pos, pos_end - pos));
+		std::string item(str + pos, pos_end - pos);
+		__do_string_trim(&item);
+
+		if (!(skip_empty && item.empty())) {
+			out->push_back(item);
 		}
 
 		pos = pos_end + 1;
@@ -33,7 +70,8 @@ static void __do_pattern_to_regex(const char* pattern, std::regex* re) {
 	pattern_re_lit.reserve(pattern_len);
 
 	std::vector<std::string> pattern_vec;
-	__do_string_split(pattern, &pattern_vec);
+	__do_string_split(pattern, ",; \t", true, &pattern_vec);
+
 	for (const std::string& pattern_item : pattern_vec) {
 		ASSERT(!pattern_item.empty());
 
@@ -70,37 +108,70 @@ void ks_async_flow::set_j(size_t j) {
 	m_j = j != 0 ? j : size_t(-1);
 }
 
-bool ks_async_flow::do_add_task(
-	const char* task_name, const char* task_dependencies, const std::type_info* task_result_value_typeinfo,
-	ks_apartment* apartment, const std::function<ks_future<ks_raw_value>()>& eval_fn, const ks_async_context& context) {
+bool ks_async_flow::do_add_task_raw(
+	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, std::function<ks_future<ks_raw_value>()>&& eval_fn, const ks_async_context& context) {
+
+	if (name_and_dependencies == nullptr || name_and_dependencies[0] == 0) {
+		ASSERT(false);
+		return true;
+	}
+
+	std::vector<std::string> splits1;
+	__do_string_split(name_and_dependencies, ":", false, &splits1);
+	if (!(splits1.size() == 1 || splits1.size() == 2)) {
+		ASSERT(false);
+		return false;
+	}
+
+	std::string task_name;
+	task_name.swap(splits1[0]);
+	__do_string_trim(&task_name);
+
+	if (!__do_check_name_legal(task_name.c_str(), false)) {
+		ASSERT(false);
+		return false;
+	}
+
+	std::vector<std::string> task_dependencies;
+	if (splits1.size() >= 2) {
+		__do_string_split(splits1[1].c_str(), ",; \t", true, &task_dependencies);
+
+		for (auto dep_name : task_dependencies) {
+			if (!__do_check_name_legal(dep_name.c_str(), false)) {
+				ASSERT(false);
+				return false;
+			}
+		}
+
+		if (std::find(task_dependencies.cbegin(), task_dependencies.cend(), task_name) != task_dependencies.cend()) {
+			ASSERT(false);
+			return false;
+		}
+	}
+
 
 	std::unique_lock<ks_mutex> lock(m_mutex);
 	if (m_flow_status != status_t::not_start) {
 		ASSERT(false);
 		return false;
 	}
+	if (m_task_map.find(task_name) != m_task_map.cend()) {
+		ASSERT(false);
+		return false;
+	}
 
 	std::shared_ptr<_TASK_ITEM> task_item = std::make_shared<_TASK_ITEM>();
-	task_item->task_name = task_name;
-
-	__do_string_split(task_dependencies, &task_item->task_dependencies);
+	task_item->task_name.swap(task_name);
+	task_item->task_dependencies.swap(task_dependencies);
 
 #ifdef _DEBUG
-	task_item->task_result_value_typeinfo = task_result_value_typeinfo;
+	task_item->task_result_value_typeinfo = result_value_typeinfo;
 #endif
 
 	task_item->task_apartment = apartment;
-	task_item->task_eval_fn = eval_fn;
+	task_item->task_eval_fn = std::move(eval_fn);
 	task_item->task_context = context;
-
-	if (task_item->task_name.find_first_of(",; \t") != size_t(-1)) {
-		ASSERT(false);
-		return false;
-	}
-	if (m_task_map.find(task_item->task_name) != m_task_map.cend()) {
-		ASSERT(false);
-		return false;
-	}
 
 	task_item->task_trigger = ks_promise<void>::create();
 	task_item->task_trigger.get_future().then<ks_raw_value>(
@@ -162,8 +233,10 @@ void ks_async_flow::remove_observer(uint64_t observer_id) {
 
 bool ks_async_flow::start() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	if (m_flow_status != status_t::not_start)
+	if (m_flow_status != status_t::not_start) {
+		ASSERT(false);
 		return false;
+	}
 
 	if (!m_task_map.empty()) {
 		//check dep valid
@@ -171,8 +244,10 @@ bool ks_async_flow::start() {
 			const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
 			for (auto& dep : task_item->task_dependencies) {
 				auto dep_it = m_task_map.find(dep);
-				if (dep_it == m_task_map.cend())
+				if (dep_it == m_task_map.cend()) {
+					ASSERT(false);
 					return false;
+				}
 			}
 		}
 
@@ -206,8 +281,10 @@ bool ks_async_flow::start() {
 						if (task_item->task_level < dep_item->task_level + 1) {
 							task_item->task_level = dep_item->task_level + 1;
 							some_level_changed = true;
-							if (task_item->task_level > (int)m_task_map.size() * 2)
+							if (task_item->task_level > (int)m_task_map.size() * 2) {
+								ASSERT(false);
 								return false; //level overflow
+							}
 						}
 					}
 				}
@@ -218,8 +295,10 @@ bool ks_async_flow::start() {
 
 			//check isolated task
 			if (std::find_if(m_task_map.cbegin(), m_task_map.cend(),
-				[](auto& entry) -> bool { return entry.second->task_level == 0; }) != m_task_map.cend())
+				[](auto& entry) -> bool { return entry.second->task_level == 0; }) != m_task_map.cend()) {
+				ASSERT(false);
 				return false;
+			}
 		}
 	}
 

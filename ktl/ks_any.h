@@ -123,6 +123,10 @@ private:
 
 public:
 	template <class T>
+	static ks_any of(const T& x) {
+		return ks_any(x, 0);
+	}
+	template <class T>
 	static ks_any of(T&& x) {
 		return ks_any(std::forward<T>(x), 0);
 	}

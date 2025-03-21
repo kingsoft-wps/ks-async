@@ -32,6 +32,10 @@ public:
 
 public:
 	template <class T>
+	static ks_raw_value of(const T& x) {
+		return ks_raw_value(x, 0);
+	}
+	template <class T>
 	static ks_raw_value of(T&& x) {
 		return ks_raw_value(std::forward<T>(x), 0);
 	}

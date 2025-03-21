@@ -17,12 +17,20 @@ limitations under the License.
 
 #include "ks_cxxbase.h"
 #include <mutex>
+#include <shared_mutex>
 #include <condition_variable>
 #include <atomic>
 #include <thread>
 
 
 using ks_mutex = std::mutex;
+
+#if __cplusplus < 201703L
+using ks_shared_mutex = std::shared_timed_mutex;
+#else
+using ks_shared_mutex = std::shared_mutex;
+#endif
+
 using ks_condition_variable = std::condition_variable;
 
 

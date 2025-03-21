@@ -246,13 +246,13 @@ void test_async_flow() {
     std::cout << "test async-flow ... \n";
 
     ks_async_flow_ptr flow = ks_async_flow::create();
-    flow->add_task<std::string>("a1", nullptr, ks_apartment::default_mta(), [](auto& flow) {
+    flow->add_task<std::string>("a1", ks_apartment::default_mta(), [](auto& flow) {
         return "a1-tasktask";
         });
-    flow->add_task<std::string>("a2", nullptr, ks_apartment::default_mta(), [](auto& flow) {
+    flow->add_task<std::string>("a2", ks_apartment::default_mta(), [](auto& flow) {
         return "a2-tasktask";
         });
-    flow->add_task<std::string>("b1", "a1", ks_apartment::default_mta(), [](auto& flow) {
+    flow->add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](auto& flow) {
         return "b1-tasktask";
         });
 

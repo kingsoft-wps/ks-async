@@ -52,8 +52,8 @@ private: //__wrap_task_fn
 	static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN>> ? -1 :
-			std::is_same_v<ks_future<void>, std::invoke_result_t<FN>> ? 3 :
-			std::is_same_v<ks_result<void>, std::invoke_result_t<FN>> ? 2 : 0;
+			std::is_same_v<std::invoke_result_t<FN>, ks_future<void>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN>, ks_result<void>> ? 2 : 0;
 		static_assert(ret_mode != 0, "illegal task-fn's ret");
 		return ks_future<void>::__wrap_task_fn_by_arglist_ret(std::forward<FN>(task_fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
@@ -61,8 +61,8 @@ private: //__wrap_task_fn
 	static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, ks_cancel_inspector*>> ? -1 :
-			std::is_same_v<ks_future<void>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 3 :
-			std::is_same_v<ks_result<void>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 2 : 0;
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<void>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_result<void>> ? 2 : 0;
 		static_assert(ret_mode != 0, "illegal task-fn's ret");
 		return ks_future<void>::__wrap_task_fn_by_arglist_ret(std::forward<FN>(task_fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
@@ -122,8 +122,8 @@ private: //__wrap_then_fn
 	static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN>> ? -1 :
-			std::is_same_v<ks_future<R>, std::invoke_result_t<FN>> ? 3 :
-			std::is_same_v<ks_result<R>, std::invoke_result_t<FN>> ? 2 :
+			std::is_same_v<std::invoke_result_t<FN>, ks_future<R>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN>, ks_result<R>> ? 2 :
 			std::is_convertible_v<R, std::invoke_result_t<FN>> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal then-fn's ret");
 		return ks_future<void>::__wrap_then_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
@@ -132,8 +132,8 @@ private: //__wrap_then_fn
 	static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, ks_cancel_inspector*>> ? -1 :
-			std::is_same_v<ks_future<R>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 3 :
-			std::is_same_v<ks_result<R>, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 2 :
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<R>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_result<R>> ? 2 :
 			std::is_convertible_v<R, std::invoke_result_t<FN, ks_cancel_inspector*>> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal then-fn's ret");
 		return ks_future<void>::__wrap_then_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
@@ -206,9 +206,9 @@ private: //__wrap_transform_fn
 	static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&>> ? -1 :
-			std::is_same_v<ks_future<R>, std::invoke_result_t<FN, const ks_result<void>&>> ? 3 :
-			std::is_same_v<ks_result<R>, std::invoke_result_t<FN, const ks_result<void>&>> ? 2 :
-			std::is_convertible_v<R, std::invoke_result_t<FN, const ks_result<void>&>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<void>&>, ks_future<R>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<void>&>, ks_result<R>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_result<void>&>, R> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal transform-fn's ret");
 		return ks_future<void>::__wrap_transform_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
@@ -216,9 +216,9 @@ private: //__wrap_transform_fn
 	static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>> ? -1 :
-			std::is_same_v<ks_future<R>, std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>> ? 3 :
-			std::is_same_v<ks_result<R>, std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>> ? 2 :
-			std::is_convertible_v<R, std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>> ? 1 : 0;
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>, ks_future<R>> ? 3 :
+			std::is_same_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>, ks_result<R>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>, R> ? 1 : 0;
 		static_assert(ret_mode != 0, "illegal transform-fn's ret");
 		return ks_future<void>::__wrap_transform_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}

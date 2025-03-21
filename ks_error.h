@@ -35,6 +35,12 @@ public:
 	}
 
 	template <class T>
+	ks_error with_payload(const T& payload) const {
+		ks_error ret = *this;
+		ret.m_payload_any = ks_any::of(payload);
+		return ret;
+	}
+	template <class T>
 	ks_error with_payload(T&& payload) const {
 		ks_error ret = *this;
 		ret.m_payload_any = ks_any::of(std::forward<T>(payload));
