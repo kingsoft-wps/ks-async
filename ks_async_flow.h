@@ -50,7 +50,7 @@ public:
 
 private:
 	KS_ASYNC_API bool do_add_task(
-		const char* task_name, const char* task_dependencies,
+		const char* task_name, const char* task_dependencies, const std::type_info* task_result_value_typeinfo,
 		ks_apartment* apartment, const std::function<ks_future<ks_raw_value>()>& eval_fn, const ks_async_context& context); //called in add_task<T>, so need export
 
 public:
@@ -100,6 +100,10 @@ private:
 		ks_apartment* task_apartment = nullptr; //const-like
 		std::function<ks_future<ks_raw_value>()> task_eval_fn; //const-like
 		ks_async_context task_context; //const-like
+
+#ifdef _DEBUG
+		const std::type_info* task_result_value_typeinfo = nullptr;
+#endif
 
 		int task_level = 0;
 		std::unordered_set<std::string> task_waiting_for_dependencies;
@@ -177,8 +181,14 @@ bool ks_async_flow::add_task(
 	const char* task_name, const char* task_dependencies,
 	ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 
+#ifdef _DEBUG
+	const std::type_info* task_result_value_typeinfo = &typeid(T);
+#else
+	const std::type_info* task_result_value_typeinfo = nullptr;
+#endif
+
 	return do_add_task(
-		task_name, task_dependencies, apartment,
+		task_name, task_dependencies, task_result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() -> ks_future<ks_raw_value> {
 
 		if (m_flow_cancelled_flag_v) 
@@ -199,8 +209,14 @@ bool ks_async_flow::add_task(
 	const char* task_name, const char* task_dependencies,
 	ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 
+#ifdef _DEBUG
+	const std::type_info* task_result_value_typeinfo = &typeid(T);
+#else
+	const std::type_info* task_result_value_typeinfo = nullptr;
+#endif
+
 	return do_add_task(
-		task_name, task_dependencies, apartment,
+		task_name, task_dependencies, task_result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() -> ks_future<ks_raw_value> {
 
 		if (m_flow_cancelled_flag_v) 
@@ -225,8 +241,14 @@ bool ks_async_flow::add_task(
 	const char* task_name, const char* task_dependencies,
 	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)> fn, const ks_async_context& context) {
 
+#ifdef _DEBUG
+	const std::type_info* task_result_value_typeinfo = &typeid(T);
+#else
+	const std::type_info* task_result_value_typeinfo = nullptr;
+#endif
+
 	return do_add_task(
-		task_name, task_dependencies, apartment,
+		task_name, task_dependencies, task_result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]() ->ks_future<ks_raw_value> {
 
 		if (m_flow_cancelled_flag_v) 
@@ -255,6 +277,8 @@ ks_result<T> ks_async_flow::get_task_result(const char* task_name) {
 		ASSERT(false);
 		throw std::runtime_error("task result not found");
 	}
+
+	ASSERT(it->second->task_result_value_typeinfo != nullptr && (*it->second->task_result_value_typeinfo == typeid(XT) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(XT).name()) == 0));
 
 	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
 		ASSERT(false);

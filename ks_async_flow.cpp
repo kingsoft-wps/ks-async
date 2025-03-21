@@ -71,7 +71,7 @@ void ks_async_flow::set_j(size_t j) {
 }
 
 bool ks_async_flow::do_add_task(
-	const char* task_name, const char* task_dependencies,
+	const char* task_name, const char* task_dependencies, const std::type_info* task_result_value_typeinfo,
 	ks_apartment* apartment, const std::function<ks_future<ks_raw_value>()>& eval_fn, const ks_async_context& context) {
 
 	std::unique_lock<ks_mutex> lock(m_mutex);
@@ -82,7 +82,12 @@ bool ks_async_flow::do_add_task(
 
 	std::shared_ptr<_TASK_ITEM> task_item = std::make_shared<_TASK_ITEM>();
 	task_item->task_name = task_name;
+
 	__do_string_split(task_dependencies, &task_item->task_dependencies);
+
+#ifdef _DEBUG
+	task_item->task_result_value_typeinfo = task_result_value_typeinfo;
+#endif
 
 	task_item->task_apartment = apartment;
 	task_item->task_eval_fn = eval_fn;
