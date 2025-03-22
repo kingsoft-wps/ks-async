@@ -315,7 +315,7 @@ bool ks_async_flow::start() {
 				do_wrap_task_eval_fn(task_item),
 				task_item->task_context
 			).on_completion(
-				task_item->task_apartment,
+				do_sel_apartment(task_item->task_apartment),
 				[this, this_ptr = this->shared_from_this(), task_item](const ks_result<ks_raw_value>& task_result) {
 					std::unique_lock<ks_mutex> lock(m_mutex);
 					do_make_task_completed_locked(task_item, task_result, lock);
