@@ -39,7 +39,7 @@ public:
 	bool is_error() const { return m_nothing_result.is_error(); }
 
 	nothing_t to_value() const noexcept(false) { return (m_nothing_result.to_value(), nothing); }
-	const ks_error& to_error() const noexcept(false) { return m_nothing_result.to_error(); }
+	ks_error to_error() const noexcept(false) { return m_nothing_result.to_error(); }
 
 	template <class R>
 	ks_result<R> cast() const {
@@ -80,6 +80,7 @@ private:
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;
 	friend class ks_future_util;
+	friend class ks_async_flow;
 
 private:
 	ks_result<nothing_t> m_nothing_result;

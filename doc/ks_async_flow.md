@@ -8,21 +8,6 @@
 <br>
 
 
-
-# 枚举类型
-
-```C++
-enum class status_t {
-    not_start,  //未开始
-    running,    //正在执行
-    succeeded,  //成功
-    failed,     //失败
-};
-```
-#### 描述：用于表示异步状态，比如flow和task的状态。
-<br>
-
-
 # 静态成员方法
 
 ```C++
@@ -53,8 +38,12 @@ bool add_task<T>(
 
 
 ```C++
-uint64_t add_flow_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, status_t flow_status)>&& observer_fn, const ks_async_context& context);
-uint64_t add_task_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)>&& observer_fn, const ks_async_context& context);
+uint64_t add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+uint64_t add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context);
+
+uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context);
+uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
+
 void remove_observer(uint64_t id);
 ```
 #### 描述：添加/移除观察者。
@@ -66,44 +55,39 @@ void remove_observer(uint64_t id);
 bool start();
 void try_cancel();
 void wait(); //deprecated
-bool reset();
 ```
-#### 描述：开始、取消、等待、重置。
+#### 描述：开始、取消、等待。
 #### 特别说明：wait目前为deprecated方法，禁止使用。
 <br>
 <br>
 
 
 ```C++
-	KS_ASYNC_API bool is_flow_completed();
-	KS_ASYNC_API bool is_task_completed(const char* task_name);
+bool is_flow_completed();
+bool is_task_completed(const char* task_name);
 
-	KS_ASYNC_API status_t get_flow_status();
-	KS_ASYNC_API status_t get_task_status(const char* task_name);
-```
-#### 描述：查询状态。
-<br>
-
-```C++
 ks_result<T> get_task_result<T>(const char* task_name);
 T get_task_result_value<T>(const char* task_name);
 ```
-#### 描述：获取任务结果。
-#### 特别说明：只可在相应任务完成后调用。
+#### 描述：查询状态和结果。
 <br>
 
 ```C++
+ks_error get_last_error();
+ks_error get_task_error(const char* task_name);
+
 std::string get_failed_task_name();
-ks_error get_failed_task_error();
 ```
-#### 描述：获取首个失败任务名称和error。
-#### 特别说明：只可在有任务失败后调用。
+#### 描述：查询错误信息。
+#### 特别说明：应在相应任务完成后调用。
+<br>
 <br>
 
+
 ```C++
-ks_future<void> get_flow_future();
+ks_future<ks_async_flow_ptr> get_flow_future();
 ```
-#### 描述：获得代表flow的future。
+#### 描述：获得代表flow的一个future。
 <br>
 <br>
 

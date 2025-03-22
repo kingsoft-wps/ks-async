@@ -81,6 +81,7 @@ private:
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;
 	friend class ks_future_util;
+	friend class ks_async_flow;
 
 private:
 	ks_promise<nothing_t> m_nothing_promise;

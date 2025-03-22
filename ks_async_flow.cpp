@@ -95,7 +95,10 @@ static void __do_pattern_to_regex(const char* pattern, std::regex* re) {
 
 
 ks_async_flow::ks_async_flow(__raw_ctor) {
-	m_flow_promise = ks_promise<void>::create();
+}
+
+ks_async_flow::~ks_async_flow() {
+	ASSERT(m_flow_status != status_t::running);
 }
 
 ks_async_flow_ptr ks_async_flow::create() {
@@ -114,8 +117,11 @@ void ks_async_flow::set_j(size_t j) {
 }
 
 bool ks_async_flow::do_add_task_raw(
-	const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
-	ks_apartment* apartment, std::function<ks_future<ks_raw_value>()>&& eval_fn, const ks_async_context& context) {
+	const char* name_and_dependencies, 
+	const std::type_info* result_value_typeinfo,
+	ks_apartment* apartment, 
+	std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn,
+	const ks_async_context& context) {
 
 	if (name_and_dependencies == nullptr || name_and_dependencies[0] == 0) {
 		ASSERT(false);
@@ -168,8 +174,24 @@ bool ks_async_flow::do_add_task_raw(
 #endif
 
 	task_item->task_apartment = apartment;
-	task_item->task_eval_fn = std::move(eval_fn);
-	task_item->task_context = context;
+
+	task_item->task_trigger = ks_promise<void>::create();
+	task_item->task_trigger.get_future().then<ks_raw_value>(
+		do_sel_apartment_locked(task_item->task_apartment, lock),
+		do_wrap_task_eval_fn_locked(std::move(eval_fn), lock),
+		context
+	).on_completion(
+		do_sel_apartment_locked(task_item->task_apartment, lock),
+		[this_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), task_item](const ks_result<ks_raw_value>& task_result) {
+			std::shared_ptr<ks_async_flow> this_ptr = this_weak.lock();
+			ASSERT(this_ptr != nullptr);
+			if (this_ptr != nullptr) {
+				std::unique_lock<ks_mutex> lock(this_ptr->m_mutex);
+				this_ptr->do_make_task_completed_locked(task_item, task_result, lock);
+			}
+		},
+		ks_async_context().set_priority(0x10000)
+	);
 
 	m_task_map[task_item->task_name] = task_item;
 	m_not_start_task_count++;
@@ -181,28 +203,31 @@ inline ks_apartment* ks_async_flow::do_sel_apartment_locked(ks_apartment* apartm
 	return apartment != nullptr ? apartment : m_default_apartment;
 }
 
-inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock) {
-	return [this, this_ptr = this->shared_from_this(), task_item]() -> ks_future<ks_async_flow::ks_raw_value> {
-		if (m_flow_cancelled_flag_v)
+inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn_locked(
+	std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock) {
+
+	return [flow_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), eval_fn = std::move(eval_fn)]() -> ks_future<ks_async_flow::ks_raw_value> {
+
+		ks_async_flow_ptr flow = flow_weak.lock();
+		if (flow == nullptr) {
+			ASSERT(false);
+			return ks_future<ks_raw_value>::rejected(ks_error::unexpected_error());
+		}
+
+		if (flow->m_flow_cancelled_flag_v)
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
-		ks_raw_living_context_rtstt context_rtstt;
-		context_rtstt.apply(task_item->task_context);
-
-		if (task_item->task_context.__check_cancel_all_ctrl() || task_item->task_context.__check_owner_expired())
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
-		return task_item->task_eval_fn();
+		return eval_fn(flow);
 	};
 }
 
 
-uint64_t ks_async_flow::add_flow_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, status_t flow_status)>&& observer_fn, const ks_async_context& context) {
+uint64_t ks_async_flow::add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	std::shared_ptr<_FLOW_OBSERVER_ITEM> observer_item = std::make_shared<_FLOW_OBSERVER_ITEM>();
-	observer_item->observer_apartment = apartment;
-	observer_item->observer_fn = std::move(observer_fn);
+	observer_item->apartment = apartment;
+	observer_item->on_running_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -211,13 +236,42 @@ uint64_t ks_async_flow::add_flow_observer(ks_apartment* apartment, std::function
 	return observer_id;
 }
 
-uint64_t ks_async_flow::add_task_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)>&& observer_fn, const ks_async_context& context) {
+uint64_t ks_async_flow::add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+
+	std::shared_ptr<_FLOW_OBSERVER_ITEM> observer_item = std::make_shared<_FLOW_OBSERVER_ITEM>();
+	observer_item->apartment = apartment;
+	observer_item->on_completed_fn = std::move(fn);
+	observer_item->observer_context = context;
+
+	uint64_t observer_id = ++m_last_x_observer_id;
+	m_flow_observer_map[observer_id] = observer_item;
+
+	return observer_id;
+}
+
+uint64_t ks_async_flow::add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	std::shared_ptr<_TASK_OBSERVER_ITEM> observer_item = std::make_shared<_TASK_OBSERVER_ITEM>();
 	__do_pattern_to_regex(task_name_pattern, &observer_item->task_name_pattern_re);
-	observer_item->observer_apartment = apartment;
-	observer_item->observer_fn = std::move(observer_fn);
+	observer_item->apartment = apartment;
+	observer_item->on_running_fn = std::move(fn);
+	observer_item->observer_context = context;
+
+	uint64_t observer_id = ++m_last_x_observer_id;
+	m_task_observer_map[observer_id] = observer_item;
+
+	return observer_id;
+}
+
+uint64_t ks_async_flow::add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+
+	std::shared_ptr<_TASK_OBSERVER_ITEM> observer_item = std::make_shared<_TASK_OBSERVER_ITEM>();
+	__do_pattern_to_regex(task_name_pattern, &observer_item->task_name_pattern_re);
+	observer_item->apartment = apartment;
+	observer_item->on_completed_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -305,24 +359,6 @@ bool ks_async_flow::start() {
 				return false;
 			}
 		}
-
-		//build task triggers
-		for (auto& entry : m_task_map) {
-			const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
-			task_item->task_trigger = ks_promise<void>::create();
-			task_item->task_trigger.get_future().then<ks_raw_value>(
-				do_sel_apartment_locked(task_item->task_apartment, lock),
-				do_wrap_task_eval_fn_locked(task_item, lock),
-				task_item->task_context
-			).on_completion(
-				do_sel_apartment_locked(task_item->task_apartment, lock),
-				[this, this_ptr = this->shared_from_this(), task_item](const ks_result<ks_raw_value>& task_result) {
-					std::unique_lock<ks_mutex> lock(m_mutex);
-					do_make_task_completed_locked(task_item, task_result, lock);
-				},
-				ks_async_context().set_priority(0x10000)
-			);
-		}
 	}
 
 	//do start
@@ -337,64 +373,8 @@ void ks_async_flow::try_cancel() {
 
 void ks_async_flow::wait() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	m_flow_promise.get_future().wait();
-}
-
-bool ks_async_flow::reset() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-	if (m_flow_status == status_t::not_start) {
-		return true;
-	}
-
-	if (m_flow_status != status_t::succeeded && m_flow_status != status_t::failed) {
-		ASSERT(false);
-		return false;
-	}
-
-	m_flow_status = status_t::not_start;
-
-	m_not_start_task_count = m_task_map.size();
-	m_pending_task_count = 0;
-	m_running_task_count = 0;
-	m_succeeded_task_count = 0;
-	m_failed_task_count = 0;
-	m_temp_pending_task_queue.clear();
-
-	m_flow_cancelled_flag_v = false;
-	m_early_failed_task_item = nullptr;
-
-	for (auto& entry : m_task_map) {
-		const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
-		if (task_item->task_status == status_t::not_start) {
-			continue;
-		}
-
-		ASSERT(task_item->task_status != status_t::running);
-
-		task_item->task_level = 0;
-		task_item->task_waiting_for_dependencies.insert(task_item->task_dependencies.cbegin(), task_item->task_dependencies.cend());
-
-		task_item->task_status = status_t::not_start;
-		task_item->task_result = ks_result<ks_raw_value>();
-
-		task_item->task_trigger = nullptr;
-	}
-
-	m_flow_promise = ks_promise<void>::create();
-
-	if (!m_user_data_map.empty()) {
-		std::unordered_map<std::string, ks_any> user_data_map_bk;
-		user_data_map_bk.swap(m_user_data_map);
-
-		m_user_data_map.clear();
-
-		for (auto& entry : user_data_map_bk) {
-			if (!entry.first.empty() && entry.first[0] == '.')
-				m_user_data_map.insert(entry);
-		}
-	}
-
-	return true;
+	while (m_flow_status != status_t::succeeded && m_flow_status != status_t::failed)
+		m_flow_completed_cv.wait(lock);
 }
 
 
@@ -418,65 +398,72 @@ bool ks_async_flow::is_task_completed(const char* task_name) {
 	return task_status == status_t::succeeded || task_status == status_t::failed;
 }
 
-ks_async_flow::status_t ks_async_flow::get_flow_status() {
+ks_error ks_async_flow::get_last_error() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	status_t flow_status = m_flow_status;
-	if (flow_status == __not_start_but_pending_status)
-		flow_status = status_t::running;
-
-	return flow_status;
+	return m_1st_failed_task_error;
 }
 
-ks_async_flow::status_t ks_async_flow::get_task_status(const char* task_name) {
+ks_error ks_async_flow::get_task_error(const char* task_name) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
-		return status_t::not_start;
+		return ks_error();
 	}
 
 	status_t task_status = it->second->task_status;
-	if (task_status == __not_start_but_pending_status)
-		task_status = status_t::not_start;
+	if (task_status != status_t::failed) {
+		return ks_error();
+	}
 
-	return task_status;
+	if (!it->second->task_result.is_error()) {
+		ASSERT(false);
+		return ks_error();
+	}
+
+	return it->second->task_result.to_error();
 }
 
 std::string ks_async_flow::get_failed_task_name() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	if (m_early_failed_task_item == nullptr) {
-		ASSERT(false);
-		return "";
-	}
-	return m_early_failed_task_item->task_name;
+	return m_1st_failed_task_name;
 }
 
-ks_error ks_async_flow::get_failed_task_error() {
+ks_future<ks_async_flow_ptr> ks_async_flow::get_flow_future() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	if (m_early_failed_task_item == nullptr) {
-		ASSERT(false);
-		return ks_error();
-	}
-	if (!m_early_failed_task_item->task_result.is_error()) {
-		ASSERT(false);
-		return ks_error::unexpected_error();
-	}
-	return m_early_failed_task_item->task_result.to_error();
-}
 
-ks_future<void> ks_async_flow::get_flow_future() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-	return m_flow_promise.get_future();
+	if (m_flow_promise_ptr_keeper_until_completed != nullptr) {
+		ASSERT(m_flow_promise_ptr_keeper_until_completed == m_flow_promise_weak.lock());
+		return ks_future<ks_async_flow_ptr>::__from_raw(m_flow_promise_ptr_keeper_until_completed->get_future());
+	}
+
+	std::shared_ptr<ks_raw_promise> flow_promise = m_flow_promise_weak.lock();
+	if (flow_promise == nullptr) {
+		flow_promise = ks_raw_promise::create(m_default_apartment);
+		m_flow_promise_weak = flow_promise;
+		m_flow_promise_ptr_keeper_until_completed = flow_promise;
+
+		if (m_flow_status == status_t::succeeded)
+			flow_promise->resolve(ks_raw_value::of(this->shared_from_this()));
+		else if (m_flow_status == status_t::failed)
+			flow_promise->reject(m_1st_failed_task_error);
+		else
+			m_flow_promise_ptr_keeper_until_completed = nullptr;
+	}
+
+	return ks_future<ks_async_flow_ptr>::__from_raw(flow_promise->get_future());
 }
 
 
 void ks_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock) {
 	ASSERT(m_flow_status == status_t::not_start);
 
+	ASSERT(m_self_running_keeper == nullptr);
+	m_self_running_keeper = this->shared_from_this();
+
 	m_flow_status = status_t::running;
-	do_fire_flow_observers_locked(m_flow_status, lock);
+	do_fire_flow_observers_locked(m_flow_status, ks_error(), lock);
 
 	if (!m_task_map.empty()) {
 		m_temp_pending_task_queue.reserve(m_task_map.size());
@@ -499,14 +486,26 @@ void ks_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock
 
 void ks_async_flow::do_make_flow_completed_locked(std::unique_lock<ks_mutex>& lock) {
 	ASSERT(m_flow_status == status_t::running);
+	ASSERT(m_failed_task_count == 0 ? m_1st_failed_task_error.get_code() == 0 : m_1st_failed_task_error.get_code() != 0);
 
 	m_flow_status = m_failed_task_count == 0 ? status_t::succeeded : status_t::failed;
-	do_fire_flow_observers_locked(m_flow_status, lock);
+	do_fire_flow_observers_locked(m_flow_status, m_1st_failed_task_error, lock);
 
-	if (m_flow_status == status_t::succeeded)
-		m_flow_promise.resolve();
-	else
-		m_flow_promise.reject(m_early_failed_task_item != nullptr ? m_early_failed_task_item->task_result.to_error() : ks_error::unexpected_error());
+	m_flow_completed_cv.notify_all();
+
+	if (m_flow_promise_ptr_keeper_until_completed != nullptr) {
+		ASSERT(m_flow_promise_ptr_keeper_until_completed == m_flow_promise_weak.lock());
+
+		if (m_flow_status == status_t::succeeded)
+			m_flow_promise_ptr_keeper_until_completed->resolve(ks_raw_value::of(this->shared_from_this()));
+		else
+			m_flow_promise_ptr_keeper_until_completed->reject(m_1st_failed_task_error);
+
+		m_flow_promise_ptr_keeper_until_completed = nullptr;
+	}
+
+	ASSERT(m_self_running_keeper != nullptr);
+	m_self_running_keeper.reset();
 }
 
 void ks_async_flow::do_make_task_pending_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_result<void>& arg, std::unique_lock<ks_mutex>& lock) {
@@ -523,7 +522,7 @@ void ks_async_flow::do_make_task_pending_locked(const std::shared_ptr<_TASK_ITEM
 	m_temp_pending_task_queue.push_back(task_item);
 
 	//任务的pending状态相当于not_start，不必fire
-	//do_fire_task_observers_locked(task_item->task_name, task_item->task_status, lock);
+	//do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
 }
 
 void ks_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock) {
@@ -542,7 +541,7 @@ void ks_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM
 
 	task_item->task_status = status_t::running;
 
-	do_fire_task_observers_locked(task_item->task_name, task_item->task_status, lock);
+	do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
 
 	if (task_item->task_pending_arg.is_value())
 		task_item->task_trigger.resolve();
@@ -556,16 +555,23 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 
 	//处置任务结果
 	m_running_task_count--;
-	m_succeeded_task_count++;
+	if (task_result.is_value())
+		m_succeeded_task_count++;
+	else
+		m_failed_task_count++;
 
 	task_item->task_status = task_result.is_value() ? status_t::succeeded : status_t::failed;
 	task_item->task_result = task_result;
 
-	if (task_result.is_error() && m_early_failed_task_item == nullptr) {
-		m_early_failed_task_item = task_item;
+	if (task_result.is_error() && m_1st_failed_task_name.empty()) {
+		m_1st_failed_task_name = task_item->task_name;
+		m_1st_failed_task_error = task_result.to_error();
 	}
 
-	do_fire_task_observers_locked(task_item->task_name, task_item->task_status, lock);
+	if (task_result.is_value())
+		do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
+	else
+		do_fire_task_observers_locked(task_item->task_name, task_item->task_status, task_result.to_error(), lock);
 
 	//驱动下游任务
 	if (m_not_start_task_count != 0) {
@@ -579,7 +585,7 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 			if (!next_task_item->task_waiting_for_dependencies.empty())
 				continue;
 
-			ks_result<void> arg = m_early_failed_task_item != nullptr ? ks_result<void>(m_early_failed_task_item->task_result.to_error()) : ks_result<void>(nothing);
+			ks_result<void> arg = task_result.cast<void>();
 			do_make_task_pending_locked(next_task_item, arg, lock);
 		}
 	}
@@ -621,11 +627,30 @@ void ks_async_flow::do_drain_pending_task_queue_locked(std::unique_lock<ks_mutex
 	}
 }
 
-void ks_async_flow::do_fire_flow_observers_locked(status_t flow_status, std::unique_lock<ks_mutex>& lock) {
+void ks_async_flow::do_fire_flow_observers_locked(status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock) {
 	if (!m_flow_observer_map.empty()) {
 		auto it = m_flow_observer_map.begin();
 		while (it != m_flow_observer_map.end()) {
 			const std::shared_ptr<_FLOW_OBSERVER_ITEM>& observer_item = it->second;
+
+			bool matched = true;
+			if (status == status_t::running) {
+				if (!observer_item->on_running_fn) 
+					matched = false;
+			}
+			else if (status == status_t::succeeded || status == status_t::failed) {
+				if (!observer_item->on_completed_fn)
+					matched = false;
+			}
+			else {
+				ASSERT(false);
+				matched = false;
+			}
+
+			if (!matched) {
+				++it;
+				continue;
+			}
 
 			ks_raw_living_context_rtstt observer_context_rtstt;
 			observer_context_rtstt.apply(observer_item->observer_context);
@@ -635,9 +660,12 @@ void ks_async_flow::do_fire_flow_observers_locked(status_t flow_status, std::uni
 				continue;
 			}
 
-			do_sel_apartment_locked(observer_item->observer_apartment, lock)->schedule(
-				[this, this_ptr = this->shared_from_this(), flow_status, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
-					observer_item->observer_fn(this_ptr, flow_status);
+			do_sel_apartment_locked(observer_item->apartment, lock)->schedule(
+				[this_ptr = this->shared_from_this(), status, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
+					if (status == status_t::running) 
+						observer_item->on_running_fn(this_ptr);
+					else if (status == status_t::succeeded || status == status_t::failed)
+						observer_item->on_completed_fn(this_ptr, error);
 				}, observer_item->observer_context.__get_priority());
 
 			++it;
@@ -645,12 +673,31 @@ void ks_async_flow::do_fire_flow_observers_locked(status_t flow_status, std::uni
 	}
 }
 
-void ks_async_flow::do_fire_task_observers_locked(const std::string& task_name, status_t task_status, std::unique_lock<ks_mutex>& lock) {
+void ks_async_flow::do_fire_task_observers_locked(const std::string& task_name, status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock) {
 	if (!m_task_observer_map.empty()) {
 		auto it = m_task_observer_map.begin();
 		while (it != m_task_observer_map.end()) {
 			const std::shared_ptr<_TASK_OBSERVER_ITEM>& observer_item = it->second;
-			if (!std::regex_match(task_name, observer_item->task_name_pattern_re)) {
+
+			bool matched = true;
+			if (status == status_t::running) {
+				if (!observer_item->on_running_fn)
+					matched = false;
+			}
+			else if (status == status_t::succeeded || status == status_t::failed) {
+				if (!observer_item->on_completed_fn)
+					matched = false;
+			}
+			else {
+				ASSERT(false);
+				matched = false;
+			}
+
+			if (matched && !std::regex_match(task_name, observer_item->task_name_pattern_re)) {
+				matched = false;
+			}
+
+			if (!matched) {
 				++it;
 				continue;
 			}
@@ -663,10 +710,13 @@ void ks_async_flow::do_fire_task_observers_locked(const std::string& task_name, 
 				continue;
 			}
 
-			do_sel_apartment_locked(observer_item->observer_apartment, lock)->schedule(
-				[this, this_ptr = this->shared_from_this(), task_name, task_status, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
-				observer_item->observer_fn(this_ptr, task_name.c_str(), task_status);
-			}, observer_item->observer_context.__get_priority());
+			do_sel_apartment_locked(observer_item->apartment, lock)->schedule(
+				[this_ptr = this->shared_from_this(), task_name, status, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
+					if (status == status_t::running) 
+						observer_item->on_running_fn(this_ptr, task_name.c_str());
+					else if (status == status_t::succeeded || status == status_t::failed)
+						observer_item->on_completed_fn(this_ptr, task_name.c_str(), error);
+				}, observer_item->observer_context.__get_priority());
 
 			++it;
 			continue;

@@ -44,7 +44,7 @@ public:
 	bool is_error() const { return m_raw_result.is_error(); }
 
 	const T& to_value() const noexcept(false) { return m_raw_result.to_value().template get<T>(); }
-	const ks_error& to_error() const noexcept(false) { return m_raw_result.to_error(); }
+	ks_error to_error() const noexcept(false) { return m_raw_result.to_error(); }
 
 	template <class R>
 	ks_result<R> cast() const {
@@ -62,7 +62,7 @@ private:
 		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
 		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
 
-		if (std::is_same_v<PROXR, PROXT>)
+		if (std::is_same_v<PROXT, PROXR>)
 			return __cast_mode_t::to_same;
 		else if (std::is_nothing_v<PROXR>)
 			return __cast_mode_t::to_nothing;
@@ -78,7 +78,7 @@ private:
 		using XR = std::remove_cvref_t<R>;
 		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
 		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_same_v<PROXR, PROXT>, "ks_result::cast_to mode 1 error");
+		static_assert(std::is_same_v<PROXT, PROXR>, "ks_result::cast_to mode 1 error");
 
 		return ks_result<R>::__from_raw(m_raw_result);
 	}
@@ -133,6 +133,7 @@ private:
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;
 	friend class ks_future_util;
+	friend class ks_async_flow;
 
 private:
 	ks_raw_result m_raw_result;

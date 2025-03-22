@@ -56,6 +56,10 @@ public:
 	const T& get_payload() const { 
 		return m_payload_any.get<T>();
 	}
+	
+	bool has_payload() const {
+		return m_payload_any.has_value();
+	}
 
 private:
 	HRESULT m_code;

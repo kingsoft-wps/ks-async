@@ -90,11 +90,13 @@ public:
 			throw m_state == _STATE::JUST_ERROR ? *this->__error_data_ptr() : ks_error::unexpected_error();
 	}
 
-	const ks_error& to_error() const noexcept(false) {
+	ks_error to_error() const noexcept(false) {
 		if (m_state == _STATE::JUST_ERROR)
 			return *this->__error_data_ptr();
-		else
-			throw ks_error::unexpected_error();
+		else {
+			ASSERT(false);
+			return ks_error();
+		}
 	}
 
 private:

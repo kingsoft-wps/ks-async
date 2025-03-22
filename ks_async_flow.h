@@ -14,7 +14,7 @@ using ks_async_flow_ptr = std::shared_ptr<ks_async_flow>;
 
 
 class ks_async_flow : public std::enable_shared_from_this<ks_async_flow> {
-public:
+private:
 	enum class status_t {
 		not_start = -1,  //未开始
 		running   =  0,  //正在执行
@@ -25,6 +25,7 @@ public:
 private:
 	enum class __raw_ctor { v };
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
+	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
 	using ks_raw_living_context_rtstt = __ks_async_raw::ks_raw_living_context_rtstt;
 	static const status_t __not_start_but_pending_status = (status_t)(-1001);
 
@@ -62,12 +63,17 @@ private:
 		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
 
 	KS_ASYNC_API bool do_add_task_raw(
-		const char* name_and_dependencies, const std::type_info* result_value_typeinfo,
-		ks_apartment* apartment, std::function<ks_future<ks_raw_value>()>&& eval_fn, const ks_async_context& context); //called in add_task<T>, so need export
+		const char* name_and_dependencies, 
+		const std::type_info* result_value_typeinfo,
+		ks_apartment* apartment,
+		std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, 
+		const ks_async_context& context); //called in add_task<T>, so need export
 
 public:
-	KS_ASYNC_API uint64_t add_flow_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, status_t flow_status)>&& observer_fn, const ks_async_context& context);
-	KS_ASYNC_API uint64_t add_task_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)>&& observer_fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
 	KS_ASYNC_API bool remove_observer(uint64_t id);
 
 public:
@@ -77,25 +83,21 @@ public:
 	//慎用，使用不当可能会造成死锁或卡顿！
 	KS_ASYNC_API _DECL_DEPRECATED void wait();
 
-	//重置为not_start状态（task_result会被重置，但user_data会被保留）
-	KS_ASYNC_API bool reset();
-
 public:
 	KS_ASYNC_API bool is_flow_completed();
 	KS_ASYNC_API bool is_task_completed(const char* task_name);
-
-	KS_ASYNC_API status_t get_flow_status();
-	KS_ASYNC_API status_t get_task_status(const char* task_name);
 
 	template <class T>
 	KS_ASYNC_INLINE_API ks_result<T> get_task_result(const char* task_name);
 	template <class T>
 	KS_ASYNC_INLINE_API T get_task_result_value(const char* task_name);
 
-	KS_ASYNC_API std::string get_failed_task_name();
-	KS_ASYNC_API ks_error get_failed_task_error();
+	KS_ASYNC_API ks_error get_last_error();
+	KS_ASYNC_API ks_error get_task_error(const char* task_name);
 
-	KS_ASYNC_API ks_future<void> get_flow_future();
+	KS_ASYNC_API std::string get_failed_task_name();
+
+	KS_ASYNC_API ks_future<ks_async_flow_ptr> get_flow_future();
 
 public:
 	template <class T>
@@ -107,14 +109,11 @@ private:
 	struct _TASK_ITEM {
 		std::string task_name; //const-like
 		std::vector<std::string> task_dependencies; //const-like
-
-		ks_apartment* task_apartment = nullptr; //const-like
-		std::function<ks_future<ks_raw_value>()> task_eval_fn; //const-like
-		ks_async_context task_context; //const-like
-
 #ifdef _DEBUG
-		const std::type_info* task_result_value_typeinfo = nullptr;
+		const std::type_info* task_result_value_typeinfo; //const-like
 #endif
+
+		ks_apartment* task_apartment; //const-like
 
 		int task_level = 0;
 		std::unordered_set<std::string> task_waiting_for_dependencies;
@@ -122,20 +121,22 @@ private:
 		status_t task_status = status_t::not_start;
 		ks_result<void> task_pending_arg;
 
-		ks_result<ks_raw_value> task_result;
 		ks_promise<void> task_trigger = nullptr;
+		ks_result<ks_raw_value> task_result;
 	};
 
 	struct _FLOW_OBSERVER_ITEM {
-		ks_apartment* observer_apartment;
-		std::function<void(const ks_async_flow_ptr& flow, status_t task_status)> observer_fn;
+		ks_apartment* apartment;
+		std::function<void(const ks_async_flow_ptr& flow)> on_running_fn = nullptr;
+		std::function<void(const ks_async_flow_ptr& flow, const ks_error& error)> on_completed_fn = nullptr;
 		ks_async_context observer_context;
 	};
 
 	struct _TASK_OBSERVER_ITEM {
 		std::regex task_name_pattern_re;
-		ks_apartment* observer_apartment;
-		std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)> observer_fn;
+		ks_apartment* apartment;
+		std::function<void(const ks_async_flow_ptr& flow, const char* task_name)> on_running_fn = nullptr;
+		std::function<void(const ks_async_flow_ptr& flow, const char* task_name, const ks_error& error)> on_completed_fn = nullptr;
 		ks_async_context observer_context;
 	};
 
@@ -149,14 +150,16 @@ private:
 
 	void do_drain_pending_task_queue_locked(std::unique_lock<ks_mutex>& lock);
 
-	void do_fire_flow_observers_locked(status_t flow_status, std::unique_lock<ks_mutex>& lock);
-	void do_fire_task_observers_locked(const std::string& task_name, status_t task_status, std::unique_lock<ks_mutex>& lock);
+	void do_fire_flow_observers_locked(status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock);
+	void do_fire_task_observers_locked(const std::string& task_name, status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock);
 
 	inline ks_apartment* do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock);
-	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock);
+	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn_locked(
+		std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock);
 
 public:
 	explicit ks_async_flow(__raw_ctor); //inner use, called in create, public it because make_shared
+	~ks_async_flow(); //inner use, called in ~shared_ptr
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
 
 private:
@@ -166,25 +169,31 @@ private:
 	size_t m_j = size_t(-1);
 
 	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map;
-	ks_promise<void> m_flow_promise = nullptr;
 
 	std::unordered_map<uint64_t, std::shared_ptr<_FLOW_OBSERVER_ITEM>> m_flow_observer_map;
 	std::unordered_map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map;
 	std::atomic<uint64_t> m_last_x_observer_id = { 0 };
 
-	status_t m_flow_status = status_t::not_start;
-
+	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue{};
 	size_t m_not_start_task_count = 0;
 	size_t m_pending_task_count = 0;
 	size_t m_running_task_count = 0;
 	size_t m_succeeded_task_count = 0;
 	size_t m_failed_task_count = 0;
-	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue;
+
+	status_t m_flow_status = status_t::not_start;
+	ks_condition_variable m_flow_completed_cv{};
 
 	volatile bool m_flow_cancelled_flag_v = false;
-	std::shared_ptr<_TASK_ITEM> m_early_failed_task_item = nullptr;
+	std::string m_1st_failed_task_name;
+	ks_error m_1st_failed_task_error;
 
 	std::unordered_map<std::string, ks_any> m_user_data_map;
+
+	std::shared_ptr<ks_async_flow> m_self_running_keeper = nullptr;
+
+	std::weak_ptr<ks_raw_promise> m_flow_promise_weak;
+	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed; //completed后清除，以避免循环引用
 };
 
 
@@ -197,8 +206,8 @@ bool ks_async_flow::add_task(
 	ks_apartment* apartment, FN&& fn, const ks_async_context& context) {
 
 	constexpr int ret_mode =
-		std::is_same_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_future<T>> ? 3 :
-		std::is_same_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_result<T>> ? 2 :
+		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_future<T>> ? 3 :
+		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, ks_result<T>> ? 2 :
 		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow_ptr&>, T> ? 1 : 0;
 	static_assert(ret_mode != 0, "illegal task_fn's ret");
 
@@ -222,9 +231,9 @@ bool ks_async_flow::do_add_task_choose(
 
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+		[fn = std::move(fn)](const ks_async_flow_ptr& flow)->ks_future<ks_raw_value> {
 
-		T typed_task_result_value = fn(this_ptr);
+		T typed_task_result_value = fn(flow);
 		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<T>(typed_task_result_value));
 	}, context);
 }
@@ -237,9 +246,9 @@ bool ks_async_flow::do_add_task_choose<void>(
 
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+		[fn = std::move(fn)](const ks_async_flow_ptr& flow)->ks_future<ks_raw_value> {
 
-		fn(this_ptr);
+		fn(flow);
 		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<nothing_t>(nothing));
 	}, context);
 }
@@ -252,9 +261,9 @@ bool ks_async_flow::do_add_task_choose(
 
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+		[fn = std::move(fn)](const ks_async_flow_ptr& flow)->ks_future<ks_raw_value> {
 
-		ks_result<T> typed_task_result = fn(this_ptr);
+		ks_result<T> typed_task_result = fn(flow);
 		if (typed_task_result.is_value())
 			return ks_future<ks_raw_value>::resolved(ks_raw_value::of<T>(typed_task_result.to_value()));
 		else
@@ -270,7 +279,7 @@ bool ks_async_flow::do_add_task_choose(
 
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
-		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
+		[fn = std::move(fn)](const ks_async_flow_ptr& flow)->ks_future<ks_raw_value> {
 
 		return fn(this_ptr).then<ks_raw_value>(
 			apartment,
@@ -304,10 +313,7 @@ ks_result<T> ks_async_flow::get_task_result(const char* task_name) {
 		return ks_result<T>();
 	}
 
-	if (task_result.is_value())
-		return task_result.to_value().get<T>();
-	else
-		return task_result.to_error();
+	return ks_result<T>::__from_raw(task_result);
 }
 
 template <> inline //特化
@@ -345,21 +351,10 @@ T ks_async_flow::get_task_result_value(const char* task_name) {
 	ks_result<T> task_result = this->get_task_result<T>(task_name);
 	if (!task_result.is_value()) {
 		ASSERT(false);
-		throw std::runtime_error("task result value not available");
+		return T{};
 	}
 
 	return task_result.to_value().get<T>();
-}
-
-template <> inline //特化
-void ks_async_flow::get_task_result_value<void>(const char* task_name) {
-	ks_result<void> task_result = this->get_task_result<void>(task_name);
-	if (!task_result.is_value()) {
-		ASSERT(false);
-		throw std::runtime_error("task result value not available");
-	}
-
-	return;
 }
 
 

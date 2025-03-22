@@ -253,29 +253,40 @@ void test_async_flow() {
         return "a1-tasktask";
         });
     ASSERT(b);
+
     b = flow->add_task<std::string>("a2", ks_apartment::default_mta(), [](auto& flow) {
         return "a2-tasktask";
         });
     ASSERT(b);
+
     b = flow->add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](auto& flow) {
         return "b1-tasktask";
         });
     ASSERT(b);
 
-    id = flow->add_task_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name, ks_async_flow::status_t task_status) {
-        std::cout << (std::stringstream() << "async-flow: task-notify: task_name: " << task_name << ", task_status: " << (int)task_status << "\n").str();
-    }, ks_async_context());
-    ASSERT(id != 0);
-    id = flow->add_flow_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, ks_async_flow::status_t flow_status) {
-        std::cout << (std::stringstream() << "async-flow: flow-notify: flow_status: " << (int)flow_status << "\n").str();
+    id = flow->add_task_running_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name) {
+        std::cout << (std::stringstream() << "async-flow: notify: task/" << task_name << ": running" << "\n").str();
     }, ks_async_context());
     ASSERT(id != 0);
 
-    flow->get_flow_future().on_completion(ks_apartment::background_sta(), [](const ks_result<void>& result) {
-        g_exit_latch.count_down();
-        std::cout << "async-flow ";
-        _output_result("complete(void): ", result);
+    id = flow->add_task_completed_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name, const ks_error& error) {
+        std::cout << (std::stringstream() << "async-flow: notify: task/" << task_name << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
+        }, ks_async_context());
+    ASSERT(id != 0);
+
+    id = flow->add_flow_running_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow) {
+        std::cout << (std::stringstream() << "async-flow: notify: flow" << ": running" << "\n").str();
     }, ks_async_context());
+    ASSERT(id != 0);
+
+    id = flow->add_flow_completed_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const ks_error& error) {
+        std::cout << (std::stringstream() << "async-flow: notify: flow" << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
+
+        std::cout << "async-flow ";
+        _output_result("complete(void): ", error.get_code() == 0 ? ks_result<void>(nothing) : ks_result<void>(error));
+        g_exit_latch.count_down();
+    }, ks_async_context());
+    ASSERT(id != 0);
 
     flow->start();
 
