@@ -383,14 +383,14 @@ bool ks_async_flow::reset() {
 	m_flow_promise = ks_promise<void>::create();
 
 	if (!m_user_data_map.empty()) {
-		auto it = m_user_data_map.begin();
-		while (it != m_user_data_map.end()) {
-			if (it->first.empty() || it->first[0] != '.') {
-				it = m_user_data_map.erase(it);
-			}
-			else {
-				++it;
-			}
+		std::unordered_map<std::string, ks_any> user_data_map_bk;
+		user_data_map_bk.swap(m_user_data_map);
+
+		m_user_data_map.clear();
+
+		for (auto& entry : user_data_map_bk) {
+			if (!entry.first.empty() && entry.first[0] == '.')
+				m_user_data_map.insert(entry);
 		}
 	}
 
