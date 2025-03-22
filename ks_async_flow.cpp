@@ -177,11 +177,11 @@ bool ks_async_flow::do_add_task_raw(
 }
 
 
-inline ks_apartment* ks_async_flow::do_sel_apartment(ks_apartment* apartment) {
-	return apartment != nullptr ? apartment : ks_apartment::default_mta();
+inline ks_apartment* ks_async_flow::do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock) {
+	return apartment != nullptr ? apartment : m_default_apartment;
 }
 
-inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn(const std::shared_ptr<_TASK_ITEM>& task_item) {
+inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock) {
 	return [this, this_ptr = this->shared_from_this(), task_item]() -> ks_future<ks_async_flow::ks_raw_value> {
 		if (m_flow_cancelled_flag_v)
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
@@ -311,11 +311,11 @@ bool ks_async_flow::start() {
 			const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
 			task_item->task_trigger = ks_promise<void>::create();
 			task_item->task_trigger.get_future().then<ks_raw_value>(
-				do_sel_apartment(task_item->task_apartment),
-				do_wrap_task_eval_fn(task_item),
+				do_sel_apartment_locked(task_item->task_apartment, lock),
+				do_wrap_task_eval_fn_locked(task_item, lock),
 				task_item->task_context
 			).on_completion(
-				do_sel_apartment(task_item->task_apartment),
+				do_sel_apartment_locked(task_item->task_apartment, lock),
 				[this, this_ptr = this->shared_from_this(), task_item](const ks_result<ks_raw_value>& task_result) {
 					std::unique_lock<ks_mutex> lock(m_mutex);
 					do_make_task_completed_locked(task_item, task_result, lock);
@@ -635,7 +635,7 @@ void ks_async_flow::do_fire_flow_observers_locked(status_t flow_status, std::uni
 				continue;
 			}
 
-			do_sel_apartment(observer_item->observer_apartment)->schedule(
+			do_sel_apartment_locked(observer_item->observer_apartment, lock)->schedule(
 				[this, this_ptr = this->shared_from_this(), flow_status, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 					observer_item->observer_fn(this_ptr, flow_status);
 				}, observer_item->observer_context.__get_priority());
@@ -663,7 +663,7 @@ void ks_async_flow::do_fire_task_observers_locked(const std::string& task_name, 
 				continue;
 			}
 
-			do_sel_apartment(observer_item->observer_apartment)->schedule(
+			do_sel_apartment_locked(observer_item->observer_apartment, lock)->schedule(
 				[this, this_ptr = this->shared_from_this(), task_name, task_status, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 				observer_item->observer_fn(this_ptr, task_name.c_str(), task_status);
 			}, observer_item->observer_context.__get_priority());

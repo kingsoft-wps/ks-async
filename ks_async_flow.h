@@ -152,8 +152,8 @@ private:
 	void do_fire_flow_observers_locked(status_t flow_status, std::unique_lock<ks_mutex>& lock);
 	void do_fire_task_observers_locked(const std::string& task_name, status_t task_status, std::unique_lock<ks_mutex>& lock);
 
-	inline ks_apartment* do_sel_apartment(ks_apartment* apartment);
-	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn(const std::shared_ptr<_TASK_ITEM>& task_item);
+	inline ks_apartment* do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock);
+	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock);
 
 public:
 	explicit ks_async_flow(__raw_ctor); //inner use, called in create, public it because make_shared
