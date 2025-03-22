@@ -83,6 +83,9 @@ public:
 	//慎用，使用不当可能会造成死锁或卡顿！
 	KS_ASYNC_API _DECL_DEPRECATED void wait();
 
+	//强制清理，一般不需要调用，出现循环引用时可用
+	KS_ASYNC_API void force_cleanup();
+
 public:
 	KS_ASYNC_API bool is_flow_completed();
 	KS_ASYNC_API bool is_task_completed(const char* task_name);
@@ -92,18 +95,16 @@ public:
 	template <class T>
 	KS_ASYNC_INLINE_API T get_task_result_value(const char* task_name);
 
-	KS_ASYNC_API ks_error get_last_error();
-	KS_ASYNC_API ks_error get_task_error(const char* task_name);
-
-	KS_ASYNC_API std::string get_failed_task_name();
-
-	KS_ASYNC_API ks_future<ks_async_flow_ptr> get_flow_future();
-
-public:
 	template <class T>
 	KS_ASYNC_INLINE_API void set_user_data(const char* name, const T& value);
 	template <class T>
 	KS_ASYNC_INLINE_API T get_user_data(const char* name);
+
+	KS_ASYNC_API ks_error get_last_error();
+	KS_ASYNC_API std::string get_failed_task_name();
+	KS_ASYNC_API ks_error get_task_error(const char* task_name);
+
+	KS_ASYNC_API ks_future<ks_async_flow_ptr> get_flow_future();
 
 private:
 	struct _TASK_ITEM {
@@ -153,6 +154,8 @@ private:
 	void do_fire_flow_observers_locked(status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock);
 	void do_fire_task_observers_locked(const std::string& task_name, status_t status, const ks_error& error, std::unique_lock<ks_mutex>& lock);
 
+	void do_force_cleanup_data_locked(std::unique_lock<ks_mutex>& lock);
+
 	inline ks_apartment* do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock);
 	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn_locked(
 		std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock);
@@ -185,15 +188,18 @@ private:
 	ks_condition_variable m_flow_completed_cv{};
 
 	volatile bool m_flow_cancelled_flag_v = false;
+	volatile bool m_flow_force_cleanup_flag_v = false;
+
 	std::string m_1st_failed_task_name;
 	ks_error m_1st_failed_task_error;
 
 	std::unordered_map<std::string, ks_any> m_user_data_map;
 
-	std::shared_ptr<ks_async_flow> m_self_running_keeper = nullptr;
-
+	ks_result<void> m_flow_result;
 	std::weak_ptr<ks_raw_promise> m_flow_promise_weak;
-	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed; //completed后清除，以避免循环引用
+	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed; //completed后自动清除，以避免循环引用
+
+	std::shared_ptr<ks_async_flow> m_self_running_keeper = nullptr;
 };
 
 
