@@ -36,14 +36,6 @@ static ks_async_flow_ptr ks_async_flow::create();
 # 一般成员方法
 
 ```C++
-void set_j(size_t j);
-```
-#### 描述：设置并发度，默认无限制。
-<br>
-<br>
-
-
-```C++
 bool add_task<T>(
     const char* name_and_dependencies,
     ks_apartment* apartment, std::function<T(const ks_async_flow_ptr& flow)>&& fn, const ks_async_context& context = {});
@@ -78,14 +70,6 @@ bool reset();
 ```
 #### 描述：开始、取消、等待、重置。
 #### 特别说明：wait目前为deprecated方法，禁止使用。
-<br>
-<br>
-
-
-```C++
-ks_async_flow_ptr spawn();
-```
-#### 描述：不带状态和observer克隆flow，新flow对象状态为init。
 <br>
 <br>
 
@@ -131,3 +115,18 @@ T get_user_data(const char* name);
 #### 描述：设置/获取user-data。
 <br>
 <br>
+
+
+```C++
+void set_default_apartment(ks_apartment* apartment);
+```
+#### 描述：设置默认套间，初始为default-mta。
+<br>
+
+```C++
+void set_j(size_t j);
+```
+#### 描述：设置并发度，初始无限制。
+<br>
+<br>
+

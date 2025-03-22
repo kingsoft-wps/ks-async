@@ -246,24 +246,35 @@ void test_async_flow() {
     std::cout << "test async-flow ... \n";
 
     ks_async_flow_ptr flow = ks_async_flow::create();
-    flow->add_task<std::string>("a1", ks_apartment::default_mta(), [](auto& flow) {
+    bool b;
+    uint64_t id;
+
+    b = flow->add_task<std::string>("a1", ks_apartment::default_mta(), [](auto& flow) {
         return "a1-tasktask";
         });
-    flow->add_task<std::string>("a2", ks_apartment::default_mta(), [](auto& flow) {
+    ASSERT(b);
+    b = flow->add_task<std::string>("a2", ks_apartment::default_mta(), [](auto& flow) {
         return "a2-tasktask";
         });
-    flow->add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](auto& flow) {
+    ASSERT(b);
+    b = flow->add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](auto& flow) {
         return "b1-tasktask";
         });
+    ASSERT(b);
 
-    flow->add_task_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name, ks_async_flow::status_t task_status) {
-        std::cout << (std::stringstream() << "task_name: " << task_name << ", task_status: " << (int)task_status << "\n").str();
+    id = flow->add_task_observer("*", ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, const char* task_name, ks_async_flow::status_t task_status) {
+        std::cout << (std::stringstream() << "async-flow: task-notify: task_name: " << task_name << ", task_status: " << (int)task_status << "\n").str();
     }, ks_async_context());
-    flow->add_flow_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, ks_async_flow::status_t flow_status) {
-        std::cout << (std::stringstream() << "flow_status: " << (int)flow_status << "\n").str();
+    ASSERT(id != 0);
+    id = flow->add_flow_observer(ks_apartment::background_sta(), [](const ks_async_flow_ptr& flow, ks_async_flow::status_t flow_status) {
+        std::cout << (std::stringstream() << "async-flow: flow-notify: flow_status: " << (int)flow_status << "\n").str();
     }, ks_async_context());
-    flow->get_flow_future().on_completion(ks_apartment::background_sta(), [](auto&) {
+    ASSERT(id != 0);
+
+    flow->get_flow_future().on_completion(ks_apartment::background_sta(), [](const ks_result<void>& result) {
         g_exit_latch.count_down();
+        std::cout << "async-flow ";
+        _output_result("complete(void): ", result);
     }, ks_async_context());
 
     flow->start();

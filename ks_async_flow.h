@@ -32,6 +32,7 @@ public:
 	KS_ASYNC_API static ks_async_flow_ptr create();
 
 public:
+	KS_ASYNC_API void set_default_apartment(ks_apartment* apartment);
 	KS_ASYNC_API void set_j(size_t j);
 
 public:
@@ -67,7 +68,7 @@ private:
 public:
 	KS_ASYNC_API uint64_t add_flow_observer(ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, status_t flow_status)>&& observer_fn, const ks_async_context& context);
 	KS_ASYNC_API uint64_t add_task_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)>&& observer_fn, const ks_async_context& context);
-	KS_ASYNC_API void remove_observer(uint64_t id);
+	KS_ASYNC_API bool remove_observer(uint64_t id);
 
 public:
 	KS_ASYNC_API bool start();
@@ -78,9 +79,6 @@ public:
 
 	//重置为not_start状态（task_result会被重置，但user_data会被保留）
 	KS_ASYNC_API bool reset();
-
-	//不带状态和observer克隆flow，新flow对象状态为init
-	KS_ASYNC_API ks_async_flow_ptr spawn();
 
 public:
 	KS_ASYNC_API bool is_flow_completed();
@@ -129,16 +127,16 @@ private:
 	};
 
 	struct _FLOW_OBSERVER_ITEM {
-		ks_apartment* apartment;
+		ks_apartment* observer_apartment;
 		std::function<void(const ks_async_flow_ptr& flow, status_t task_status)> observer_fn;
-		ks_async_context context;
+		ks_async_context observer_context;
 	};
 
 	struct _TASK_OBSERVER_ITEM {
 		std::regex task_name_pattern_re;
-		ks_apartment* apartment;
+		ks_apartment* observer_apartment;
 		std::function<void(const ks_async_flow_ptr& flow, const char* task_name, status_t task_status)> observer_fn;
-		ks_async_context context;
+		ks_async_context observer_context;
 	};
 
 private:
@@ -154,6 +152,9 @@ private:
 	void do_fire_flow_observers_locked(status_t flow_status, std::unique_lock<ks_mutex>& lock);
 	void do_fire_task_observers_locked(const std::string& task_name, status_t task_status, std::unique_lock<ks_mutex>& lock);
 
+	inline ks_apartment* do_sel_apartment(ks_apartment* apartment);
+	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn(const std::shared_ptr<_TASK_ITEM>& task_item);
+
 public:
 	explicit ks_async_flow(__raw_ctor); //inner use, called in create, public it because make_shared
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
@@ -161,6 +162,7 @@ public:
 private:
 	ks_mutex m_mutex;
 
+	ks_apartment* m_default_apartment = ks_apartment::default_mta();
 	size_t m_j = size_t(-1);
 
 	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map;
@@ -222,15 +224,6 @@ bool ks_async_flow::do_add_task_choose(
 		name_and_dependencies, result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
 
-		if (m_flow_cancelled_flag_v)
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
-		ks_raw_living_context_rtstt context_rtstt;
-		context_rtstt.apply(context);
-
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
 		T typed_task_result_value = fn(this_ptr);
 		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<T>(typed_task_result_value));
 	}, context);
@@ -246,15 +239,6 @@ bool ks_async_flow::do_add_task_choose<void>(
 		name_and_dependencies, result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
 
-		if (m_flow_cancelled_flag_v)
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
-		ks_raw_living_context_rtstt context_rtstt;
-		context_rtstt.apply(context);
-
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
 		fn(this_ptr);
 		return ks_future<ks_raw_value>::resolved(ks_raw_value::of<nothing_t>(nothing));
 	}, context);
@@ -269,15 +253,6 @@ bool ks_async_flow::do_add_task_choose(
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
-
-		if (m_flow_cancelled_flag_v)
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
-		ks_raw_living_context_rtstt context_rtstt;
-		context_rtstt.apply(context);
-
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		ks_result<T> typed_task_result = fn(this_ptr);
 		if (typed_task_result.is_value())
@@ -296,15 +271,6 @@ bool ks_async_flow::do_add_task_choose(
 	return do_add_task_raw(
 		name_and_dependencies, result_value_typeinfo, apartment,
 		[this, this_ptr = this->shared_from_this(), apartment, fn = std::move(fn), context]()->ks_future<ks_raw_value> {
-
-		if (m_flow_cancelled_flag_v)
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
-
-		ks_raw_living_context_rtstt context_rtstt;
-		context_rtstt.apply(context);
-
-		if (context.__check_cancel_all_ctrl() || context.__check_owner_expired())
-			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 
 		return fn(this_ptr).then<ks_raw_value>(
 			apartment,
