@@ -91,9 +91,10 @@ ks_error get_task_error(const char* task_name);
 <br>
 
 ```C++
+ks_future<T> get_task_future<T>(const char* task_name);
 ks_future<ks_async_flow_ptr> get_flow_future();
 ```
-#### 描述：获得代表flow的一个future。
+#### 描述：获得代表task或flow的一个future。
 <br>
 <br>
 
@@ -102,7 +103,7 @@ ks_future<ks_async_flow_ptr> get_flow_future();
 void set_default_apartment(ks_apartment* apartment);
 void set_j(size_t j);
 ```
-#### 描述：配置选项。
+#### 描述：各可配置选项。
 <br>
 <br>
 

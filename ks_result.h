@@ -33,7 +33,7 @@ public:
 	ks_result& operator=(const ks_result&) = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
 
-	static ks_result bare() { return ks_result(__raw_ctor::v); }
+	static ks_result __bare() { return ks_result(__raw_ctor::v); }
 
 	using value_type = T;
 	using this_result_type = ks_result<T>;
@@ -111,9 +111,9 @@ private:
 	ks_result<R> __do_map(std::bool_constant<true> __is_void_fn, const FN& fn) const {
 		static_assert(std::is_void_v<R>, "invalid map type");
 		if (this->is_value()) 
-			return ks_result<void>((fn(this->to_value()), nothing));
+			return ks_result<R>((fn(this->to_value()), nothing));
 		else
-			return ks_result<void>(this->to_error());
+			return ks_result<R>(this->to_error());
 	}
 
 	template <class R, class FN>

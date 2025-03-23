@@ -29,7 +29,7 @@ public:
 	ks_result& operator=(const ks_result&) = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
 
-	static ks_result bare() { return ks_result(__raw_ctor::v); }
+	static ks_result __bare() { return ks_result(__raw_ctor::v); }
 
 	using value_type = void;
 	using this_result_type = ks_result<void>;

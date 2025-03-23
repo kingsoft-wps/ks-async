@@ -26,6 +26,7 @@ private:
 	enum class __raw_ctor { v };
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
+	using ks_raw_promise_ptr = __ks_async_raw::ks_raw_promise_ptr;
 	using ks_raw_living_context_rtstt = __ks_async_raw::ks_raw_living_context_rtstt;
 	static const status_t __not_start_but_pending_status = (status_t)(-1001);
 
@@ -84,7 +85,7 @@ public:
 	KS_ASYNC_API _DECL_DEPRECATED void wait();
 
 	//强制清理，一般不需要调用，出现循环引用时可用
-	KS_ASYNC_API void force_cleanup();
+	KS_ASYNC_API void __force_cleanup();
 
 public:
 	KS_ASYNC_API bool is_flow_completed();
@@ -104,6 +105,8 @@ public:
 	KS_ASYNC_API std::string get_failed_task_name();
 	KS_ASYNC_API ks_error get_task_error(const char* task_name);
 
+	template <class T>
+	KS_ASYNC_INLINE_API ks_future<T> get_task_future(const char* task_name);
 	KS_ASYNC_API ks_future<ks_async_flow_ptr> get_flow_future();
 
 private:
@@ -120,10 +123,14 @@ private:
 		std::unordered_set<std::string> task_waiting_for_dependencies;
 
 		status_t task_status = status_t::not_start;
-		ks_result<void> task_pending_arg = ks_result<void>::bare();
+		ks_condition_variable task_completed_cv{};
 
+		ks_result<void> task_pending_arg = ks_result<void>::__bare();
 		ks_promise<void> task_trigger{ nullptr };
-		ks_result<ks_raw_value> task_result = ks_result<ks_raw_value>::bare();
+		ks_result<ks_raw_value> task_result = ks_result<ks_raw_value>::__bare();
+
+		std::weak_ptr<ks_raw_promise> task_promise_weak = {};
+		ks_raw_promise_ptr task_promise_keeper_until_completed = nullptr;
 	};
 
 	struct _FLOW_OBSERVER_ITEM {
@@ -156,9 +163,12 @@ private:
 
 	void do_force_cleanup_data_locked(std::unique_lock<ks_mutex>& lock);
 
-	inline ks_apartment* do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock);
 	inline std::function<ks_future<ks_raw_value>()> do_wrap_task_eval_fn_locked(
 		std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock);
+
+	inline ks_apartment* do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock) { 
+		return apartment != nullptr ? apartment : m_default_apartment;
+	}
 
 public:
 	explicit ks_async_flow(__raw_ctor); //inner use, called in create, public it because make_shared
@@ -189,15 +199,15 @@ private:
 	status_t m_flow_status = status_t::not_start;
 	ks_condition_variable m_flow_completed_cv{};
 
-	volatile bool m_flow_cancelled_flag_v = false;
-	volatile bool m_flow_force_cleanup_flag_v = false;
+	volatile bool m_cancelled_flag_v = false;
+	volatile bool m_force_cleanup_flag_v = false;
 
 	std::string m_1st_failed_task_name{};
-	ks_result<void> m_flow_result = ks_result<void>::bare();
+	ks_result<void> m_flow_result = ks_result<void>::__bare();
 	ks_error m_last_error{};
 
-	std::weak_ptr<ks_raw_promise> m_flow_promise_weak{};
-	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed = nullptr; //completed后自动清除，以避免循环引用
+	std::weak_ptr<ks_raw_promise> m_flow_promise_weak = {};
+	ks_raw_promise_ptr m_flow_promise_ptr_keeper_until_completed = nullptr; //completed后自动清除，以避免循环引用
 
 	std::shared_ptr<ks_async_flow> m_self_running_keeper = nullptr;
 };
@@ -305,15 +315,16 @@ ks_result<T> ks_async_flow::get_task_result(const char* task_name) {
 		return ks_result<T>();
 	}
 
-	ASSERT(it->second->task_result_value_typeinfo != nullptr);
-	ASSERT(*it->second->task_result_value_typeinfo == typeid(T) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(T).name()) == 0);
+	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
+	ASSERT(task_item->task_result_value_typeinfo != nullptr);
+	ASSERT(*task_item->task_result_value_typeinfo == typeid(T) || strcmp(task_item->task_result_value_typeinfo->name(), typeid(T).name()) == 0);
 
-	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
+	if (task_item->task_status != status_t::succeeded && task_item->task_status != status_t::failed) {
 		ASSERT(false);
 		return ks_result<T>();
 	}
 
-	const ks_result<ks_raw_value>& task_result = it->second->task_result;
+	const ks_result<ks_raw_value>& task_result = task_item->task_result;
 	if (!task_result.is_completed()) {
 		ASSERT(false);
 		return ks_result<T>();
@@ -329,21 +340,22 @@ ks_result<void> ks_async_flow::get_task_result<void>(const char* task_name) {
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
-		return ks_result<void>::bare();
+		return ks_result<void>::__bare();
 	}
 
-	ASSERT(it->second->task_result_value_typeinfo != nullptr);
-	ASSERT(*it->second->task_result_value_typeinfo == typeid(void) || strcmp(it->second->task_result_value_typeinfo->name(), typeid(void).name()) == 0);
+	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
+	ASSERT(task_item->task_result_value_typeinfo != nullptr);
+	ASSERT(*task_item->task_result_value_typeinfo == typeid(void) || strcmp(task_item->task_result_value_typeinfo->name(), typeid(void).name()) == 0);
 
-	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
+	if (task_item->task_status != status_t::succeeded && task_item->task_status != status_t::failed) {
 		ASSERT(false);
-		return ks_result<void>::bare();
+		return ks_result<void>::__bare();
 	}
 
-	const ks_result<ks_raw_value>& task_result = it->second->task_result;
+	const ks_result<ks_raw_value>& task_result = task_item->task_result;
 	if (!task_result.is_completed()) {
 		ASSERT(false);
-		return ks_result<void>::bare();
+		return ks_result<void>::__bare();
 	}
 
 	return task_result.cast<void>();
@@ -378,4 +390,44 @@ T ks_async_flow::get_user_data(const char* name) {
 	}
 
 	return it->second.cast<T>();
+}
+
+template <class T>
+ks_future<T> ks_async_flow::get_task_future(const char* task_name) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+
+	auto it = m_task_map.find(task_name);
+	if (it == m_task_map.cend()) {
+		ASSERT(false);
+		return nullptr;
+	}
+
+	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
+	ASSERT(task_item->task_result_value_typeinfo != nullptr);
+	ASSERT(*task_item->task_result_value_typeinfo == typeid(T) || strcmp(task_item->task_result_value_typeinfo->name(), typeid(T).name()) == 0);
+
+	if (task_item->task_promise_keeper_until_completed != nullptr) {
+		ASSERT(task_item->task_promise_keeper_until_completed == task_item->task_promise_weak.lock());
+		return ks_future<T>::__from_raw(task_item->task_promise_keeper_until_completed->get_future());
+	}
+
+	ks_raw_promise_ptr task_promise = task_item->task_promise_weak.lock();
+	if (task_promise == nullptr) {
+		task_promise = ks_raw_promise::create(do_sel_apartment_locked(task_item->task_apartment, lock));
+		task_item->task_promise_weak = task_promise;
+
+		if (task_item->task_status == status_t::succeeded || task_item->task_status == status_t::failed) {
+			if (task_item->task_result.is_value())
+				task_promise->resolve(task_item->task_result.to_value());
+			else
+				task_promise->reject(task_item->task_result.to_error());
+
+			ASSERT(task_item->task_promise_keeper_until_completed == nullptr);
+		}
+		else {
+			task_item->task_promise_keeper_until_completed = task_promise;
+		}
+	}
+
+	return ks_future<T>::__from_raw(task_promise->get_future());
 }

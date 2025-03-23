@@ -199,10 +199,6 @@ bool ks_async_flow::do_add_task_raw(
 }
 
 
-inline ks_apartment* ks_async_flow::do_sel_apartment_locked(ks_apartment* apartment, std::unique_lock<ks_mutex>& lock) {
-	return apartment != nullptr ? apartment : m_default_apartment;
-}
-
 inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn_locked(
 	std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock) {
 
@@ -214,7 +210,11 @@ inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do
 			return ks_future<ks_raw_value>::rejected(ks_error::unexpected_error());
 		}
 
-		if (flow->m_flow_cancelled_flag_v || flow->m_flow_force_cleanup_flag_v) {
+		if (flow->m_force_cleanup_flag_v) {
+			return ks_future<ks_raw_value>::rejected(ks_error::was_terminated_error());
+		}
+
+		if (flow->m_cancelled_flag_v) {
 			return ks_future<ks_raw_value>::rejected(ks_error::was_cancelled_error());
 		}
 
@@ -297,6 +297,10 @@ bool ks_async_flow::start() {
 		ASSERT(false);
 		return false;
 	}
+	if (m_force_cleanup_flag_v) {
+		ASSERT(false);
+		return false;
+	}
 
 	if (!m_task_map.empty()) {
 		//check task deps valid
@@ -369,7 +373,7 @@ bool ks_async_flow::start() {
 
 void ks_async_flow::try_cancel() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	m_flow_cancelled_flag_v = true;
+	m_cancelled_flag_v = true;
 }
 
 void ks_async_flow::wait() {
@@ -378,9 +382,9 @@ void ks_async_flow::wait() {
 		m_flow_completed_cv.wait(lock);
 }
 
-void ks_async_flow::force_cleanup() {
+void ks_async_flow::__force_cleanup() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	m_flow_force_cleanup_flag_v = true;
+	m_force_cleanup_flag_v = true;
 
 	if (m_flow_status == status_t::running) {
 		do_force_cleanup_data_locked(lock);
@@ -447,7 +451,7 @@ ks_future<ks_async_flow_ptr> ks_async_flow::get_flow_future() {
 		return ks_future<ks_async_flow_ptr>::__from_raw(m_flow_promise_ptr_keeper_until_completed->get_future());
 	}
 
-	std::shared_ptr<ks_raw_promise> flow_promise = m_flow_promise_weak.lock();
+	ks_raw_promise_ptr flow_promise = m_flow_promise_weak.lock();
 	if (flow_promise == nullptr) {
 		flow_promise = ks_raw_promise::create(m_default_apartment);
 		m_flow_promise_weak = flow_promise;
@@ -457,6 +461,8 @@ ks_future<ks_async_flow_ptr> ks_async_flow::get_flow_future() {
 				flow_promise->resolve(ks_raw_value::of(this->shared_from_this()));
 			else
 				flow_promise->reject(m_flow_result.to_error());
+
+			ASSERT(m_flow_promise_ptr_keeper_until_completed == nullptr);
 		}
 		else {
 			m_flow_promise_ptr_keeper_until_completed = flow_promise;
@@ -506,15 +512,13 @@ void ks_async_flow::do_make_flow_completed_locked(const ks_result<void>& flow_re
 			m_last_error = flow_result.to_error();
 	}
 
+	//fire flow-observers
 	if (flow_result.is_value())
 		do_fire_flow_observers_locked(m_flow_status, ks_error(), lock);
 	else 
 		do_fire_flow_observers_locked(m_flow_status, flow_result.to_error(), lock);
 
-	//unblock waiting
-	m_flow_completed_cv.notify_all();
-
-	//settle flow_promise
+	//settle flow-promise
 	if (m_flow_promise_ptr_keeper_until_completed != nullptr) {
 		ASSERT(m_flow_promise_ptr_keeper_until_completed == m_flow_promise_weak.lock());
 
@@ -524,11 +528,14 @@ void ks_async_flow::do_make_flow_completed_locked(const ks_result<void>& flow_re
 			m_flow_promise_ptr_keeper_until_completed->reject(flow_result.to_error());
 
 		//release m_flow_promise_ptr_keeper_until_completed, after completed
-		m_flow_promise_ptr_keeper_until_completed = nullptr;
+		m_flow_promise_ptr_keeper_until_completed.reset();
 	}
 
+	//unblock waiting
+	m_flow_completed_cv.notify_all();
+
 	//cleanup if need
-	if (m_flow_force_cleanup_flag_v) {
+	if (m_force_cleanup_flag_v) {
 		do_force_cleanup_data_locked(lock);
 	}
 
@@ -597,10 +604,27 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 			m_last_error = task_result.to_error();
 	}
 
+	//fire task-observers
 	if (task_result.is_value())
 		do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
 	else
 		do_fire_task_observers_locked(task_item->task_name, task_item->task_status, task_result.to_error(), lock);
+
+	//settle task-promise
+	if (task_item->task_promise_keeper_until_completed != nullptr) {
+		ASSERT(task_item->task_promise_keeper_until_completed == task_item->task_promise_weak.lock());
+
+		if (task_result.is_value())
+			task_item->task_promise_keeper_until_completed->resolve(task_result.to_value());
+		else
+			task_item->task_promise_keeper_until_completed->reject(task_result.to_error());
+
+		//release task_item->task_promise_keeper_until_completed, after completed
+		task_item->task_promise_keeper_until_completed.reset();
+	}
+
+	//unblock waiting
+	task_item->task_completed_cv.notify_all();
 
 	//驱动下游任务
 	if (m_not_start_task_count != 0) {
@@ -630,7 +654,7 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 			if (next_task_item->task_status != status_t::not_start)
 				continue;
 
-			do_make_task_pending_locked(next_task_item, ks_error::was_cancelled_error(), lock);
+			do_make_task_pending_locked(next_task_item, ks_error::unexpected_error(), lock);
 			if (m_not_start_task_count == 0)
 				break;
 		}
@@ -760,19 +784,39 @@ void ks_async_flow::do_fire_task_observers_locked(const std::string& task_name, 
 }
 
 void ks_async_flow::do_force_cleanup_data_locked(std::unique_lock<ks_mutex>& lock) {
-	ASSERT(m_flow_force_cleanup_flag_v);
-	ASSERT(m_flow_status != status_t::running);
+	ASSERT(m_force_cleanup_flag_v);
 
-	if (m_flow_status != status_t::running) {
-		m_task_map.clear();
-		m_temp_pending_task_queue.clear();
-
-		m_flow_observer_map.clear();
-		m_task_observer_map.clear();
-
-		m_user_data_map.clear();
-
-		m_flow_promise_weak.reset();
-		m_flow_promise_ptr_keeper_until_completed.reset();
+	if (m_flow_status == status_t::running) {
+		ASSERT(false);
+		return;
 	}
+
+	if (m_flow_status == status_t::not_start) {
+		for (auto& entry : m_task_map) {
+			if (entry.second->task_promise_keeper_until_completed != nullptr) {
+				ASSERT(entry.second->task_promise_keeper_until_completed == entry.second->task_promise_weak.lock());
+				entry.second->task_promise_keeper_until_completed->reject(ks_error::was_terminated_error());
+				entry.second->task_promise_keeper_until_completed.reset();
+				entry.second->task_promise_weak.reset();
+			}
+		}
+
+		if (m_flow_promise_ptr_keeper_until_completed != nullptr) {
+			ASSERT(m_flow_promise_ptr_keeper_until_completed == m_flow_promise_weak.lock());
+			m_flow_promise_ptr_keeper_until_completed->reject(ks_error::was_terminated_error());
+			m_flow_promise_ptr_keeper_until_completed.reset();
+			m_flow_promise_weak.reset();
+		}
+	}
+
+	m_task_map.clear();
+	m_temp_pending_task_queue.clear();
+
+	m_flow_observer_map.clear();
+	m_task_observer_map.clear();
+
+	m_user_data_map.clear();
+
+	m_flow_promise_weak.reset();
+	m_flow_promise_ptr_keeper_until_completed.reset();
 }
