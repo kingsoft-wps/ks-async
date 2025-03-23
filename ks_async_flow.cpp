@@ -180,15 +180,18 @@ bool ks_async_flow::do_add_task_raw(
 		do_sel_apartment_locked(task_item->task_apartment, lock),
 		do_wrap_task_eval_fn_locked(std::move(eval_fn), lock),
 		context
-	).on_completion(
+	).transform<ks_result<ks_raw_value>>(
 		do_sel_apartment_locked(task_item->task_apartment, lock),
-		[this_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), task_item](const ks_result<ks_raw_value>& task_result) {
-			std::shared_ptr<ks_async_flow> this_ptr = this_weak.lock();
-			ASSERT(this_ptr != nullptr);
-			if (this_ptr != nullptr) {
-				std::unique_lock<ks_mutex> lock(this_ptr->m_mutex);
-				this_ptr->do_make_task_completed_locked(task_item, task_result, lock);
+		[flow_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), task_item](const ks_result<ks_raw_value>& task_result) -> ks_result<ks_raw_value> {
+			ks_async_flow_ptr flow = flow_weak.lock();
+			if (flow == nullptr) {
+				ASSERT(false);
+				return ks_error::was_terminated_error();
 			}
+
+			std::unique_lock<ks_mutex> lock(flow->m_mutex);
+			flow->do_make_task_completed_locked(task_item, task_result, lock);
+			return task_result;
 		},
 		ks_async_context().set_priority(0x10000)
 	);
@@ -202,12 +205,13 @@ bool ks_async_flow::do_add_task_raw(
 inline std::function<ks_future<ks_async_flow::ks_raw_value>()> ks_async_flow::do_wrap_task_eval_fn_locked(
 	std::function<ks_future<ks_raw_value>(const ks_async_flow_ptr& flow)>&& eval_fn, std::unique_lock<ks_mutex>& lock) {
 
-	return [flow_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), eval_fn = std::move(eval_fn)]() -> ks_future<ks_async_flow::ks_raw_value> {
+	return [flow_weak = std::weak_ptr<ks_async_flow>(this->shared_from_this()), eval_fn = std::move(eval_fn)]() 
+		-> ks_future<ks_async_flow::ks_raw_value> {
 
 		ks_async_flow_ptr flow = flow_weak.lock();
 		if (flow == nullptr) {
 			ASSERT(false);
-			return ks_future<ks_raw_value>::rejected(ks_error::unexpected_error());
+			return ks_future<ks_raw_value>::rejected(ks_error::was_terminated_error());
 		}
 
 		if (flow->m_force_cleanup_flag_v) {
