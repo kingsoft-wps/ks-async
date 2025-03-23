@@ -78,7 +78,8 @@ public:
 	KS_ASYNC_API std::string get_failed_task_name();
 
 	KS_ASYNC_API ks_raw_future_ptr get_task_future(const char* task_name, const std::type_info* value_typeinfo = nullptr);
-	KS_ASYNC_API ks_future<ks_async_flow> get_flow_future_ext(); //由于future对象声明期管理的原因，这里会直接以ks_future<ks_async_flow>类型直接进行管理
+	KS_ASYNC_API ks_raw_future_ptr  get_flow_future_void();
+	KS_ASYNC_API ks_future<ks_async_flow> get_flow_future_wrapper(); //由于future对象声明期管理的原因，这里会直接以ks_future<ks_async_flow>类型直接进行管理
 
 private:
 	enum __raw_ctor { v };
@@ -114,7 +115,7 @@ private:
 		ks_raw_promise_ptr task_trigger_void;
 		ks_raw_result task_result{}; //result<T>
 
-		std::shared_ptr<ks_raw_promise> task_promise_opt = nullptr;
+		ks_raw_promise_ptr task_promise_opt = nullptr;
 	};
 
 	struct _FLOW_OBSERVER_ITEM {
@@ -177,10 +178,12 @@ private:
 	std::string m_1st_failed_task_name{};
 	ks_error m_last_error{};
 
+	ks_raw_promise_ptr m_flow_promise_void_opt = nullptr;
+
 	//flow_promise_ext本质上是ks_future<ks_async_flow>
 	//keeper仅在flow执行完成前才会保持，完成时清空，以避免循环引用
-	std::weak_ptr<ks_raw_promise> m_flow_promise_ext_weak = {};
-	ks_raw_promise_ptr m_flow_promise_ext_ptr_keeper_until_completed = nullptr;
+	std::weak_ptr<ks_raw_promise> m_flow_promise_wrapper_weak = {};
+	ks_raw_promise_ptr m_flow_promise_wrapper_kept_until_completed = nullptr;
 
 	std::shared_ptr<ks_raw_async_flow> m_self_running_keeper = nullptr;
 };

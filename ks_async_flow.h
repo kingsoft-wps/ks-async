@@ -165,7 +165,7 @@ public:
 	}
 	ks_future<ks_async_flow> get_flow_future() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->get_flow_future_ext();
+		return m_raw_flow->get_flow_future_wrapper();
 	}
 
 private:
@@ -220,6 +220,9 @@ private:
 
 	static ks_future<ks_async_flow> __wrap_raw_flow_future_ext(const ks_raw_future_ptr& raw_flow_future_ext) {
 		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_ext);
+	}
+	static ks_raw_future_ptr __unwrap_raw_flow_future_void(const ks_future<void>& flow_future_void) {
+		return flow_future_void.__get_raw();
 	}
 
 	friend class __ks_async_raw::ks_raw_async_flow;
