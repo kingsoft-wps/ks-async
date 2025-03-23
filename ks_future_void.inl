@@ -570,6 +570,14 @@ public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
 	}
 
 private:
+	using __cast_mode_t = typename ks_result<void>::__cast_mode_t;
+
+	template <class R>
+	static constexpr __cast_mode_t __determine_cast_mode() {
+		return ks_result<void>::template __determine_cast_mode<R>();
+	}
+
+private:
 	using ks_raw_future = __ks_async_raw::ks_raw_future;
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
 

@@ -409,7 +409,7 @@ bool ks_async_flow::is_task_completed(const char* task_name) {
 
 ks_error ks_async_flow::get_last_error() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
-	return m_1st_failed_task_error;
+	return m_last_error;
 }
 
 std::string ks_async_flow::get_failed_task_name() {
@@ -451,14 +451,16 @@ ks_future<ks_async_flow_ptr> ks_async_flow::get_flow_future() {
 	if (flow_promise == nullptr) {
 		flow_promise = ks_raw_promise::create(m_default_apartment);
 		m_flow_promise_weak = flow_promise;
-		m_flow_promise_ptr_keeper_until_completed = flow_promise;
 
-		if (m_flow_status == status_t::succeeded)
-			flow_promise->resolve(ks_raw_value::of(this->shared_from_this()));
-		else if (m_flow_status == status_t::failed)
-			flow_promise->reject(m_1st_failed_task_error);
-		else
-			m_flow_promise_ptr_keeper_until_completed = nullptr;
+		if (m_flow_status == status_t::succeeded || m_flow_status == status_t::failed) {
+			if (m_flow_result.is_value())
+				flow_promise->resolve(ks_raw_value::of(this->shared_from_this()));
+			else
+				flow_promise->reject(m_flow_result.to_error());
+		}
+		else {
+			m_flow_promise_ptr_keeper_until_completed = flow_promise;
+		}
 	}
 
 	return ks_future<ks_async_flow_ptr>::__from_raw(flow_promise->get_future());
@@ -474,7 +476,10 @@ void ks_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock
 	m_flow_status = status_t::running;
 	do_fire_flow_observers_locked(m_flow_status, ks_error(), lock);
 
-	if (!m_task_map.empty()) {
+	if (m_task_map.empty()) {
+		do_make_flow_completed_locked(ks_result<void>(nothing), lock);
+	}
+	else {
 		m_temp_pending_task_queue.reserve(m_task_map.size());
 
 		for (auto& entry : m_task_map) {
@@ -488,26 +493,23 @@ void ks_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock
 		ASSERT(!m_temp_pending_task_queue.empty());
 		do_drain_pending_task_queue_locked(lock);
 	}
-	else {
-		do_make_flow_completed_locked(lock);
-	}
 }
 
-void ks_async_flow::do_make_flow_completed_locked(std::unique_lock<ks_mutex>& lock) {
+void ks_async_flow::do_make_flow_completed_locked(const ks_result<void>& flow_result, std::unique_lock<ks_mutex>& lock) {
 	ASSERT(m_flow_status == status_t::running);
 
-	m_flow_status = m_failed_task_count == 0 ? status_t::succeeded : status_t::failed;
+	m_flow_status = flow_result.is_value() ? status_t::succeeded : status_t::failed;
+	m_flow_result = flow_result;
 
-	m_flow_result = ks_result<void>(nothing);
-	if (m_flow_status != status_t::succeeded) {
-		ASSERT(m_1st_failed_task_error.get_code() != 0);
-		m_flow_result = m_1st_failed_task_error.get_code() != 0 ? m_1st_failed_task_error : ks_error::unexpected_error();
+	if (flow_result.is_error()) {
+		if (m_last_error.get_code() == 0)
+			m_last_error = flow_result.to_error();
 	}
 
-	if (m_flow_result.is_value())
+	if (flow_result.is_value())
 		do_fire_flow_observers_locked(m_flow_status, ks_error(), lock);
 	else 
-		do_fire_flow_observers_locked(m_flow_status, m_flow_result.to_error(), lock);
+		do_fire_flow_observers_locked(m_flow_status, flow_result.to_error(), lock);
 
 	//unblock waiting
 	m_flow_completed_cv.notify_all();
@@ -516,11 +518,12 @@ void ks_async_flow::do_make_flow_completed_locked(std::unique_lock<ks_mutex>& lo
 	if (m_flow_promise_ptr_keeper_until_completed != nullptr) {
 		ASSERT(m_flow_promise_ptr_keeper_until_completed == m_flow_promise_weak.lock());
 
-		if (m_flow_result.is_value())
+		if (flow_result.is_value())
 			m_flow_promise_ptr_keeper_until_completed->resolve(ks_raw_value::of(this->shared_from_this()));
 		else
-			m_flow_promise_ptr_keeper_until_completed->reject(m_flow_result.to_error());
+			m_flow_promise_ptr_keeper_until_completed->reject(flow_result.to_error());
 
+		//release m_flow_promise_ptr_keeper_until_completed, after completed
 		m_flow_promise_ptr_keeper_until_completed = nullptr;
 	}
 
@@ -569,10 +572,8 @@ void ks_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM
 
 	do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
 
-	if (task_item->task_pending_arg.is_value())
-		task_item->task_trigger.resolve();
-	else
-		task_item->task_trigger.reject(task_item->task_pending_arg.to_error());
+	ASSERT(task_item->task_pending_arg.is_completed());
+	task_item->task_trigger.try_complete(task_item->task_pending_arg);
 }
 
 void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_result<ks_raw_value>& task_result, std::unique_lock<ks_mutex>& lock) {
@@ -589,9 +590,11 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 	task_item->task_status = task_result.is_value() ? status_t::succeeded : status_t::failed;
 	task_item->task_result = task_result;
 
-	if (task_result.is_error() && m_1st_failed_task_name.empty()) {
-		m_1st_failed_task_name = task_item->task_name;
-		m_1st_failed_task_error = task_result.to_error();
+	if (task_result.is_error()) {
+		if (m_1st_failed_task_name.empty())
+			m_1st_failed_task_name = task_item->task_name;
+		if (m_last_error.get_code() == 0)
+			m_last_error = task_result.to_error();
 	}
 
 	if (task_result.is_value())
@@ -635,7 +638,13 @@ void ks_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_IT
 
 	//若全部任务都已完成，则代表整个flow完成
 	if (m_succeeded_task_count + m_failed_task_count == m_task_map.size()) {
-		do_make_flow_completed_locked(lock);
+		ks_result<void> flow_result(nothing);
+		if (m_failed_task_count != 0) {
+			ASSERT(m_last_error.get_code() != 0);
+			flow_result = m_last_error.get_code() != 0 ? m_last_error : ks_error::unexpected_error();
+		}
+
+		do_make_flow_completed_locked(flow_result, lock);
 	}
 }
 

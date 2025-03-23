@@ -120,10 +120,10 @@ private:
 		std::unordered_set<std::string> task_waiting_for_dependencies;
 
 		status_t task_status = status_t::not_start;
-		ks_result<void> task_pending_arg;
+		ks_result<void> task_pending_arg = ks_result<void>::bare();
 
-		ks_promise<void> task_trigger = nullptr;
-		ks_result<ks_raw_value> task_result;
+		ks_promise<void> task_trigger{ nullptr };
+		ks_result<ks_raw_value> task_result = ks_result<ks_raw_value>::bare();
 	};
 
 	struct _FLOW_OBSERVER_ITEM {
@@ -143,7 +143,7 @@ private:
 
 private:
 	void do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock);
-	void do_make_flow_completed_locked(std::unique_lock<ks_mutex>& lock);
+	void do_make_flow_completed_locked(const ks_result<void>& flow_result, std::unique_lock<ks_mutex>& lock);
 
 	void do_make_task_pending_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_result<void>& arg, std::unique_lock<ks_mutex>& lock);
 	void do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock);
@@ -171,18 +171,20 @@ private:
 	ks_apartment* m_default_apartment = ks_apartment::default_mta();
 	size_t m_j = size_t(-1);
 
-	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map;
+	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map{};
 
-	std::unordered_map<uint64_t, std::shared_ptr<_FLOW_OBSERVER_ITEM>> m_flow_observer_map;
-	std::unordered_map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map;
-	std::atomic<uint64_t> m_last_x_observer_id = { 0 };
+	std::unordered_map<uint64_t, std::shared_ptr<_FLOW_OBSERVER_ITEM>> m_flow_observer_map{};
+	std::unordered_map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map{};
+	std::atomic<uint64_t> m_last_x_observer_id = {0};
 
-	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue{};
+	std::unordered_map<std::string, ks_any> m_user_data_map{};
+
 	size_t m_not_start_task_count = 0;
 	size_t m_pending_task_count = 0;
 	size_t m_running_task_count = 0;
 	size_t m_succeeded_task_count = 0;
 	size_t m_failed_task_count = 0;
+	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue{};
 
 	status_t m_flow_status = status_t::not_start;
 	ks_condition_variable m_flow_completed_cv{};
@@ -190,14 +192,12 @@ private:
 	volatile bool m_flow_cancelled_flag_v = false;
 	volatile bool m_flow_force_cleanup_flag_v = false;
 
-	std::string m_1st_failed_task_name;
-	ks_error m_1st_failed_task_error;
+	std::string m_1st_failed_task_name{};
+	ks_result<void> m_flow_result = ks_result<void>::bare();
+	ks_error m_last_error{};
 
-	std::unordered_map<std::string, ks_any> m_user_data_map;
-
-	ks_result<void> m_flow_result;
-	std::weak_ptr<ks_raw_promise> m_flow_promise_weak;
-	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed; //completed后自动清除，以避免循环引用
+	std::weak_ptr<ks_raw_promise> m_flow_promise_weak{};
+	std::shared_ptr<ks_raw_promise> m_flow_promise_ptr_keeper_until_completed = nullptr; //completed后自动清除，以避免循环引用
 
 	std::shared_ptr<ks_async_flow> m_self_running_keeper = nullptr;
 };
@@ -329,7 +329,7 @@ ks_result<void> ks_async_flow::get_task_result<void>(const char* task_name) {
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
-		return ks_result<void>();
+		return ks_result<void>::bare();
 	}
 
 	ASSERT(it->second->task_result_value_typeinfo != nullptr);
@@ -337,19 +337,16 @@ ks_result<void> ks_async_flow::get_task_result<void>(const char* task_name) {
 
 	if (it->second->task_status != status_t::succeeded && it->second->task_status != status_t::failed) {
 		ASSERT(false);
-		return ks_result<void>();
+		return ks_result<void>::bare();
 	}
 
 	const ks_result<ks_raw_value>& task_result = it->second->task_result;
 	if (!task_result.is_completed()) {
 		ASSERT(false);
-		return ks_result<void>();
+		return ks_result<void>::bare();
 	}
 
-	if (task_result.is_value())
-		return nothing;
-	else
-		return task_result.to_error();
+	return task_result.cast<void>();
 }
 
 template <class T>

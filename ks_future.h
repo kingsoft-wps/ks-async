@@ -1004,23 +1004,11 @@ private:
 
 	template <class R>
 	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_same> __cast_mode) const {
-		using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_same_v<PROXT, PROXR>, "ks_future::cast_to mode 1 error");
-
 		return ks_future<R>::__from_raw(m_raw_future);
 	}
 
 	template <class R>
 	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_nothing> __cast_mode) const {
-		//using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		//using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_nothing_v<PROXR>, "ks_future::cast_to mode 2 error");
-
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[](const ks_raw_value& value) -> ks_raw_result { return ks_raw_value::of(nothing); },
 			make_async_context().set_priority(0x10000), nullptr);
@@ -1029,15 +1017,9 @@ private:
 
 	template <class R>
 	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_other> __cast_mode) const {
-		using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_convertible_v<PROXT, PROXR>, "ks_future::cast_to mode 3 error");
-
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[](const ks_raw_value& value) -> ks_raw_result {
-				return ks_raw_value::of(static_cast<PROXR>(value.get<PROXT>()));
+				return ks_raw_value::of(static_cast<R>(value.get<T>()));
 			},
 			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);

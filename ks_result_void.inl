@@ -18,9 +18,8 @@ limitations under the License.
 template <>
 class ks_result<void> final {
 public:
-	ks_result() : m_nothing_result() {}
-
-	ks_result(nothing_t) : m_nothing_result(nothing) {}
+	ks_result(const nothing_t&) : m_nothing_result(nothing) {}
+	ks_result(nothing_t&&) : m_nothing_result(nothing) {}
 
 	ks_result(const ks_error& error) : m_nothing_result(error) {}
 	ks_result(ks_error&& error) : m_nothing_result(std::move(error)) {}
@@ -29,6 +28,8 @@ public:
 	ks_result(ks_result&&) noexcept = default;
 	ks_result& operator=(const ks_result&) = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
+
+	static ks_result bare() { return ks_result(__raw_ctor::v); }
 
 	using value_type = void;
 	using this_result_type = ks_result<void>;
@@ -43,7 +44,25 @@ public:
 
 	template <class R>
 	ks_result<R> cast() const {
-		return m_nothing_result.cast<R>();
+		return m_nothing_result.template cast<R>();
+	}
+
+	template <class R, class FN = std::function<R()>>
+	ks_result<R> map(FN&& fn) const {
+		return m_nothing_result.template map<R>([fn = std::forward<FN>(fn)](nothing_t) { return fn(); });
+	}
+
+	template <class R, class X = R>
+	ks_result<R> map_value(X&& x) const {
+		return m_nothing_result.template map_value<R>(std::forward<X>(x));
+	}
+
+private:
+	using __cast_mode_t = ks_result<nothing_t>::__cast_mode_t;
+
+	template <class R>
+	static constexpr __cast_mode_t __determine_cast_mode() {
+		return  ks_result<nothing_t>::__determine_cast_mode();
 	}
 
 private:

@@ -22,8 +22,6 @@ limitations under the License.
 template <class T>
 class ks_result final {
 public:
-	ks_result() : m_raw_result() {}
-
 	ks_result(const T& value) : m_raw_result(ks_raw_value::of(value)) {}
 	ks_result(T&& value) : m_raw_result(ks_raw_value::of(std::move(value))) {}
 
@@ -34,6 +32,8 @@ public:
 	ks_result(ks_result&&) noexcept = default;
 	ks_result& operator=(const ks_result&) = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
+
+	static ks_result bare() { return ks_result(__raw_ctor::v); }
 
 	using value_type = T;
 	using this_result_type = ks_result<T>;
@@ -49,7 +49,24 @@ public:
 	template <class R>
 	ks_result<R> cast() const {
 		constexpr __cast_mode_t cast_mode = __determine_cast_mode<R>();
+		static_assert(cast_mode != __cast_mode_t::invalid, "invalid cast type");
 		return __do_cast<R>(std::integral_constant<__cast_mode_t, cast_mode>());
+	}
+
+	template <class R, class FN = std::function<R(const T&)>>
+	ks_result<R> map(const FN& fn) const {
+		constexpr bool is_void_fn = std::is_void_v<std::invoke_result_t<FN, const T&>>;
+		static_assert(is_void_fn ? std::is_void_v<R> : std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>, "inalid map fn");
+		return __do_map<R, FN>(std::bool_constant<is_void_fn>(), fn);
+	}
+
+	template <class R, class X = R>
+	ks_result<R> map_value(const X& x) const {
+		static_assert(std::is_convertible_v<X, R>, "invalid map_value type");
+		if (this->is_value())
+			return ks_result<R>(x);
+		else
+			return ks_result<R>(this->to_error());
 	}
 
 private:
@@ -74,37 +91,38 @@ private:
 
 	template <class R>
 	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_same> __cast_mode) const {
-		using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_same_v<PROXT, PROXR>, "ks_result::cast_to mode 1 error");
-
 		return ks_result<R>::__from_raw(m_raw_result);
 	}
 
 	template <class R>
 	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_nothing> __cast_mode) const {
-		//using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		//using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_nothing_v<PROXR>, "ks_result::cast_to mode 2 error");
-
 		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of(nothing) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
 	}
 
 	template <class R>
 	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_other> __cast_mode) const {
-		using XT = std::remove_cvref_t<T>;
-		using XR = std::remove_cvref_t<R>;
-		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
-		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
-		static_assert(std::is_convertible_v<PROXT, PROXR>, "ks_result::cast_to mode 3 error");
-
-		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of(static_cast<PROXR>(m_raw_result.to_value().template get<PROXT>())) : m_raw_result;
+		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of<R>(m_raw_result.to_value().template get<T>()) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
+	}
+
+private:
+	template <class R, class FN>
+	ks_result<R> __do_map(std::bool_constant<true> __is_void_fn, const FN& fn) const {
+		static_assert(std::is_void_v<R>, "invalid map type");
+		if (this->is_value()) 
+			return ks_result<void>((fn(this->to_value()), nothing));
+		else
+			return ks_result<void>(this->to_error());
+	}
+
+	template <class R, class FN>
+	ks_result<R> __do_map(std::bool_constant<false> __is_void_fn, const FN& fn) const {
+		static_assert(std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>, "invalid map type");
+		if (this->is_value())
+			return ks_result<R>(fn(this->to_value()));
+		else
+			return ks_result<R>(this->to_error());
 	}
 
 private:
