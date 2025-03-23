@@ -91,29 +91,6 @@ return *this;
 
 private:
 	template <class T>
-	explicit ks_any(T&& x, int) {
-		using XT = std::remove_cvref_t<T>;
-		if (__can_embed_tiny_trivial_x<XT>()) {
-			*(XT*)(void*)(&m_embed_tiny_trivial_x_mem) = x;
-			m_data_p = (_DATA_HEADER*)(void*)(-1);
-		}
-		else {
-			constexpr size_t x_offset = (sizeof(_DATA_HEADER) + alignof(XT) - 1) / alignof(XT) * alignof(XT);
-			_DATA_HEADER* data_p = (_DATA_HEADER*)malloc(x_offset + sizeof(XT));
-			::new ((void*)data_p) _DATA_HEADER();
-			data_p->x_offset = int(x_offset);
-			data_p->x_dtor = [](void* px) { ((XT*)px)->~XT(); };
-			::new (data_p->x_addr()) XT(std::forward<T>(x));
-			m_data_p = data_p;
-		}
-
-#ifdef _DEBUG
-		m_x_typeinfo = &typeid(XT);
-		m_x_sizeof = sizeof(XT);
-#endif
-	}
-
-	template <class T>
 	static constexpr bool __can_embed_tiny_trivial_x() {
 		using XT = std::remove_cvref_t<T>;
 		return std::is_trivially_copy_assignable_v<XT>
@@ -121,14 +98,51 @@ private:
 			&& sizeof(XT) <= sizeof(m_embed_tiny_trivial_x_mem);
 	}
 
+	template <class T>
+	ks_any& __init(T&& x, std::bool_constant<true>) {
+		using XT = std::remove_cvref_t<T>;
+		ASSERT(!this->has_value());
+
+		*(XT*)(void*)(&m_embed_tiny_trivial_x_mem) = x;
+		m_data_p = (_DATA_HEADER*)(void*)(-1);
+
+#ifdef _DEBUG
+		m_x_typeinfo = &typeid(XT);
+		m_x_sizeof = sizeof(XT);
+#endif
+		return *this;
+	}
+
+	template <class T>
+	ks_any& __init(T&& x, std::bool_constant<false>) {
+		using XT = std::remove_cvref_t<T>;
+		ASSERT(!this->has_value());
+
+		constexpr size_t x_offset = (sizeof(_DATA_HEADER) + alignof(XT) - 1) / alignof(XT) * alignof(XT);
+		_DATA_HEADER* data_p = (_DATA_HEADER*)malloc(x_offset + sizeof(XT));
+		::new ((void*)data_p) _DATA_HEADER();
+		data_p->x_offset = int(x_offset);
+		data_p->x_dtor = [](void* px) { ((XT*)px)->~XT(); };
+		::new (data_p->x_addr()) XT(std::forward<T>(x));
+		m_data_p = data_p;
+
+#ifdef _DEBUG
+		m_x_typeinfo = &typeid(XT);
+		m_x_sizeof = sizeof(XT);
+#endif
+		return *this;
+	}
+
 public:
 	template <class T>
 	static ks_any of(const T& x) {
-		return ks_any(x, 0);
+		constexpr bool can_embed = __can_embed_tiny_trivial_x<T>();
+		return ks_any().__init(x, std::bool_constant<can_embed>());
 	}
 	template <class T>
 	static ks_any of(T&& x) {
-		return ks_any(std::forward<T>(x), 0);
+		constexpr bool can_embed = __can_embed_tiny_trivial_x<T>();
+		return ks_any().__init(std::forward<T>(x), std::bool_constant<can_embed>());
 	}
 
 	bool has_value() const {

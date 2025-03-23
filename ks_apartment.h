@@ -38,9 +38,6 @@ public:
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 
 public:
-	KS_ASYNC_API static bool __current_thread_apartment_try_pump_once();
-
-public:
 	enum { //feature consts
 		sequential_feature = 0x01,
 	};
@@ -83,4 +80,10 @@ public:
 	KS_ASYNC_API static void __unregister_public_apartment(const char* name, ks_apartment* apartment);
 
 	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
+
+public:
+	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用
+	KS_ASYNC_API static void __set_default_mta_max_thread_count(size_t max_thread_count);
+	//注：主动泵当前线程所属套间的下一条异步任务
+	KS_ASYNC_API static bool __try_pump_current_thread_apartment_once();
 };

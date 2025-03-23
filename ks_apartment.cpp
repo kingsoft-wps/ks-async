@@ -30,6 +30,8 @@ static std::unordered_map<std::string, ks_apartment*> g_public_apartment_map = {
 
 static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
 
+static size_t g_default_mta_max_thread_count = 0;
+
 
 ks_apartment* ks_apartment::ui_sta() {
 	return g_ui_sta;
@@ -47,15 +49,14 @@ ks_apartment* ks_apartment::background_sta() {
 ks_apartment* ks_apartment::default_mta() {
 	struct _default_mta_options {
 		static size_t max_thread_count() {
-#ifdef __KS_DEFAULT_MTA_MAX_THREAD_COUNT_CUSTOM
-			return __KS_DEFAULT_MTA_MAX_THREAD_COUNT_CUSTOM;
-#else
-			size_t cpu_count = (size_t)std::thread::hardware_concurrency();
-			size_t max_thread_count = cpu_count + 1;
-			if (max_thread_count < 3)
-				max_thread_count = 3;
+			size_t max_thread_count = g_default_mta_max_thread_count;
+			if (max_thread_count == 0) {
+				size_t cpu_count = (size_t)std::thread::hardware_concurrency();
+				max_thread_count = cpu_count;
+				if (max_thread_count < 2)
+					max_thread_count = 2;
+			}
 			return max_thread_count;
-#endif
 		}
 	};
 
@@ -107,13 +108,6 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 	return cur_apartment;
 }
 
-bool ks_apartment::__current_thread_apartment_try_pump_once() {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	ASSERT(cur_apartment != nullptr);
-	return cur_apartment->__try_pump_once();
-}
-
-
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
 	ASSERT(g_ui_sta == nullptr || ui_sta == nullptr);
 	ASSERT(g_ui_sta != nullptr || ui_sta != nullptr);
@@ -147,4 +141,15 @@ void ks_apartment::__tls_set_current_thread_apartment(ks_apartment* current_thre
 	ASSERT(tls_current_thread_apartment == nullptr || current_thread_apartment == nullptr);
 	ASSERT(tls_current_thread_apartment != nullptr || current_thread_apartment != nullptr);
 	tls_current_thread_apartment = current_thread_apartment;
+}
+
+
+void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
+	g_default_mta_max_thread_count = max_thread_count;
+}
+
+bool ks_apartment::__try_pump_current_thread_apartment_once() {
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	ASSERT(cur_apartment != nullptr);
+	return cur_apartment->__try_pump_once();
 }

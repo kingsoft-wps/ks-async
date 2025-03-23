@@ -26,8 +26,8 @@ using ks_raw_promise_ptr = std::shared_ptr<ks_raw_promise>;
 
 class ks_raw_promise {
 protected:
-	KS_ASYNC_API ks_raw_promise() = default;
-	KS_ASYNC_API virtual ~ks_raw_promise() = default;  //protected
+	ks_raw_promise() = default;
+	virtual ~ks_raw_promise() = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise);
 
 public:

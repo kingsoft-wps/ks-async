@@ -42,6 +42,8 @@ public:
 
 private:
 	template <class T>
+	explicit ks_raw_value(const T& x, int) : m_any(ks_any::of(x)) {}
+	template <class T>
 	explicit ks_raw_value(T&& x, int) : m_any(ks_any::of(std::forward<T>(x))) {}
 
 public:

@@ -28,8 +28,8 @@ using ks_raw_future_ptr = std::shared_ptr<ks_raw_future>;
 
 class ks_raw_future {
 protected:
-	KS_ASYNC_API ks_raw_future() = default;
-	KS_ASYNC_API virtual ~ks_raw_future() = default;  //protected
+	ks_raw_future() = default;
+	virtual ~ks_raw_future() = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future);
 
 public:
