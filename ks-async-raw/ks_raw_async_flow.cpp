@@ -594,18 +594,18 @@ ks_raw_future_ptr ks_raw_async_flow::get_flow_future_void() {
 	return m_flow_promise_void_opt->get_future();
 }
 
-ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_wrapper() {
+ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_wrapped() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
-	if (m_flow_promise_wrapper_kept_until_completed != nullptr) {
-		ASSERT(m_flow_promise_wrapper_kept_until_completed == m_flow_promise_wrapper_weak.lock());
-		return ks_async_flow::__wrap_raw_flow_future_ext(m_flow_promise_wrapper_kept_until_completed->get_future());
+	if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
+		ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
+		return ks_async_flow::__wrap_raw_flow_future_ext(m_flow_promise_wrapped_keepper_until_completed->get_future());
 	}
 
-	ks_raw_promise_ptr flow_promise_ext = m_flow_promise_wrapper_weak.lock();
+	ks_raw_promise_ptr flow_promise_ext = m_flow_promise_wrapped_weak.lock();
 	if (flow_promise_ext == nullptr) {
 		flow_promise_ext = ks_raw_promise::create(m_default_apartment);
-		m_flow_promise_wrapper_weak = flow_promise_ext;
+		m_flow_promise_wrapped_weak = flow_promise_ext;
 
 		if (m_flow_status == status_t::succeeded || m_flow_status == status_t::failed) {
 			if (m_last_error.get_code() == 0) {
@@ -616,10 +616,10 @@ ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_wrapper() {
 				flow_promise_ext->reject(m_last_error);
 			}
 
-			ASSERT(m_flow_promise_wrapper_kept_until_completed == nullptr);
+			ASSERT(m_flow_promise_wrapped_keepper_until_completed == nullptr);
 		}
 		else {
-			m_flow_promise_wrapper_kept_until_completed = flow_promise_ext;
+			m_flow_promise_wrapped_keepper_until_completed = flow_promise_ext;
 		}
 	}
 
@@ -673,25 +673,25 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	//settle flow-promise
 	if (m_flow_promise_void_opt != nullptr) {
 		if (flow_error.get_code() == 0) 
-			m_flow_promise_wrapper_kept_until_completed->resolve(ks_raw_value::of(nothing));
+			m_flow_promise_wrapped_keepper_until_completed->resolve(ks_raw_value::of(nothing));
 		else 
-			m_flow_promise_wrapper_kept_until_completed->reject(flow_error);
+			m_flow_promise_wrapped_keepper_until_completed->reject(flow_error);
 	}
 
 	//settle flow-promise ext
-	if (m_flow_promise_wrapper_kept_until_completed != nullptr) {
-		ASSERT(m_flow_promise_wrapper_kept_until_completed == m_flow_promise_wrapper_weak.lock());
+	if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
+		ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
 
 		if (flow_error.get_code() == 0) {
 			ks_async_flow flow_ext = ks_async_flow::__from_raw(this->shared_from_this());
-			m_flow_promise_wrapper_kept_until_completed->resolve(ks_raw_value::of(std::move(flow_ext)));
+			m_flow_promise_wrapped_keepper_until_completed->resolve(ks_raw_value::of(std::move(flow_ext)));
 		}
 		else {
-			m_flow_promise_wrapper_kept_until_completed->reject(flow_error);
+			m_flow_promise_wrapped_keepper_until_completed->reject(flow_error);
 		}
 
 		//release flow_promise_ext keeper, after completed
-		m_flow_promise_wrapper_kept_until_completed.reset();
+		m_flow_promise_wrapped_keepper_until_completed.reset();
 	}
 
 	//unblock waiting
@@ -962,11 +962,11 @@ void ks_raw_async_flow::do_force_cleanup_data_locked(std::unique_lock<ks_mutex>&
 			}
 		}
 
-		if (m_flow_promise_wrapper_kept_until_completed != nullptr) {
-			ASSERT(m_flow_promise_wrapper_kept_until_completed == m_flow_promise_wrapper_weak.lock());
-			m_flow_promise_wrapper_kept_until_completed->reject(ks_error::was_terminated_error());
-			m_flow_promise_wrapper_kept_until_completed.reset();
-			m_flow_promise_wrapper_weak.reset();
+		if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
+			ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
+			m_flow_promise_wrapped_keepper_until_completed->reject(ks_error::was_terminated_error());
+			m_flow_promise_wrapped_keepper_until_completed.reset();
+			m_flow_promise_wrapped_weak.reset();
 		}
 	}
 
@@ -978,8 +978,8 @@ void ks_raw_async_flow::do_force_cleanup_data_locked(std::unique_lock<ks_mutex>&
 
 	m_user_data_map.clear();
 
-	m_flow_promise_wrapper_weak.reset();
-	m_flow_promise_wrapper_kept_until_completed.reset();
+	m_flow_promise_wrapped_weak.reset();
+	m_flow_promise_wrapped_keepper_until_completed.reset();
 }
 
 

@@ -165,7 +165,7 @@ public:
 	}
 	ks_future<ks_async_flow> get_flow_future() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->get_flow_future_wrapper();
+		return m_raw_flow->get_flow_future_wrapped();
 	}
 
 private:
