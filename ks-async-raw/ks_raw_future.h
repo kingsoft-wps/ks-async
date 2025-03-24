@@ -70,9 +70,7 @@ public:
 	virtual void set_timeout(int64_t timeout, bool backtrack);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	//由于声明为_DECL_DEPRECATED，为避免编译警告，直接在此实现、而非override。
-	template <class _ = void>
-	_DECL_DEPRECATED KS_ASYNC_INLINE_API bool wait() { return this->do_wait(); }
+	KS_ASYNC_INLINE_API bool wait() { return this->do_wait(); }
 
 protected:
 	virtual void do_add_next(const ks_raw_future_ptr& next_future) = 0;
