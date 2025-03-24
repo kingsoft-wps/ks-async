@@ -121,16 +121,16 @@ private:
 
 	struct _FLOW_OBSERVER_ITEM {
 		ks_apartment* apartment;
-		std::function<void(const ks_raw_async_flow_ptr& flow)> on_running_fn = nullptr;
-		std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)> on_completed_fn = nullptr;
+		std::function<void(const ks_raw_async_flow_ptr& flow)> on_flow_running_fn = nullptr;
+		std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)> on_flow_completed_fn = nullptr;
 		ks_async_context observer_context;
 	};
 
 	struct _TASK_OBSERVER_ITEM {
 		std::regex task_name_pattern_re;
 		ks_apartment* apartment;
-		std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)> on_running_fn = nullptr;
-		std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)> on_completed_fn = nullptr;
+		std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)> on_task_running_fn = nullptr;
+		std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)> on_task_completed_fn = nullptr;
 		ks_async_context observer_context;
 	};
 

@@ -252,7 +252,7 @@ uint64_t ks_raw_async_flow::add_flow_running_observer(ks_apartment* apartment, s
 
 	std::shared_ptr<_FLOW_OBSERVER_ITEM> observer_item = std::make_shared<_FLOW_OBSERVER_ITEM>();
 	observer_item->apartment = apartment != nullptr ? apartment : m_default_apartment;
-	observer_item->on_running_fn = std::move(fn);
+	observer_item->on_flow_running_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -266,7 +266,7 @@ uint64_t ks_raw_async_flow::add_flow_completed_observer(ks_apartment* apartment,
 
 	std::shared_ptr<_FLOW_OBSERVER_ITEM> observer_item = std::make_shared<_FLOW_OBSERVER_ITEM>();
 	observer_item->apartment = apartment != nullptr ? apartment : m_default_apartment;
-	observer_item->on_completed_fn = std::move(fn);
+	observer_item->on_flow_completed_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -281,7 +281,7 @@ uint64_t ks_raw_async_flow::add_task_running_observer(const char* task_name_patt
 	std::shared_ptr<_TASK_OBSERVER_ITEM> observer_item = std::make_shared<_TASK_OBSERVER_ITEM>();
 	__do_pattern_to_regex(task_name_pattern, &observer_item->task_name_pattern_re);
 	observer_item->apartment = apartment != nullptr ? apartment : m_default_apartment;
-	observer_item->on_running_fn = std::move(fn);
+	observer_item->on_task_running_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -296,7 +296,7 @@ uint64_t ks_raw_async_flow::add_task_completed_observer(const char* task_name_pa
 	std::shared_ptr<_TASK_OBSERVER_ITEM> observer_item = std::make_shared<_TASK_OBSERVER_ITEM>();
 	__do_pattern_to_regex(task_name_pattern, &observer_item->task_name_pattern_re);
 	observer_item->apartment = apartment != nullptr ? apartment : m_default_apartment;
-	observer_item->on_completed_fn = std::move(fn);
+	observer_item->on_task_completed_fn = std::move(fn);
 	observer_item->observer_context = context;
 
 	uint64_t observer_id = ++m_last_x_observer_id;
@@ -612,7 +612,7 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	else 
 		do_fire_flow_observers_locked(m_flow_status, flow_error, lock);
 
-	//settle flow-promise
+	//settle flow-promise (void)
 	if (m_flow_promise_void_opt != nullptr) {
 		if (flow_error.get_code() == 0)
 			m_flow_promise_wrapped_keepper_until_completed->resolve(ks_raw_value::of(nothing));
@@ -620,7 +620,7 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 			m_flow_promise_wrapped_keepper_until_completed->reject(flow_error);
 	}
 
-	//settle flow-promise ext
+	//settle flow-promise (wrapped)
 	if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
 		ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
 
@@ -804,11 +804,11 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(status_t status, const ks_
 
 			bool matched = true;
 			if (status == status_t::running) {
-				if (!observer_item->on_running_fn) 
+				if (!observer_item->on_flow_running_fn) 
 					matched = false;
 			}
 			else if (status == status_t::succeeded || status == status_t::failed) {
-				if (!observer_item->on_completed_fn)
+				if (!observer_item->on_flow_completed_fn)
 					matched = false;
 			}
 			else {
@@ -832,9 +832,9 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(status_t status, const ks_
 			observer_item->apartment->schedule(
 				[this_ptr = this->shared_from_this(), status, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 					if (status == status_t::running) 
-						observer_item->on_running_fn(this_ptr);
+						observer_item->on_flow_running_fn(this_ptr);
 					else if (status == status_t::succeeded || status == status_t::failed)
-						observer_item->on_completed_fn(this_ptr, error);
+						observer_item->on_flow_completed_fn(this_ptr, error);
 				}, observer_item->observer_context.__get_priority());
 
 			++it;
@@ -850,11 +850,11 @@ void ks_raw_async_flow::do_fire_task_observers_locked(const std::string& task_na
 
 			bool matched = true;
 			if (status == status_t::running) {
-				if (!observer_item->on_running_fn)
+				if (!observer_item->on_task_running_fn)
 					matched = false;
 			}
 			else if (status == status_t::succeeded || status == status_t::failed) {
-				if (!observer_item->on_completed_fn)
+				if (!observer_item->on_task_completed_fn)
 					matched = false;
 			}
 			else {
@@ -882,9 +882,9 @@ void ks_raw_async_flow::do_fire_task_observers_locked(const std::string& task_na
 			observer_item->apartment->schedule(
 				[this_ptr = this->shared_from_this(), task_name, status, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 					if (status == status_t::running) 
-						observer_item->on_running_fn(this_ptr, task_name.c_str());
+						observer_item->on_task_running_fn(this_ptr, task_name.c_str());
 					else if (status == status_t::succeeded || status == status_t::failed)
-						observer_item->on_completed_fn(this_ptr, task_name.c_str(), error);
+						observer_item->on_task_completed_fn(this_ptr, task_name.c_str(), error);
 				}, observer_item->observer_context.__get_priority());
 
 			++it;
