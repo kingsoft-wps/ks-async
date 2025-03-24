@@ -18,7 +18,9 @@ limitations under the License.
 template <>
 class ks_promise<void> final {
 public:
+	ks_promise() : m_nothing_promise() {}
 	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
+
 	ks_promise(const ks_promise&) = default;
 	ks_promise& operator=(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;

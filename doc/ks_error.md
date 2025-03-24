@@ -8,7 +8,12 @@
 <br>
 
 
-# 静态成员方法
+# 构造方法
+
+```C++
+ks_error::ks_error();
+```
+<br>
 
 ```C++
 static ks_error of(HRESULT code);

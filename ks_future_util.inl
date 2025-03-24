@@ -41,7 +41,7 @@ public: //resolved, rejected
 		return ks_future<T>::resolved(std::forward<X>(value));
 	}
 	template <class T, class _ = std::enable_if_t<std::is_void_v<T>>>
-	static ks_future<void> resolved() {
+	static ks_future<void> resolved(nothing_t = nothing) {
 		return ks_future<void>::resolved();
 	}
 

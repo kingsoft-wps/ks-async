@@ -37,10 +37,10 @@ public:
 
 public:
 	void add_observer(
-		const void* observer, const char* notification_name, 
+		const void* observer, const char* notification_name_pattern,
 		std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment);
 
-	void remove_observer(const void* observer, const char* notification_name);
+	void remove_observer(const void* observer, const char* notification_name_pattern);
 
 public:
 	void do_post_notification(const ks_notification& notification);
@@ -119,22 +119,22 @@ const char* ks_notification_center::__ks_notification_center_data::name() {
 	return m_center_name.c_str();
 }
 
-void ks_notification_center::__ks_notification_center_data::add_observer(const void* observer, const char* notification_name, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
+void ks_notification_center::__ks_notification_center_data::add_observer(const void* observer, const char* notification_name_pattern, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	ASSERT(observer != nullptr);
 	ASSERT(apartment != nullptr);
 	if (apartment == nullptr)
 		apartment = ks_apartment::current_thread_apartment_or_default_mta();
-	if (notification_name == nullptr)
-		notification_name = "*";
+	if (notification_name_pattern == nullptr || notification_name_pattern[0] == 0)
+		notification_name_pattern = "*";
 
 	_ENTRY_PTR entry_ptr = std::make_shared<_ENTRY_DATA>();
 	entry_ptr->observer = observer;
 	entry_ptr->fn = std::move(fn);
 	entry_ptr->context = context;
 	entry_ptr->apartment = apartment;
-	static_cast<_PARSED_NOTIFICATION_NAME&>(*entry_ptr) = do_parse_notification_name(notification_name);
+	static_cast<_PARSED_NOTIFICATION_NAME&>(*entry_ptr) = do_parse_notification_name(notification_name_pattern);
 
 	m_observer_map[observer]
 		.his_group_map[entry_ptr->base_name]
@@ -145,19 +145,19 @@ void ks_notification_center::__ks_notification_center_data::add_observer(const v
 		.entry_list.push_back(entry_ptr);
 }
 
-void ks_notification_center::__ks_notification_center_data::remove_observer(const void* observer, const char* notification_name) {
+void ks_notification_center::__ks_notification_center_data::remove_observer(const void* observer, const char* notification_name_pattern) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	ASSERT(observer != 0);
-	if (notification_name == nullptr || notification_name[0] == 0)
-		notification_name = "*";
+	if (notification_name_pattern == nullptr || notification_name_pattern[0] == 0)
+		notification_name_pattern = "*";
 
 	auto observer_it = m_observer_map.find(observer);
 	if (observer_it == m_observer_map.end())
 		return;
 
 	_OBSERVER_DATA& observer_data = observer_it->second;
-	const _PARSED_NOTIFICATION_NAME parsed_notification_name = do_parse_notification_name(notification_name);
+	const _PARSED_NOTIFICATION_NAME parsed_notification_name = do_parse_notification_name(notification_name_pattern);
 
 	//匹配所有(*)，observer的全部entry将被移除
 	if (parsed_notification_name.base_name == "*") {
@@ -469,7 +469,7 @@ ks_notification_center* ks_notification_center::default_center() {
 	return &g_default_center;
 }
 
-std::shared_ptr<ks_notification_center> ks_notification_center::_create_center(const char* center_name) {
+std::shared_ptr<ks_notification_center> ks_notification_center::__create_center(const char* center_name) {
 	return std::make_shared< ks_notification_center>(__raw_ctor::v, center_name);
 }
 
@@ -478,12 +478,12 @@ const char* ks_notification_center::name() {
 	return m_d->name();
 }
 
-void ks_notification_center::add_observer(const void* observer, const char* notification_name, ks_apartment* apartment, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context) {
-	m_d->add_observer(observer, notification_name, std::move(fn), context, apartment);
+void ks_notification_center::add_observer(const void* observer, const char* notification_name_pattern, ks_apartment* apartment, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context) {
+	m_d->add_observer(observer, notification_name_pattern, std::move(fn), context, apartment);
 }
 
-void ks_notification_center::remove_observer(const void* observer, const char* notification_name) {
-	m_d->remove_observer(observer, notification_name);
+void ks_notification_center::remove_observer(const void* observer, const char* notification_name_pattern) {
+	m_d->remove_observer(observer, notification_name_pattern);
 }
 
 void ks_notification_center::remove_observer(const void* observer) {

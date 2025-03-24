@@ -13,7 +13,7 @@
 # 构造方法
 
 ```C++
-ks_async_controller();
+ks_async_controller::ks_async_controller();
 ```
 #### 描述：无。
 <br>

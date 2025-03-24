@@ -25,7 +25,9 @@ limitations under the License.
 template <class T>
 class ks_promise final {
 public:
+	ks_promise() : m_raw_promise(__do_create_raw_promise()) {}
 	ks_promise(nullptr_t) : m_raw_promise(nullptr) {}
+
 	ks_promise(const ks_promise&) = default;
 	ks_promise& operator=(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
@@ -41,9 +43,7 @@ public:
 
 public:
 	static ks_promise<T> create() {
-		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
-		ks_raw_promise_ptr raw_promise = ks_raw_promise::create(apartment_hint);
-		return ks_promise<T>::__from_raw(raw_promise);
+		return ks_promise<T>::__from_raw(__do_create_raw_promise());
 	}
 
 public:
@@ -94,6 +94,11 @@ private:
 	static ks_promise<T> __from_raw(const ks_raw_promise_ptr& raw_promise) { return ks_promise<T>(raw_promise, 0); }
 	static ks_promise<T> __from_raw(ks_raw_promise_ptr&& raw_promise) { return ks_promise<T>(std::move(raw_promise), 0); }
 	const ks_raw_promise_ptr& __get_raw() const { return m_raw_promise; }
+
+	static ks_raw_promise_ptr __do_create_raw_promise() {
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
+		return ks_raw_promise::create(apartment_hint);
+	}
 
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;

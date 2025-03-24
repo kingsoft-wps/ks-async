@@ -33,16 +33,22 @@ ks_future<ks_stdptr<IDataBuffer>> async_download(const std::string& url) {
 
 <br>
 <br>
+<br>
 
 
-# 静态成员方法
+# 构造方法
 
 ```C++
-static ks_promise<T> create();
+ks_promise<T>::ks_promise();
 ```
 #### 描述：创建一个ks_promise对象。
 #### 特别说明：新ks_promise对象应该最终完成（reslove或reject），以避免相关ks_future永不能完成，从而产生意料外的资源泄漏。
 <br>
+
+```C++
+static ks_promise<T> create();
+```
+#### 描述：创建一个ks_promise对象。（等价于默认构造）
 <br>
 <br>
 
@@ -85,4 +91,5 @@ void reject(ks_error error) const;
 # 另请参阅
   - [HOME](HOME.md)
   - [ks_future\<T>](ks_future.md)
+  - [ks_future_util](ks_future_util.md)
   - [ks_result\<T>](ks_result.md)

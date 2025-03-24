@@ -27,7 +27,9 @@ template <class T> class ks_promise;
 template <class T>
 class ks_future final {
 public:
+	ks_future() = delete;
 	ks_future(nullptr_t) : m_raw_future(nullptr) {}
+
 	ks_future(const ks_future&) = default;
 	ks_future& operator=(const ks_future&) = default;
 	ks_future(ks_future&&) noexcept = default;
@@ -224,7 +226,7 @@ public: //on_success, on_failure, on_completion
 	}
 
 public: //cast, map, map_value
-	template <class R>
+	template <class R, class _ = std::enable_if_t<std::is_convertible_v<T, R> || std::is_void_v<R> || std::is_nothing_v<R>>>
 	ks_future<R> cast() const {
 		ASSERT(this->is_valid());
 		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();

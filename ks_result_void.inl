@@ -44,7 +44,7 @@ public:
 	nothing_t to_value() const noexcept(false) { return (m_nothing_result.to_value(), nothing); }
 	ks_error to_error() const noexcept(false) { return m_nothing_result.to_error(); }
 
-	template <class R>
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R> || std::is_nothing_v<R>>>
 	ks_result<R> cast() const {
 		return m_nothing_result.template cast<R>();
 	}

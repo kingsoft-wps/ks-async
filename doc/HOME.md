@@ -4,6 +4,7 @@
 
 #### 关于Future：
 - [ks_future\<T>](ks_future.md)：ks_future对象
+- [ks_future_util](ks_future_util.md)：ks_future_util工具集
 - [ks_promise\<T>](ks_promise.md)：ks_promise对象
 <br><br>
 

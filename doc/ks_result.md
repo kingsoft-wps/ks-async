@@ -21,7 +21,7 @@ ks_result还具有不可变性，其内包含的 “值” 是不可变的。（
 # 构造方法
 
 ```C++
-ks_result<T>(const T& value);
+ks_result<T>::ks_result(const T& value);
 ```
 #### 描述：构造一个有值ks_result对象，状态为已完成、且有值。
 #### 参数：
@@ -30,7 +30,7 @@ ks_result<T>(const T& value);
 <br>
 
 ```C++
-ks_result<T>(ks_error error);
+ks_result<T>::ks_result(ks_error error);
 ```
 #### 描述：构造一个错误ks_result对象，状态为已完成、且错误。
 #### 参数：
@@ -120,5 +120,4 @@ ks_result<R> map_value<R>(const R& other_value);
 # 另请参阅
   - [HOME](HOME.md)
   - [ks_error](ks_error.md)
-  - [ks_future\<T>](ks_future.md)
   - [ks_future\<T>](ks_future.md)

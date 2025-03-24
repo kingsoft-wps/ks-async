@@ -48,7 +48,7 @@ public:
 	const T& to_value() const noexcept(false) { return m_raw_result.to_value().template get<T>(); }
 	ks_error to_error() const noexcept(false) { return m_raw_result.to_error(); }
 
-	template <class R>
+	template <class R, class _ = std::enable_if_t<std::is_convertible_v<T, R> || std::is_void_v<R> || std::is_nothing_v<R>>>
 	ks_result<R> cast() const {
 		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
 		static_assert(cast_mode != __raw_cast_mode_t::invalid, "invalid cast type");

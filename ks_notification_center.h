@@ -71,29 +71,29 @@ private:
 
 public:
 	ks_notification_center() = delete;
+	explicit ks_notification_center(__raw_ctor, const char* center_name);
 	_DISABLE_COPY_CONSTRUCTOR(ks_notification_center);
 
-	explicit ks_notification_center(__raw_ctor, const char* center_name);
 	~ks_notification_center();
 
 public:
 	KS_ASYNC_API static ks_notification_center* default_center();
-	KS_ASYNC_API static std::shared_ptr<ks_notification_center> _create_center(const char* center_name);
+	KS_ASYNC_API static std::shared_ptr<ks_notification_center> __create_center(const char* center_name);
 
 public:
 	KS_ASYNC_API const char* name();
 
 public:
 	KS_ASYNC_API void add_observer(
-		const void* observer, const char* notification_name, 
+		const void* observer, const char* notification_name_pattern, 
 		ks_apartment* apartment, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context = {});
 	KS_ASYNC_INLINE_API void add_observer(
-		const void* observer, const char* notification_name,
+		const void* observer, const char* notification_name_pattern,
 		ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn) { //only for compat
-		return this->add_observer(observer, notification_name, apartment, std::move(fn), context);
+		return this->add_observer(observer, notification_name_pattern, apartment, std::move(fn), context);
 	}
 
-	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name);
+	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name_pattern);
 	KS_ASYNC_API void remove_observer(const void* observer);
 
 public:
