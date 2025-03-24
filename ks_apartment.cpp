@@ -68,10 +68,27 @@ ks_apartment* ks_apartment::current_thread_apartment() {
 	return tls_current_thread_apartment;
 }
 
+ks_apartment* ks_apartment::current_thread_apartment_or_master_sta() {
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	if (cur_apartment == nullptr)
+		cur_apartment = ks_apartment::master_sta();
+	ASSERT(cur_apartment != nullptr);
+	return cur_apartment;
+}
+
+ks_apartment* ks_apartment::current_thread_apartment_or_background_sta() {
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	if (cur_apartment == nullptr)
+		cur_apartment = ks_apartment::background_sta();
+	ASSERT(cur_apartment != nullptr);
+	return cur_apartment;
+}
+
 ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
 	ks_apartment* cur_apartment = tls_current_thread_apartment;
 	if (cur_apartment == nullptr)
 		cur_apartment = ks_apartment::default_mta();
+	ASSERT(cur_apartment != nullptr);
 	return cur_apartment;
 }
 
@@ -79,6 +96,7 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 	ks_apartment* cur_apartment = tls_current_thread_apartment;
 	if (cur_apartment == nullptr)
 		cur_apartment = or_apartment;
+	ASSERT(cur_apartment != nullptr);
 	return cur_apartment;
 }
 

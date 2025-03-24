@@ -42,24 +42,24 @@ public:
 
 public: //resolved, rejected
 	static ks_future<T> resolved(const T& value) {
-		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
 		ks_raw_future_ptr raw_future = ks_raw_future::resolved(ks_raw_value::of(value), apartment_hint);
 		return ks_future<T>::__from_raw(raw_future);
 	}
 	static ks_future<T> resolved(T&& value) {
-		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
 		ks_raw_future_ptr raw_future = ks_raw_future::resolved(ks_raw_value::of(std::move(value)), apartment_hint);
 		return ks_future<T>::__from_raw(raw_future);
 	}
 
 	static ks_future<T> rejected(const ks_error& error) {
-		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
 		ks_raw_future_ptr raw_future = ks_raw_future::rejected(error, apartment_hint);
 		return ks_future<T>::__from_raw(raw_future);
 	}
 
 	static ks_future<T> __from_result(const ks_result<T>& result) {
-		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
 		ks_raw_future_ptr raw_future = ks_raw_future::__from_result(result.__get_raw(), apartment_hint);
 		return ks_future<T>::__from_raw(raw_future);
 	}
@@ -592,7 +592,7 @@ private: //__post
 	static ks_future<T> __post_of_arglist_1_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& task_fn) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			T typed_value = task_fn();
 			return ks_raw_value::of(std::move(typed_value));
@@ -603,7 +603,7 @@ private: //__post
 	static ks_future<T> __post_of_arglist_1_ret_2(ks_apartment* apartment, const ks_async_context& context, std::function<ks_result<T>()>&& task_fn) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			ks_result<T> result = task_fn();
 			return result.__get_raw();
@@ -618,7 +618,7 @@ private: //__post
 	static ks_future<T> __post_of_arglist_2_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T(ks_cancel_inspector*)>&& task_fn) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			T typed_value = task_fn(ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(std::move(typed_value));
@@ -629,7 +629,7 @@ private: //__post
 	static ks_future<T> __post_of_arglist_2_ret_2(ks_apartment* apartment, const ks_async_context& context, std::function<ks_result<T>(ks_cancel_inspector*)>&& task_fn) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			ks_result<T> result = task_fn(ks_cancel_inspector::__for_future());
 			return result.__get_raw();
@@ -646,7 +646,7 @@ private: //__post_delayed
 	static ks_future<T> __post_delayed_of_arglist_1_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T()>&& task_fn, int64_t delay) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			T typed_value = task_fn();
 			return ks_raw_value::of(std::move(typed_value));
@@ -657,7 +657,7 @@ private: //__post_delayed
 	static ks_future<T> __post_delayed_of_arglist_1_ret_2(ks_apartment* apartment, const ks_async_context& context, std::function<ks_result<T>()>&& task_fn, int64_t delay) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			ks_result<T> result = task_fn();
 			return result.__get_raw();
@@ -672,7 +672,7 @@ private: //__post_delayed
 	static ks_future<T> __post_delayed_of_arglist_2_ret_1(ks_apartment* apartment, const ks_async_context& context, std::function<T(ks_cancel_inspector*)>&& task_fn, int64_t delay) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			T typed_value = task_fn(ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(std::move(typed_value));
@@ -683,7 +683,7 @@ private: //__post_delayed
 	static ks_future<T> __post_delayed_of_arglist_2_ret_2(ks_apartment* apartment, const ks_async_context& context, std::function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay) {
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)]()->ks_raw_result {
 			ks_result<T> result = task_fn(ks_cancel_inspector::__for_future());
 			return result.__get_raw();
@@ -701,7 +701,7 @@ private: //__post_pending
 		ASSERT(apartment != nullptr);
 		ASSERT(trigger != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)](const ks_raw_result&)->ks_raw_result {
 			T typed_value = task_fn();
 			return ks_raw_value::of(std::move(typed_value));
@@ -715,7 +715,7 @@ private: //__post_pending
 		ASSERT(apartment != nullptr);
 		ASSERT(trigger != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)](const ks_raw_result&)->ks_raw_result {
 			ks_result<T> result = task_fn();
 			return result.__get_raw();
@@ -733,7 +733,7 @@ private: //__post_pending
 		ASSERT(apartment != nullptr);
 		ASSERT(trigger != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)](const ks_raw_result&)->ks_raw_result {
 			T typed_value = task_fn(ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(std::move(typed_value));
@@ -747,7 +747,7 @@ private: //__post_pending
 		ASSERT(apartment != nullptr);
 		ASSERT(trigger != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::current_thread_apartment_or_master_sta();
 		auto raw_task_fn = [task_fn = std::move(task_fn)](const ks_raw_result&)->ks_raw_result {
 			ks_result<T> result = task_fn(ks_cancel_inspector::__for_future());
 			return result.__get_raw();

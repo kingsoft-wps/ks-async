@@ -32,6 +32,8 @@ public:
 	KS_ASYNC_API static ks_apartment* default_mta();    //默认[多线程]套间
 
 	KS_ASYNC_API static ks_apartment* current_thread_apartment();
+	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_master_sta();
+	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_background_sta();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 
