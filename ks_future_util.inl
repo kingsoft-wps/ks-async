@@ -257,7 +257,7 @@ public: //repeat, repeat_periodic, repeat_productive
 				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
 					auto data = data_weak.lock();
 					if (data != nullptr)
-						data->cancel_ctrl = true;
+						data->cancel_ctrl_v = true;
 				}
 			},
 			make_async_context().set_priority(0x10000), apartment);
@@ -302,7 +302,7 @@ public: //repeat, repeat_periodic, repeat_productive
 				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
 					auto data = data_weak.lock();
 					if (data != nullptr)
-						data->cancel_ctrl = true;
+						data->cancel_ctrl_v = true;
 				}
 			}, 
 			make_async_context().set_priority(0x10000), produce_apartment);
@@ -322,7 +322,7 @@ private:
 
 		std::chrono::steady_clock::time_point create_time{};
 		uint64_t rounds = 0;
-		volatile bool cancel_ctrl = false;
+		volatile bool cancel_ctrl_v = false;
 		ks_raw_promise_ptr raw_final_promise_void = nullptr;
 	};
 
@@ -331,7 +331,7 @@ private:
 			::post_delayed<void>(
 				data->apartment,
 				[data]() -> ks_result<void> {
-					if (data->cancel_ctrl)
+					if (data->cancel_ctrl_v)
 						return ks_error::cancelled_error();
 					else
 						return nothing;
@@ -382,7 +382,7 @@ private:
 
 		std::chrono::steady_clock::time_point create_time{};
 		uint64_t rounds = 0;
-		volatile bool cancel_ctrl = false;
+		volatile bool cancel_ctrl_v = false;
 		ks_raw_promise_ptr raw_final_promise_void = nullptr;
 	};
 
@@ -392,7 +392,7 @@ private:
 			::post<V>(
 				data->produce_apartment,
 				[data]() -> ks_future<V> {
-					if (data->cancel_ctrl)
+					if (data->cancel_ctrl_v)
 						return ks_future<V>::rejected(ks_error::cancelled_error());
 					ks_future<V> fut = data->produce_fn();
 					ASSERT(fut.is_valid());
@@ -404,7 +404,7 @@ private:
 			.template flat_then<void>(
 				data->consume_apartment,
 				[data](const V& value) -> ks_future<void> {
-					if (data->cancel_ctrl)
+					if (data->cancel_ctrl_v)
 						return ks_future<void>::rejected(ks_error::cancelled_error());
 					ks_future<void> fut = data->consume_fn(value);
 					ASSERT(fut.is_valid());
