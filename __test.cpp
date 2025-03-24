@@ -528,6 +528,12 @@ void test_fork() {
         ks_apartment::background_sta()->atfork_parent();
     }
 
+    if (pid == 0) {
+        ks_future<void>::post(ks_apartment::default_mta(), {}, []() {
+            std::cout << "test fork child-post\n";
+        });
+    }
+
     if (pid != 0 && pid != -1) {
         int status = 0;
         pid_t wait_res = wait(&status);
