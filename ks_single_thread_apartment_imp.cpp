@@ -289,7 +289,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 		std::unique_lock<ks_mutex> lock(d->mutex);
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		while (d->atforking_flag_v) 
+		while (d->atforking_flag) 
 			d->atforking_done_cv.wait(lock);
 #endif
 
@@ -309,15 +309,15 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 				now_fn_queue_sel->pop_front();
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-				++d->working_rc_v;
+				++d->working_rc;
 #endif
 
 				lock.unlock();
 				now_fn_item.fn(); //invoke fn, maybe except => fault
+
 #if __KS_APARTMENT_ATFORK_ENABLED
 				lock.lock();
-
-				if (--d->working_rc_v == 0)
+				if (--d->working_rc == 0)
 					d->working_done_cv.notify_all();
 #endif
 				continue;
@@ -415,7 +415,7 @@ bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(const std:
 #if __KS_APARTMENT_ATFORK_ENABLED
 void ks_single_thread_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (m_d->atforking_flag_v) 
+	if (m_d->atforking_flag) 
 		return; //重复prepare
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
@@ -423,9 +423,9 @@ void ks_single_thread_apartment_imp::atfork_prepare() {
 		return; //该sta线程内调用fork，不必做什么
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	m_d->atforking_flag_v = true;
+	m_d->atforking_flag = true;
 
-	while (m_d->working_rc_v != 0)
+	while (m_d->working_rc != 0)
 		m_d->working_done_cv.wait(lock);
 
 	lock.release();
@@ -433,21 +433,21 @@ void ks_single_thread_apartment_imp::atfork_prepare() {
 
 void ks_single_thread_apartment_imp::atfork_parent() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (!m_d->atforking_flag_v)
+	if (!m_d->atforking_flag)
 		return;
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 	if (atfork_calling_in_my_thread_flag)
 		return; //该sta线程内调用fork，不必做什么
 
-	m_d->atforking_flag_v = false;
+	m_d->atforking_flag = false;
 	m_d->atforking_done_cv.notify_all();
 	m_d->mutex.unlock();
 }
 
 void ks_single_thread_apartment_imp::atfork_child() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (!m_d->atforking_flag_v)
+	if (!m_d->atforking_flag)
 		return;
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
@@ -468,7 +468,7 @@ void ks_single_thread_apartment_imp::atfork_child() {
 		}).detach();
 	}
 
-	m_d->atforking_flag_v = false;
+	m_d->atforking_flag = false;
 	m_d->atforking_done_cv.notify_all();
 	m_d->mutex.unlock();
 }
@@ -490,7 +490,7 @@ bool ks_single_thread_apartment_imp::__do_run_nested_pump_loop_for_extern_waitin
 		std::unique_lock<ks_mutex> lock(d->mutex);
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		if (d->atforking_flag_v)
+		if (d->atforking_flag)
 			break; //atforking, broken
 #endif
 
@@ -511,15 +511,15 @@ bool ks_single_thread_apartment_imp::__do_run_nested_pump_loop_for_extern_waitin
 				now_fn_queue_sel->pop_front();
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-				++d->working_rc_v;
+				++d->working_rc;
 #endif
 
 				lock.unlock();
 				now_fn_item.fn(); //invoke fn, maybe except => fault
+
 #if __KS_APARTMENT_ATFORK_ENABLED
 				lock.lock();
-
-				if (--d->working_rc_v == 0)
+				if (--d->working_rc == 0)
 					d->working_done_cv.notify_all();
 #endif
 				continue;

@@ -285,7 +285,7 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(ks_thread_pool_apartment_imp
 		std::unique_lock<ks_mutex> lock(d->mutex);
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		while (d->atforking_flag_v) {
+		while (d->atforking_flag) {
 			d->atforking_done_cv.wait(lock);
 		}
 #endif
@@ -314,19 +314,19 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(ks_thread_pool_apartment_imp
 				++d->busy_thread_count_for_idle;
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-			++d->working_rc_v;
+			++d->working_rc;
 #endif
 
 			lock.unlock();
 			now_fn_item.fn();
-			lock.lock();
 
+			lock.lock();
 			--d->busy_thread_count;
 			if (is_from_queue_idle)
 				--d->busy_thread_count_for_idle;
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-			if (--d->working_rc_v == 0)
+			if (--d->working_rc == 0)
 				d->working_done_cv.notify_all();
 #endif
 			continue;
@@ -389,7 +389,7 @@ void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc(ks_thread_pool_
 		std::unique_lock<ks_mutex> lock(d->mutex);
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		while (d->atforking_flag_v)
+		while (d->atforking_flag)
 			d->atforking_done_cv.wait(lock);
 #endif
 
@@ -485,16 +485,16 @@ void ks_thread_pool_apartment_imp::_do_put_fn_item_into_delaying_list_locked(con
 #if __KS_APARTMENT_ATFORK_ENABLED
 void ks_thread_pool_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (m_d->atforking_flag_v)
+	if (m_d->atforking_flag)
 		return; //重复prepare
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 	_UNUSED(atfork_calling_in_my_thread_flag); //即使在该mta某个线程内调用fork，也要照样lock，因为至少还有delaying线程呢
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	m_d->atforking_flag_v = true;
+	m_d->atforking_flag = true;
 
-	while (m_d->working_rc_v != 0)
+	while (m_d->working_rc != 0)
 		m_d->working_done_cv.wait(lock);
 
 	lock.release();
@@ -502,20 +502,20 @@ void ks_thread_pool_apartment_imp::atfork_prepare() {
 
 void ks_thread_pool_apartment_imp::atfork_parent() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (!m_d->atforking_flag_v)
+	if (!m_d->atforking_flag)
 		return;
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
 	_UNUSED(atfork_calling_in_my_thread_flag); //即使在该mta某个线程内调用fork，也要照样lock，因为至少还有delaying线程呢
 
-	m_d->atforking_flag_v = false;
+	m_d->atforking_flag = false;
 	m_d->atforking_done_cv.notify_all();
 	m_d->mutex.unlock();
 }
 
 void ks_thread_pool_apartment_imp::atfork_child() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-	if (!m_d->atforking_flag_v)
+	if (!m_d->atforking_flag)
 		return;
 
 	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
@@ -547,7 +547,7 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 		}).detach();
 	}
 
-	m_d->atforking_flag_v = false;
+	m_d->atforking_flag = false;
 	m_d->atforking_done_cv.notify_all();
 	m_d->mutex.unlock();
 }
@@ -569,7 +569,7 @@ bool ks_thread_pool_apartment_imp::__do_run_nested_pump_loop_for_extern_waiting(
 		std::unique_lock<ks_mutex> lock(d->mutex);
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		if (d->atforking_flag_v)
+		if (d->atforking_flag)
 			break; //atforking, broken
 #endif
 
@@ -597,19 +597,19 @@ bool ks_thread_pool_apartment_imp::__do_run_nested_pump_loop_for_extern_waiting(
 				++d->busy_thread_count_for_idle;
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-			++d->working_rc_v;
+			++d->working_rc;
 #endif
 
 			lock.unlock();
 			now_fn_item.fn();
-			lock.lock();
 
+			lock.lock();
 			--d->busy_thread_count;
 			if (is_from_queue_idle)
 				--d->busy_thread_count_for_idle;
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-			if (--d->working_rc_v == 0)
+			if (--d->working_rc == 0)
 				d->working_done_cv.notify_all();
 #endif
 			continue;

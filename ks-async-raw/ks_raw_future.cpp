@@ -19,6 +19,9 @@ limitations under the License.
 #include "../ktl/ks_concurrency.h"
 #include <algorithm>
 #include <set>
+#if __KS_APARTMENT_ATFORK_ENABLED
+#include <unistd.h>
+#endif
 
 template <class FN>
 using function = std::function<FN>;
@@ -43,6 +46,9 @@ class ks_raw_future_baseimp : public ks_raw_future, public std::enable_shared_fr
 protected:
 	explicit ks_raw_future_baseimp(ks_raw_future_mode mode, bool cancelable, ks_apartment* spec_apartment, const ks_async_context& living_context)
 		: m_spec_apartment(spec_apartment), m_create_time(std::chrono::steady_clock::now()), m_living_context(living_context)
+#if __KS_APARTMENT_ATFORK_ENABLED
+		, m_belong_pid(getpid())
+#endif
 		, m_mode(mode), m_cancelable(cancelable), m_living_context_controller_available_v(living_context.__is_controller_present()) {}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future_baseimp);
@@ -159,16 +165,28 @@ protected:
 			return true;
 		}
 		else {
-#if !__KS_APARTMENT_ATFORK_ENABLED
 			std::unique_lock<ks_mutex> lock(m_mutex);
-			while (!m_completed_result.is_completed()) {
-				m_completed_result_cv.wait(lock);
-			}
-#else
-			while (!m_completed_result.is_completed()) {
-				std::this_thread::yield();
-			}
+			if (m_completed_result.is_completed())
+				return true;
+
+			bool should_completed_cv_wait = true;
+#if __KS_APARTMENT_ATFORK_ENABLED
+			if (m_belong_pid != getpid())
+				should_completed_cv_wait = false;
 #endif
+			
+			if (should_completed_cv_wait) {
+				++m_completed_result_cv_waiting_rc;
+				while (!m_completed_result.is_completed()) {
+					m_completed_result_cv.wait(lock);
+				}
+				--m_completed_result_cv_waiting_rc;
+			}
+			else {
+				lock.unlock();
+				while (!m_completed_result.is_completed())
+					std::this_thread::yield();
+			}
 
 			return true;
 		}
@@ -261,9 +279,21 @@ protected:
 
 		m_completed_result = result.require_completed_or_error();
 		m_completed_prefer_apartment = prefer_apartment;
-#if !__KS_APARTMENT_ATFORK_ENABLED
-		m_completed_result_cv.notify_all();
+
+		bool should_completed_cv_notify = true;
+		if (m_completed_result_cv_waiting_rc == 0) {
+			should_completed_cv_notify = false;
+		}
+		else {
+#if __KS_APARTMENT_ATFORK_ENABLED
+			if (m_belong_pid != getpid())
+				should_completed_cv_notify = false;
 #endif
+		}
+
+		if (should_completed_cv_notify) {
+			m_completed_result_cv.notify_all();
+		}
 
 		for (ks_apartment* apartment : m_waiting_for_me_apartment_set) {
 			apartment->__do_notify_nested_pump_loop_for_extern_waiting();
@@ -397,14 +427,16 @@ protected:
 	//const bool m_cancelable;  //const-like  //被移动位置，使内存更紧凑
 	const std::add_const_t<ks_apartment*> m_spec_apartment;  //const-like
 	const std::chrono::steady_clock::time_point m_create_time;  //const-like
+#if __KS_APARTMENT_ATFORK_ENABLED
+	const pid_t m_belong_pid;  //const-like
+#endif
 
 	ks_mutex m_mutex;
 
 	ks_raw_result m_completed_result;
-#if !__KS_APARTMENT_ATFORK_ENABLED
-	ks_condition_variable m_completed_result_cv{}; //fork子进程中cv有几率死锁，故若支持fork则弃用！
-#endif
 	ks_apartment* m_completed_prefer_apartment = nullptr;
+	ks_condition_variable m_completed_result_cv{}; //fork子进程中操作cv有几率死锁，故子进程中不要使用它！
+	int m_completed_result_cv_waiting_rc = 0;
 
 	ks_async_context m_living_context; //在complete后被自动清除
 	//volatile bool m_living_context_controller_available_v = false;  //被移动位置，使内存更紧凑

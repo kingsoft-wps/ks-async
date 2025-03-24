@@ -124,9 +124,9 @@ private:
 		volatile _STATE state_v = _STATE::NOT_START;
 
 #if __KS_APARTMENT_ATFORK_ENABLED
-		volatile size_t working_rc_v = 0;
+		int working_rc = 0;
 		ks_condition_variable working_done_cv{};
-		volatile bool atforking_flag_v = false;
+		bool atforking_flag = false;
 		ks_condition_variable atforking_done_cv{};
 #endif
 	};
