@@ -52,7 +52,7 @@ public:
 		std::is_convertible_v<std::invoke_result_t<FN>, R>>>
 	ks_result<R> map(FN&& fn) const {
 		return m_nothing_result.template map<R>(
-			[fn = std::forward<FN>(fn)](const nothing_t&) { return fn(); }
+			[fn = std::forward<FN>(fn)](const nothing_t&) -> R { return fn(); }
 		);
 	}
 

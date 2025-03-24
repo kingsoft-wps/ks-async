@@ -207,7 +207,7 @@ private:
 				},
 				context)
 			.on_completion(
-				producer_apartment,
+				consumer_apartment,
 				[producer_apartment, producer_fn, consumer_apartment, consumer_fn, context, final_promise](const ks_result<void>& consume_res) -> void {
 					if (consume_res.is_value()) {
 						__do_pump_repetitive_once(
