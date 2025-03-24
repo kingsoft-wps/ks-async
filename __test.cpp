@@ -185,6 +185,34 @@ void test_any() {
     g_exit_latch.wait();
 }
 
+void test_repetitive() {
+    g_exit_latch.add(1);
+    std::cout << "test repetitive ... ";
+
+    std::atomic<int> sn = { 0 };
+
+    auto producer = [p_sn = &sn]() -> ks_future<int> {
+        int sn = ++(*p_sn);
+        if (sn <= 5)
+            return ks_future<int>::resolved(sn);
+        else
+            return ks_future<int>::rejected(ks_error::was_terminated_error());
+    };
+
+    auto consumer = [](const int& sn) -> ks_future<void> {
+        std::cout << sn << " ";
+        return ks_future<void>::resolved();
+    };
+
+    ks_future_util::repetitive<int>(ks_apartment::default_mta(), producer, consumer)
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+            _output_result("completion: ", result);
+            g_exit_latch.count_down();
+        });
+
+    g_exit_latch.wait();
+}
+
 void test_future_methods() {
     g_exit_latch.add(1);
     std::cout << "test future ... ";
@@ -363,6 +391,7 @@ int main() {
 
     test_all();
     test_any();
+    test_repetitive();
 
     test_future_methods();
     test_post_delayed();

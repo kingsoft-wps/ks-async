@@ -149,10 +149,66 @@ public: //vector aggr
 		return ks_future<T>::__from_raw(raw_future);
 	}
 
+public: //repetitive
+	template <class T>
+	static ks_future<void> repetitive(
+		ks_apartment* apartment,
+		const std::function<ks_future<T>()>& producer,
+		const std::function<ks_future<void>(const T&)>& consumer,
+		const ks_async_context& context = {}) {
+
+		ks_promise<void> final_promise = ks_promise<void>::create();
+		__do_pump_repetitive_once(apartment, producer, consumer, context, final_promise);
+		return final_promise.get_future();
+	}
+
 private:
 	template <class... Ts, size_t... IDXs>
 	static std::tuple<Ts...> __convert_raw_value_vector_to_typed_value_tuple(const std::vector<ks_raw_value>& value_vec, std::index_sequence<IDXs...>) {
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
+	}
+
+private:
+	template <class T>
+	static void __do_pump_repetitive_once(
+		ks_apartment* apartment,
+		const std::function<ks_future<T>()>& producer,
+		const std::function<ks_future<void>(const T&)>& consumer,
+		const ks_async_context& context,
+		const ks_promise<void>& final_promise) {
+
+		ks_future<T>
+			::post(
+				apartment, 
+				[producer]() -> ks_future<T> {
+					ks_future<T> fut = producer();
+					ASSERT(fut.is_valid());
+					if (!fut.is_valid()) 
+						fut = ks_future<T>::rejected(ks_error::unexpected_error());
+					return fut;
+				},
+				context)
+			.flat_then<void>(
+				apartment, 
+				[consumer](const T& value) -> ks_future<void> {
+					ks_future<void> fut = consumer(value);
+					ASSERT(fut.is_valid());
+					if (!fut.is_valid())
+						fut = ks_future<void>::rejected(ks_error::unexpected_error());
+					return fut;
+				},
+				context)
+			.on_completion(
+				apartment,
+				[apartment, producer, consumer, context, final_promise](const ks_result<void>& consume_res) -> void {
+					if (consume_res.is_value()) {
+						__do_pump_repetitive_once(apartment, producer, consumer, context, final_promise);
+					}
+					else {
+						final_promise.reject(consume_res.to_error());
+					}
+				},
+				context);
 	}
 
 };

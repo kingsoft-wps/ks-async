@@ -296,13 +296,31 @@ static ks_future<T> ks_future_util::any(const std::vector<ks_future<T>>& futures
 static ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>& future1, ...);
 ```
 #### 描述：创建一个ks_future对象，代表任一（实际上就是最先）future “成功”。
-#### 模板参数：
-  -- autoCancelOthers: 当有任一前序future成功，进而使all的结果future为成功时，是否自动try_cancel其他未完成的future。
 #### 参数：
   - futures: 前序ks_future对象数组。
   - future0, future1, ...: 前序ks_future对象列表。
 #### 返回值：新ks_future对象，其 “值” 类型为R。若全部前序future失败，则转发首个 “错误”。
 #### 特别说明：若某前序future成功，则立即处置此聚合ks_future为成功，不会等待其他future完成（然而会自动尝试try_cancel它们，但并无保证）。
+<br>
+<br>
+
+```C++
+	template <class T>
+	static ks_future<void> repetitive(
+		ks_apartment* apartment,
+		const std::function<ks_future<T>()>& producer,
+		const std::function<ks_future<void>(const T&)>& consumer,
+		const ks_async_context& context = {});
+```
+#### 描述：反复迭代一个异步的produce-consume过程，直至出现 “错误”。
+#### 模板参数：
+  -- T: producer产生的、以及consumer消费的数据类型。
+#### 参数：
+  - apartment: 指定异步任务执行时所在套间。
+  - producer: 生产者异步函数。
+  - consumer: 消费者异步函数。
+  - context: 异步任务执行时所需上下文。
+#### 返回值：代表迭代结束的一个future，因迭代过程是出现 “错误” 时结束，故返回的future的最终状态必为 “错误”。
 <br>
 <br>
 <br>

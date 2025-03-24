@@ -251,7 +251,7 @@ bool ks_async_flow::add_task(
 	return __choose_add_task<T>(
 		std::integral_constant<int, ret_mode>(),
 		name_and_dependencies,
-		apartment, std::forward<FN>(fn), context,
+		apartment, FN(std::forward<FN>(fn)), context,
 		__typeinfo_of<T>());
 }
 
@@ -298,7 +298,7 @@ bool ks_async_flow::__choose_add_task(
 	const char* name_and_dependencies, 
 	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 	const std::type_info* value_typeinfo) const {
-	return m_raw_flow->add_task(
+	return m_raw_flow->add_flat_task(
 		name_and_dependencies, apartment, 
 		[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_future_ptr { return fn(ks_async_flow::__from_raw(flow)).__get_raw(); },
 		context, value_typeinfo);

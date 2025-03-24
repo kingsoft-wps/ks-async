@@ -76,4 +76,5 @@ public:
 	static constexpr HRESULT WAS_TIMEOUT_ERROR_CODE    = 0xFF3C0002;
 	static constexpr HRESULT WAS_CANCELLED_ERROR_CODE  = 0xFF3C0003;
 	static constexpr HRESULT WAS_TERMINATED_ERROR_CODE = 0xFF3C0004;
+
 };
