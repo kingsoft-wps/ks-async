@@ -297,7 +297,7 @@ void test_sequential() {
 
     auto c = std::make_shared<std::atomic<int>>(0);
     ks_future_util
-        ::parallel(
+        ::sequential(
             ks_apartment::default_mta(),
             [c]() { ++(*c); },
             5)

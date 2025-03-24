@@ -477,21 +477,21 @@ public: //parallel, sequential
 			return ks_future_util::post<void>(apartment, std::forward<FN>(fn), context);
 		}
 		else {
-			std::shared_ptr<size_t> index = std::make_shared<__sequential_ctrl_t>();
-			std::function<ks_future<void>()> fn2 = [apartment, count, fn = __wrap_async_fn_0<void>(fn), index]()->ks_future<void> {
-				if ((*index)++ < count)
+			std::shared_ptr<size_t> index_p = std::make_shared<size_t>();
+			std::function<ks_future<void>()> fn2 = [fn = __wrap_async_fn_0<void>(std::forward<FN>(fn)), index_p, count]()->ks_future<void> {
+				if ((*index_p)++ < count)
 					return fn();
 				else
 					return ks_future<void>::rejected(ks_error::eof_error());
 			};
 
 			return ks_future_util
-				::repeat(apartment, fn, context)
-				.then<void>(
+				::repeat(apartment, fn2, context)
+				.template then<void>(
 					apartment, 
-					[index]() -> ks_result<void> {
+					[index_p, count]() -> ks_result<void> {
 						//若repeat返回成功，但index未达到count，则意味着中间遇到了eof，那么我们还原这个eof错误
-						if ((*index) < count)
+						if ((*index_p) < count)
 							return ks_error::eof_error();
 						else
 							return nothing;
