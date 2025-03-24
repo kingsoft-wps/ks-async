@@ -204,7 +204,7 @@ bool ks_raw_async_flow::add_flat_task(
 
 	task_item->task_trigger_void = ks_raw_promise::create(task_item->task_apartment);
 	task_item->task_trigger_void->get_future()->flat_then(
-		[this_weak = std::weak_ptr<ks_raw_async_flow>(this->shared_from_this()), fn = std::move(fn)](const ks_raw_value& _) -> ks_raw_future_ptr {
+		[this_weak = this->weak_from_this(), fn = std::move(fn)](const ks_raw_value& _) -> ks_raw_future_ptr {
 			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
 			if (this_ptr == nullptr) {
 				ASSERT(false);
@@ -223,7 +223,7 @@ bool ks_raw_async_flow::add_flat_task(
 		}, 
 		context, task_item->task_apartment
 	)->transform(
-		[this_weak = std::weak_ptr<ks_raw_async_flow>(this->shared_from_this()), task_item](const ks_raw_result& task_result)->ks_raw_result {
+		[this_weak = this->weak_from_this(), task_item](const ks_raw_result& task_result)->ks_raw_result {
 			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
 			if (this_ptr == nullptr) {
 				ASSERT(false);

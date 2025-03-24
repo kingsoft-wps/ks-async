@@ -358,7 +358,7 @@ private:
 				[data]() {
 					data->rounds++;
 					const std::chrono::steady_clock::time_point now_time = std::chrono::steady_clock::now();
-					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds(data->delay + data->interval * data->rounds);
+					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds((long long)(data->delay + data->interval * data->rounds));
 					const int64_t next_delay = std::chrono::duration_cast<std::chrono::milliseconds>(next_time - now_time).count();
 					__schedule_periodic_once(data, next_delay);
 				},

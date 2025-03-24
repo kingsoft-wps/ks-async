@@ -115,13 +115,13 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 
 
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
-	ASSERT(ui_sta != nullptr);
+	ASSERT(ui_sta != nullptr && (ui_sta->features() & sequential_feature) != 0);
 	ASSERT(g_ui_sta == nullptr || g_ui_sta == ui_sta);
 	g_ui_sta = ui_sta;
 }
 
 void ks_apartment::__set_master_sta(ks_apartment* master_sta) {
-	ASSERT(master_sta != nullptr);
+	ASSERT(master_sta != nullptr && (master_sta->features() & sequential_feature) != 0);
 	ASSERT(g_master_sta == nullptr || g_master_sta == master_sta);
 	g_master_sta = master_sta;
 }
