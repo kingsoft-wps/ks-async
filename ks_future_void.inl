@@ -382,9 +382,8 @@ public: //on_success, on_failure, on_completion
 			context
 		); 
 	}
-	template <class FN>
-	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
-		return this->on_success(apartment, std::forward<FN>(fn), context);
+	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, std::function<void()>&& fn) const { //only for compat
+		return this->on_success(apartment, std::move(fn), context);
 	}
 
 	ks_future<void> on_failure(ks_apartment* apartment, std::function<void(const ks_error&)>&& fn, const ks_async_context& context = {}) const {
@@ -394,9 +393,8 @@ public: //on_success, on_failure, on_completion
 			context
 		);
 	}
-	template <class FN>
-	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
-		return this->on_failure(apartment, std::forward<FN>(fn), context);
+	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_error&)>&& fn) const { //only for compat
+		return this->on_failure(apartment, std::move(fn), context);
 	}
 
 	ks_future<void> on_completion(ks_apartment* apartment, std::function<void(const ks_result<void>&)>&& fn, const ks_async_context& context = {}) const {
@@ -406,9 +404,8 @@ public: //on_success, on_failure, on_completion
 			context
 		); 
 	}
-	template <class FN>
-	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
-		return this->on_completion(apartment, std::forward<FN>(fn), context);
+	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<void>&)>&& fn) const { //only for compat
+		return this->on_completion(apartment, std::move(fn), context);
 	}
 
 public: //cast, map, deliver_to_promise, set_timeout
