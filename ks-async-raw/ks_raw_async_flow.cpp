@@ -379,7 +379,7 @@ bool ks_raw_async_flow::start() {
 
 			//check isolated task
 			if (std::find_if(m_task_map.cbegin(), m_task_map.cend(),
-				[](auto& entry) -> bool { return entry.second->task_level == 0; }) != m_task_map.cend()) {
+				[](const auto& entry) -> bool { return entry.second->task_level == 0; }) != m_task_map.cend()) {
 				ASSERT(false);
 				return false;
 			}

@@ -208,7 +208,7 @@ void ks_single_thread_apartment_imp::try_unschedule(uint64_t id) {
 
 	auto do_erase_fn_from = [](std::deque<_FN_ITEM>* fn_queue, uint64_t fn_id) -> bool {
 		auto it = std::find_if(fn_queue->begin(), fn_queue->end(),
-			[fn_id](auto& item) {return item.fn_id == fn_id; });
+			[fn_id](const auto& item) {return item.fn_id == fn_id; });
 		if (it != fn_queue->end()) {
 			fn_queue->erase(it);
 			return true;
@@ -371,7 +371,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc() {
 bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {
 	auto do_check_fn_exists = [](std::deque<_FN_ITEM>* fn_queue, uint64_t fn_id) -> bool {
 		return std::find_if(fn_queue->cbegin(), fn_queue->cend(),
-			[fn_id](auto& item) {return item.fn_id == fn_id; }) != fn_queue->cend();
+			[fn_id](const auto& item) {return item.fn_id == fn_id; }) != fn_queue->cend();
 	};
 
 	return do_check_fn_exists(&m_d->now_fn_queue_prior, id)
@@ -405,7 +405,7 @@ void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(_
 			//新项的目标时点落在当前队列的时段区间内。。。
 			//忽略priority
 			where_it = std::upper_bound(m_d->delaying_fn_queue.begin(), m_d->delaying_fn_queue.end(), fn_item,
-				[](auto& a, auto& b) { return a.until_time < b.until_time; });
+				[](const auto& a, const auto& b) { return a.until_time < b.until_time; });
 		}
 	}
 

@@ -98,7 +98,7 @@ public: //tuple aggr
 				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);
@@ -117,7 +117,7 @@ public: //tuple aggr
 				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);
@@ -132,7 +132,7 @@ public: //tuple aggr
 		ks_raw_future_ptr raw_future = ks_raw_future::any(raw_arg_futures, nullptr);
 		//for any(), when succ, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);
@@ -159,7 +159,7 @@ public: //vector aggr
 				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);
@@ -179,7 +179,7 @@ public: //vector aggr
 				}, make_async_context().set_priority(0x10000), nullptr);
 		//for all(), when error, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);
@@ -196,7 +196,7 @@ public: //vector aggr
 		ks_raw_future_ptr raw_future = ks_raw_future::any(raw_arg_futures, nullptr);
 		//for any(), when succ, auto cancel other not-completed futures
 		if (true) {
-			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](auto&) {
+			raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 				for (auto& rawf : raw_arg_futures)
 					rawf->try_cancel(true);
 			}, make_async_context().set_priority(0x10000), nullptr);

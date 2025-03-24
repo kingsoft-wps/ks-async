@@ -1259,7 +1259,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::noop(ks_apartment* apartment) {
 		ks_raw_pipe_future>(
 			ks_raw_future_mode::FORWARD,
 			apartment,
-			[](auto& input) { return input; },
+			[](const auto& input) { return input; },
 			ks_async_context(m_living_context).set_priority(0x10000),
 			false);
 	pipe_future->connect(this->shared_from_this());
