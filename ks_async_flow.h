@@ -8,8 +8,8 @@
 
 class ks_async_flow {
 public:
-	ks_async_flow() : m_raw_flow(ks_raw_async_flow::create()) {}
 	explicit ks_async_flow(nullptr_t) : m_raw_flow(nullptr) {}
+	explicit ks_async_flow(const ks_async_context& context = {}) : m_raw_flow(ks_raw_async_flow::create()) {}
 
 	ks_async_flow(ks_async_flow&&) noexcept = default;
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
@@ -93,10 +93,9 @@ public:
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	template <class _ = void>
-	_DECL_DEPRECATED void wait() const {
+	void __wait() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->wait();
+		return m_raw_flow->__wait();
 	}
 
 	//强制清理，一般不需要调用，出现循环引用时可用

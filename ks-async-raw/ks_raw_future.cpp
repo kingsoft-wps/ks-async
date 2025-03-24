@@ -18,6 +18,7 @@ limitations under the License.
 #include "ks_raw_internal_helper.h"
 #include "../ktl/ks_concurrency.h"
 #include <algorithm>
+#include <set>
 
 template <class FN>
 using function = std::function<FN>;
@@ -130,25 +131,41 @@ protected:
 	}
 
 	virtual bool do_wait() override {
-#ifdef _DEBUG
-		ks_apartment* cur_apartment = ks_apartment::current_thread_apartment();
-		if (cur_apartment != nullptr && cur_apartment == m_spec_apartment) {
-			//特别说明：
-			//要求在不同套间之间才允许wait，以避免死锁。
-			//但即便进行了如此检查，仍不能完全避免死锁，因为this的前序未完成的future仍可能要求在当前套间中执行，
-			//若此套间的线程已全部处于wait状态，那么就没有机会去调度前序future了，自然也就永远等不到this的完成信号了（死锁）。
-			//如果要完美支持wait，就要求apartment实现真正的协程机制，这是个大挑战，宜单独立项。
-			//或者退而求其次采用一个流氓方案，在wait期间临时允许线程池扩容，不过这个办法并不适用于sta套间。
-			//但目前我们没有做任何特别支持。
-			ASSERT(false);
-			return false;
-		}
-#endif
+		if (m_completed_result.is_completed())
+			return true;
 
-		std::unique_lock<ks_mutex> lock(m_mutex);
-		while (!m_completed_result.is_completed())
-			m_completed_result_cv.wait(lock);
-		return true;
+		ks_apartment* cur_apartment = ks_apartment::current_thread_apartment();
+		if (cur_apartment != nullptr && (cur_apartment->features() & ks_apartment::nested_pump_loop_future) != 0) {
+			if (true) {
+				std::unique_lock<ks_mutex> lock(m_mutex);
+				m_waiting_for_me_apartment_set.insert(cur_apartment); //若嵌套loop会遭遇相同项，但不必重复记录，因为至多仅顶层可能会卡在真cv.wait调用处
+			}
+
+			bool was_satisfied = cur_apartment->__do_run_nested_pump_loop_for_extern_waiting(
+				[this, this_shared = this->shared_from_this()]() -> bool { return m_completed_result.is_completed(); }
+			);
+
+			if (true) {
+				std::unique_lock<ks_mutex> lock(m_mutex);
+				m_waiting_for_me_apartment_set.erase(cur_apartment); //若退嵌套loop则会遭遇缺失项，这是正常的
+
+				if (!was_satisfied) {
+					this->do_complete_locked<false>(ks_raw_result(ks_error::interupted_error()), cur_apartment, false, lock);
+					return false;
+				}
+			}
+
+			return true;
+		}
+		else {
+			std::unique_lock<ks_mutex> lock(m_mutex);
+			while (!m_completed_result.is_completed()) {
+				//m_completed_result_cv.wait(lock);
+				std::this_thread::yield();
+			}
+
+			return true;
+		}
 	}
 
 	virtual ks_apartment* get_spec_apartment() override {
@@ -238,7 +255,11 @@ protected:
 
 		m_completed_result = result.require_completed_or_error();
 		m_completed_prefer_apartment = prefer_apartment;
-		m_completed_result_cv.notify_all();
+		//m_completed_result_cv.notify_all();
+
+		for (ks_apartment* apartment : m_waiting_for_me_apartment_set) {
+			apartment->__do_notify_nested_pump_loop_for_extern_waiting();
+		}
 
 		if (m_timeout_schedule_id != 0) {
 			uint64_t timeout_schedule_id = m_timeout_schedule_id;
@@ -264,7 +285,7 @@ protected:
 
 			if (from_internal) {
 				ASSERT(lock.owns_lock());
-				lock.unlock(); //内部流程无需解锁（除非外部不合理乱用0x10000优先级）
+				lock.unlock(); //按说内部流程无需解锁（除非外部不合理乱用0x10000优先级）
 				if (t_next_future_0 != nullptr)
 					t_next_future_0->on_feeded_by_prev(result, this, prefer_apartment);
 				for (auto& next_future : t_next_future_more)
@@ -372,7 +393,7 @@ protected:
 	ks_mutex m_mutex;
 
 	ks_raw_result m_completed_result;
-	ks_condition_variable m_completed_result_cv{};
+	//ks_condition_variable m_completed_result_cv{}; //fork子进程中cv有几率死锁，故弃用！
 	ks_apartment* m_completed_prefer_apartment = nullptr;
 
 	ks_async_context m_living_context; //在complete后被自动清除
@@ -386,6 +407,8 @@ protected:
 
 	//volatile HRESULT m_cancel_error_code_v = 0;  //被移动位置，使内存更紧凑
 	//volatile bool m_pending_flag_v = true;  //被移动位置，使内存更紧凑
+
+	std::set<ks_apartment*> m_waiting_for_me_apartment_set{};
 
 	//为了使内存布局更紧凑，将部分成员变量集中安置
 	volatile HRESULT m_cancel_error_code_v = 0;
@@ -1141,7 +1164,11 @@ ks_error ks_raw_future::get_current_future_cancel_error(bool with_extra) {
 }
 
 void ks_raw_future::set_timeout(int64_t timeout, bool backtrack) {
-	this->do_set_timeout(timeout, ks_error::timeout_error(), backtrack); 
+	return this->do_set_timeout(timeout, ks_error::timeout_error(), backtrack); 
+}
+
+void ks_raw_future::__wait() {
+	return (void)this->do_wait();
 }
 
 ks_raw_promise_ptr ks_raw_promise::create(ks_apartment* apartment) {

@@ -170,7 +170,7 @@ public: //flat_then, flat_transform
 
 public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void(const T&)>>>>
+		std::is_convertible_v<FN, std::function<void(const T&)>> && std::is_void_v<std::invoke_result_t<FN, const T&>>>>
 	ks_future<T> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
@@ -188,7 +188,7 @@ public: //on_success, on_failure, on_completion
 	}
 
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void(const ks_error&)>>>>
+		std::is_convertible_v<FN, std::function<void(const ks_error&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_error&>>>>
 	ks_future<T> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
@@ -206,7 +206,7 @@ public: //on_success, on_failure, on_completion
 	}
 
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void(const ks_result<T>&)>>>>
+		std::is_convertible_v<FN, std::function<void(const ks_result<T>&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_result<T>&>>>>
 	ks_future<T> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
@@ -223,7 +223,7 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
-public: //cast, map, deliver_to_promise, set_timeout
+public: //cast, map, map_value
 	template <class R>
 	ks_future<R> cast() const {
 		ASSERT(this->is_valid());
@@ -252,6 +252,7 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 
+public: //deliver_to_promise, set_timeout, try_cancel
 	const this_future_type& deliver_to_promise(const ks_promise<T>& promise) const {
 		ASSERT(this->is_valid());
 		m_raw_future->on_completion(
@@ -266,7 +267,13 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return *this;
 	}
 
-public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
+	const this_future_type& try_cancel() const {
+		ASSERT(this->is_valid());
+		m_raw_future->try_cancel(true);
+		return *this;
+	}
+
+public: //is_valid, is_completed, peek_result, wait
 	bool is_valid() const {
 		return m_raw_future != nullptr;
 	}
@@ -282,15 +289,9 @@ public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	template <class _ = void>
-	_DECL_DEPRECATED bool wait() const {
+	void __wait() const {
 		ASSERT(this->is_valid());
-		return m_raw_future->wait();
-	}
-
-	void try_cancel() const {
-		ASSERT(this->is_valid());
-		m_raw_future->try_cancel(true);
+		return m_raw_future->__wait();
 	}
 
 private: //__choose_post

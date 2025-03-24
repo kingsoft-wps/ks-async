@@ -64,7 +64,6 @@ bool start();
 void try_cancel();
 ```
 #### 描述：开始、取消。
-#### 特别说明：wait目前为deprecated方法，禁止使用。
 <br>
 <br>
 

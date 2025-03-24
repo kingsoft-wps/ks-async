@@ -382,7 +382,7 @@ public: //flat_then, flat_transform
 
 public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void()>>>>
+		std::is_convertible_v<FN, std::function<void()>> && std::is_void_v<std::invoke_result_t<FN>>>>
 	ks_future<void> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_success(
 			apartment, 
@@ -396,7 +396,7 @@ public: //on_success, on_failure, on_completion
 	}
 
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void(const ks_error&)>>>>
+		std::is_convertible_v<FN, std::function<void(const ks_error&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_error&>>>>
 	ks_future<void> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_failure(
 			apartment,
@@ -410,7 +410,7 @@ public: //on_success, on_failure, on_completion
 	}
 
 	template <class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<void(const ks_result<void>&)>>>>
+		std::is_convertible_v<FN, std::function<void(const ks_result<void>&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&>>>>
 	ks_future<void> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_completion(
 			apartment, 
@@ -423,7 +423,7 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
-public: //cast, map, deliver_to_promise, set_timeout
+public: //cast, map, map_value
 	template <class R>
 	ks_future<R> cast() const {
 		return m_nothing_future.template cast<R>();
@@ -442,6 +442,7 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return m_nothing_future.template map_value<R>(std::forward<X>(other_value));
 	}
 
+public: //deliver_to_promise, set_timeout, try_cancel
 	template <class X /*= void*/, class _ = std::enable_if_t<std::is_void_v<X>>>
 	const this_future_type& deliver_to_promise(const ks_promise<X>& promise) const {
 		m_nothing_future.deliver_to_promise(promise.m_nothing_promise);
@@ -453,7 +454,12 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return *this;
 	}
 
-public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
+	const this_future_type& try_cancel() const {
+		m_nothing_future.try_cancel();
+		return *this;
+	}
+
+public: //is_valid, is_completed, peek_result, wait
 	bool is_valid() const {
 		return m_nothing_future.is_valid();
 	}
@@ -467,13 +473,8 @@ public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	template <class _ = void>
-	_DECL_DEPRECATED bool wait() const {
-		return m_nothing_future.wait();
-	}
-
-	void try_cancel() const {
-		m_nothing_future.try_cancel();
+	void __wait() const {
+		return m_nothing_future.__wait();
 	}
 
 private:

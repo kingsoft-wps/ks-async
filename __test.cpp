@@ -24,7 +24,6 @@ limitations under the License.
 #include <sstream>
 #include <string>
 
-
 namespace {
     template <class T>
     std::string _result_to_str(const ks_result<T>& result) {
@@ -310,6 +309,22 @@ void test_repeat_productive() {
     g_exit_latch.wait();
 }
 
+void test_future_wait() {
+    g_exit_latch.add(1);
+    std::cout << "test wait ... ";
+
+    ks_future<void>::post(ks_apartment::background_sta(), {}, []() {
+            ks_future<void>::post_delayed(ks_apartment::background_sta(), {}, []() {}, 100).__wait();
+        })
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const ks_result<void>& result) -> void {
+            std::cout << "->on_completion(void) ";
+            _output_result("complete(void): ", result);
+            g_exit_latch.count_down();
+            });
+
+        g_exit_latch.wait();
+}
+
 void test_future_methods() {
     g_exit_latch.add(1);
     std::cout << "test future ... ";
@@ -364,7 +379,6 @@ void test_future_methods() {
 
     g_exit_latch.wait();
 }
-
 
 void test_async_flow() {
     g_exit_latch.add(1);
@@ -482,12 +496,62 @@ void test_notification_center() {
 }
 
 
+
+#ifdef _WIN32
+#   define __TEST_FORK_ENABLED  0
+#else
+#   define __TEST_FORK_ENABLED  1
+#   include <unistd.h>
+#   include <sys/wait.h>
+#endif
+
+bool g_is_child_process = false;
+
+void test_fork() {
+#if __TEST_FORK_ENABLED
+    g_exit_latch.add(1);
+    std::cout << "test fork ... \n";
+
+    ks_apartment::default_mta()->atfork_prepare();
+    ks_apartment::background_sta()->atfork_prepare();
+
+    pid_t pid = fork();
+    ASSERT(pid != -1);
+
+    if (pid == 0) {
+        g_is_child_process = true;
+        ks_apartment::default_mta()->atfork_child();
+        ks_apartment::background_sta()->atfork_child();
+    }
+    else {
+        ks_apartment::default_mta()->atfork_parent();
+        ks_apartment::background_sta()->atfork_parent();
+    }
+
+    if (pid != 0 && pid != -1) {
+        int status = 0;
+        pid_t wait_res = wait(&status);
+        ASSERT(wait_res != -1);
+    }
+
+    g_exit_latch.count_down();
+    g_exit_latch.wait();
+    std::cout << "test fork completion (succ)\n";
+#else
+    std::cout << "test fork is not enabled (skipped)\n";
+#endif
+}
+
+
 int main() {
     std::cout << "start ...\n";
 
     test_promise();
     test_post();
     test_post_pending();
+    test_post_delayed();
+    test_future_wait();
+    test_future_methods();
 
     test_all();
     test_any();
@@ -499,19 +563,17 @@ int main() {
     test_repeat_periodic();
     test_repeat_productive();
 
-    test_future_methods();
-    test_post_delayed();
-
     test_async_flow();
     test_alive();
 
     test_notification_center();
 
-    g_exit_latch.wait();
+    test_fork();
+
     ks_apartment::default_mta()->async_stop();
     ks_apartment::background_sta()->async_stop();
     ks_apartment::default_mta()->wait();
     ks_apartment::background_sta()->wait();
-    std::cout << "end.\n";
+    std::cout << (g_is_child_process ? "child end." : "end.") << "\n";
     return 0;
 }

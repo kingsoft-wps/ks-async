@@ -14,6 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 #include "ks_single_thread_apartment_imp.h"
+#include "ktl/ks_deferrer.h"
+#include <thread>
 #include <algorithm>
 #include <sstream>
 #include <cstring>
@@ -27,11 +29,9 @@ limitations under the License.
 void __forcelink_to_ks_single_thread_apartment_imp_cpp() {}
 
 
-ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags) {
+ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags) : m_d(std::make_shared<_SINGLE_THREAD_APARTMENT_DATA>()) {
 	ASSERT(name != nullptr);
-	ASSERT((flags & ~__all_flags) == 0);
 
-	m_d = std::make_shared<_SINGLE_THREAD_APARTMENT_DATA>();
 	m_d->name = name;
 	m_d->flags = flags;
 
@@ -51,36 +51,28 @@ ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name,
 }
 
 ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
+	return;
 	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
 	if (m_d->state_v != _STATE::STOPPED) {
 		this->async_stop();
 		//this->wait();  //这里不等了，因为在进程退出时导致自动析构的话，可能时机就太晚，work线程已经被杀了
 	}
 
-	if (true) {
-		std::unique_lock<ks_mutex> lock(m_d->mutex);
-
-		if (m_d->isolated_thread_opt != nullptr) {
-			m_d->isolated_thread_opt->detach();   //这里也不要join了，只detach
-			//m_d->isolated_thread_opt = nullptr; //也不必置null了
+	if ((m_d->flags & endless_instance_flag) == 0) {
+		if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
+			ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
+		}
+		if (m_d->flags & be_ui_sta_flag) {
+			ks_apartment::__unset_ui_sta(this);
+			if ((m_d->flags & auto_register_flag) && m_d->name != "ui_sta")
+				ks_apartment::__unregister_public_apartment("ui_sta", this);
+		}
+		if (m_d->flags & be_master_sta_flag) {
+			ks_apartment::__unset_master_sta(this);
+			if ((m_d->flags & auto_register_flag) && m_d->name != "master_sta")
+				ks_apartment::__unregister_public_apartment("master_sta", this);
 		}
 	}
-
-	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
-		ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
-	}
-	if (m_d->flags & be_ui_sta_flag) {
-		ks_apartment::__unset_ui_sta(this);
-		if ((m_d->flags & auto_register_flag) && m_d->name != "ui_sta")
-			ks_apartment::__unregister_public_apartment("ui_sta", this);
-	}
-	if (m_d->flags & be_master_sta_flag) {
-		ks_apartment::__unset_master_sta(this);
-		if ((m_d->flags & auto_register_flag) && m_d->name != "master_sta")
-			ks_apartment::__unregister_public_apartment("master_sta", this);
-	}
-
-	m_d.reset();
 }
 
 
@@ -89,8 +81,7 @@ const char* ks_single_thread_apartment_imp::name() {
 }
 
 uint ks_single_thread_apartment_imp::features() {
-	uint my_features = sequential_feature;
-	return my_features;
+	return sequential_feature | nested_pump_loop_future;
 }
 
 
@@ -118,6 +109,7 @@ void ks_single_thread_apartment_imp::wait() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 	this->_try_stop_locked(lock); //ensure stop
 
+	ASSERT(m_d->state_v == _STATE::STOPPING || m_d->state_v == _STATE::STOPPED);
 	while (m_d->state_v == _STATE::STOPPING) {
 		m_d->stopped_state_cv.wait(lock);
 	}
@@ -236,7 +228,7 @@ void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>
 	if (m_d->state_v == _STATE::RUNNING) {
 		if ((m_d->flags & no_isolated_thread_flag) || m_d->isolated_thread_opt != nullptr) {
 			m_d->state_v = _STATE::STOPPING;
-			m_d->any_fn_queue_cv.notify_all();
+			m_d->any_fn_queue_cv.notify_all(); //trigger thread
 		}
 		else {
 			m_d->state_v = _STATE::STOPPED;
@@ -265,8 +257,11 @@ void ks_single_thread_apartment_imp::_prepare_single_thread_locked(ks_single_thr
 		need_thread_flag = false;
 
 	if (need_thread_flag) {
-		d->isolated_thread_opt = std::make_shared<std::thread>(
-			[self, d]() { _single_thread_proc(self, d); });
+		d->isolated_thread_opt = std::make_shared<_THREAD_ITEM>();
+
+		std::thread([self, d]() {
+			_single_thread_proc(self, d); 
+		}).detach();
 	}
 }
 
@@ -274,33 +269,36 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(self);
 
-	std::stringstream thread_name_ss;
-	thread_name_ss << d->name << "(sta)'s thread";
-	std::string thread_name = thread_name_ss.str();
+	if (true) {
+		std::stringstream thread_name_ss;
+		thread_name_ss << d->name << "(sta)'s thread";
+		std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
-	typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
-	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
-	if (_pfnSetThreadDescription != nullptr) 
-		_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
+		typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
+		static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
+		if (_pfnSetThreadDescription != nullptr) 
+			_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
 #elif defined(__APPLE__)
-	pthread_setname_np(thread_name.c_str());
+		pthread_setname_np(thread_name.c_str());
 #else
-	pthread_setname_np(pthread_self(), thread_name.c_str());
+		pthread_setname_np(pthread_self(), thread_name.c_str());
 #endif
+	}
 
 	while (true) {
-#if __KS_APARTMENT_ATFORK_ENABLED
-		std::unique_lock<ks_mutex> busy_unique_lock(d->busy_unique_mutex);
-#endif
 		std::unique_lock<ks_mutex> lock(d->mutex);
+
+#if __KS_APARTMENT_ATFORK_ENABLED
+		while (d->atforking_flag_v) 
+			d->atforking_done_cv.wait(lock);
+#endif
 
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
 			if (now_fn_queue_sel->empty()) {
-				if (d->state_v != _STATE::RUNNING && d->now_fn_queue_prior.empty() && d->now_fn_queue_normal.empty())
+				if (d->state_v != _STATE::RUNNING && d->now_fn_queue_prior.empty() && d->now_fn_queue_normal.empty()) 
 					break; //check stop, end
-
 				if (!d->now_fn_queue_idle.empty())
 					now_fn_queue_sel = &d->now_fn_queue_idle;
 			}
@@ -310,18 +308,18 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 				_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
 				now_fn_queue_sel->pop_front();
 
+#if __KS_APARTMENT_ATFORK_ENABLED
+				++d->working_rc_v;
+#endif
+
 				lock.unlock();
+				now_fn_item.fn(); //invoke fn, maybe except => fault
+#if __KS_APARTMENT_ATFORK_ENABLED
+				lock.lock();
 
-				//try {
-					now_fn_item.fn();
-				//}
-				//catch (...) {
-				//	//TODO dump exception ...
-				//	ASSERT(false);
-				//	//abort();
-				//	throw;
-				//}
-
+				if (--d->working_rc_v == 0)
+					d->working_done_cv.notify_all();
+#endif
 				continue;
 			}
 		}
@@ -332,17 +330,11 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 
 		if (d->delaying_fn_queue.empty()) {
 			//wait
-#if __KS_APARTMENT_ATFORK_ENABLED
-			busy_unique_lock.unlock();
-#endif
 			d->any_fn_queue_cv.wait(lock);
 			continue;
 		}
 		else if (d->delaying_fn_queue.front().until_time > std::chrono::steady_clock::now()) {
 			//wait until
-#if __KS_APARTMENT_ATFORK_ENABLED
-			busy_unique_lock.unlock();
-#endif
 			d->any_fn_queue_cv.wait_until(lock, d->delaying_fn_queue.front().until_time);
 			continue;
 		}
@@ -423,64 +415,142 @@ bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(const std:
 #if __KS_APARTMENT_ATFORK_ENABLED
 void ks_single_thread_apartment_imp::atfork_prepare() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-
-	if (m_d->atfork_prepared_flag_v) 
+	if (m_d->atforking_flag_v) 
 		return; //重复prepare
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	if (atfork_calling_in_my_thread_flag)
+		return; //该sta线程内调用fork，不必做什么
 
-	//若是在本套间线程中调用fork，则busy_unique_mutex已锁，继续保持即可...
-	if (!atfork_calling_in_my_thread_flag) {
-		m_d->busy_unique_mutex.lock();
-	}
-
-	//unlock不保证时序，所以这里需要对mutex加锁，已保证一致性
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
+	m_d->atforking_flag_v = true;
 
-	ASSERT(!m_d->atfork_prepared_flag_v);
-	m_d->atfork_prepared_flag_v = true;
+	while (m_d->working_rc_v != 0)
+		m_d->working_done_cv.wait(lock);
+
+	lock.release();
 }
 
 void ks_single_thread_apartment_imp::atfork_parent() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-
-	if (!m_d->atfork_prepared_flag_v)
+	if (!m_d->atforking_flag_v)
 		return;
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	if (atfork_calling_in_my_thread_flag)
+		return; //该sta线程内调用fork，不必做什么
 
-	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
-	std::unique_lock<ks_mutex> lock(m_d->mutex);
-
-	m_d->atfork_prepared_flag_v = false;
-
-	if (!atfork_calling_in_my_thread_flag) {
-		m_d->busy_unique_mutex.unlock();
-	}
+	m_d->atforking_flag_v = false;
+	m_d->atforking_done_cv.notify_all();
+	m_d->mutex.unlock();
 }
 
 void ks_single_thread_apartment_imp::atfork_child() {
 	ASSERT(m_d->state_v != _STATE::STOPPING && m_d->state_v != _STATE::STOPPED);
-
-	if (!m_d->atfork_prepared_flag_v)
+	if (!m_d->atforking_flag_v)
 		return;
 
-	bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	const bool atfork_calling_in_my_thread_flag = (ks_apartment::current_thread_apartment() == this);
+	if (atfork_calling_in_my_thread_flag)
+		return; //该sta线程内调用fork，不必做什么
 
-	//这里实际上不会有竞争者，因为fork是不应该出现竞争的
-	std::unique_lock<ks_mutex> lock(m_d->mutex);
+	//重建cv（析构有几率卡死，故直接重构造）
+	//子进程中此时此刻，当前线程正执行至此，而其他线程都消失了，就算正在wait也不用处理后事了
+	::new (&m_d->any_fn_queue_cv) ks_condition_variable();
+	::new (&m_d->working_done_cv) ks_condition_variable();
+	::new (&m_d->atforking_done_cv) ks_condition_variable();
+	::new (&m_d->stopped_state_cv) ks_condition_variable();
 
 	//重建线程
-	if (!atfork_calling_in_my_thread_flag && !(m_d->flags & no_isolated_thread_flag) && m_d->isolated_thread_opt) {
-		m_d->isolated_thread_opt->detach();
-		m_d->isolated_thread_opt = std::make_shared<std::thread>(
-			[this]() { this->_single_thread_proc(this, m_d); });
+	if (m_d->isolated_thread_opt != nullptr) {
+		std::thread([self = this, d = m_d]() {
+			_single_thread_proc(self, d);
+		}).detach();
 	}
 
-	m_d->atfork_prepared_flag_v = false;
-
-	if (!atfork_calling_in_my_thread_flag) {
-		m_d->busy_unique_mutex.unlock();
-	}
+	m_d->atforking_flag_v = false;
+	m_d->atforking_done_cv.notify_all();
+	m_d->mutex.unlock();
 }
 #endif
+
+
+bool ks_single_thread_apartment_imp::__do_run_nested_pump_loop_for_extern_waiting(std::function<bool()>&& extern_pred_fn) {
+	auto d = m_d;
+	bool was_satisified = false;
+	
+	ASSERT(ks_apartment::current_thread_apartment() == this);
+
+	while (true) {
+		if (extern_pred_fn()) {
+			was_satisified = true;
+			break; //waiting was satisfied, ok
+		}
+
+		std::unique_lock<ks_mutex> lock(d->mutex);
+
+#if __KS_APARTMENT_ATFORK_ENABLED
+		if (d->atforking_flag_v)
+			break; //atforking, broken
+#endif
+
+		//try next now_fn
+		if (true) {
+			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
+			if (now_fn_queue_sel->empty()) {
+				if (d->state_v != _STATE::RUNNING && d->now_fn_queue_prior.empty() && d->now_fn_queue_normal.empty())
+					break; //check stop, end
+
+				if (!d->now_fn_queue_idle.empty())
+					now_fn_queue_sel = &d->now_fn_queue_idle;
+			}
+
+			if (!now_fn_queue_sel->empty()) {
+				//pop and exec a fn
+				_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
+				now_fn_queue_sel->pop_front();
+
+#if __KS_APARTMENT_ATFORK_ENABLED
+				++d->working_rc_v;
+#endif
+
+				lock.unlock();
+				now_fn_item.fn(); //invoke fn, maybe except => fault
+#if __KS_APARTMENT_ATFORK_ENABLED
+				lock.lock();
+
+				if (--d->working_rc_v == 0)
+					d->working_done_cv.notify_all();
+#endif
+				continue;
+			}
+		}
+
+		//try next delaying_fn
+		if (d->state_v != _STATE::RUNNING)
+			break; //check stop, end
+
+		if (d->delaying_fn_queue.empty()) {
+			//wait
+			d->any_fn_queue_cv.wait(lock);
+			continue;
+		}
+		else if (d->delaying_fn_queue.front().until_time > std::chrono::steady_clock::now()) {
+			//wait until
+			d->any_fn_queue_cv.wait_until(lock , d->delaying_fn_queue.front().until_time);
+			continue;
+		}
+		else {
+			//直接将到期的delaying项移入idle队列（忽略priority）
+			_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
+			d->delaying_fn_queue.pop_front();
+			continue;
+		}
+	}
+
+	return was_satisified;
+}
+
+void ks_single_thread_apartment_imp::__do_notify_nested_pump_loop_for_extern_waiting() {
+	m_d->any_fn_queue_cv.notify_all();
+}

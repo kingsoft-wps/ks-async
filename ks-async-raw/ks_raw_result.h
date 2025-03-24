@@ -79,11 +79,11 @@ public:
 	}
 
 public:
-	bool is_completed() const { return m_state != _STATE::NOT_COMPLETED; }
-	ks_raw_result require_completed_or_error() const { return m_state != _STATE::NOT_COMPLETED ? *this : ks_error::unexpected_error(); }
+	bool is_completed() const { return (volatile _STATE&)m_state != _STATE::NOT_COMPLETED; }
+	ks_raw_result require_completed_or_error() const { return (volatile _STATE&)m_state != _STATE::NOT_COMPLETED ? *this : ks_error::unexpected_error(); }
 
-	bool is_value() const { return m_state == _STATE::JUST_VALUE; }
-	bool is_error() const { return m_state == _STATE::JUST_ERROR; }
+	bool is_value() const { return (volatile _STATE&)m_state == _STATE::JUST_VALUE; }
+	bool is_error() const { return (volatile _STATE&)m_state == _STATE::JUST_ERROR; }
 
 	const ks_raw_value& to_value() const noexcept(false) {
 		if (m_state == _STATE::JUST_VALUE)

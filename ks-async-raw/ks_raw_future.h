@@ -70,7 +70,7 @@ public:
 	virtual void set_timeout(int64_t timeout, bool backtrack);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	KS_ASYNC_INLINE_API bool wait() { return this->do_wait(); }
+	virtual void __wait();
 
 protected:
 	virtual void do_add_next(const ks_raw_future_ptr& next_future) = 0;

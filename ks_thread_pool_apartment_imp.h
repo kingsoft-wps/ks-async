@@ -18,15 +18,14 @@ limitations under the License.
 #include "ks_async_base.h"
 #include "ks_apartment.h"
 #include "ktl/ks_concurrency.h"
-#include <thread>
 #include <deque>
 
 
 class ks_thread_pool_apartment_imp final : public ks_apartment {
 public:
 	enum { //flag consts
-		auto_register_flag       = 0x01,
-		__all_flags              = 0x01,
+		auto_register_flag       = 0x00010000,
+		endless_instance_flag    = 0x00100000,
 	};
 
 	KS_ASYNC_API explicit ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags = 0);
@@ -54,6 +53,9 @@ public:
 	virtual void atfork_parent() override;
 	virtual void atfork_child() override;
 #endif
+
+	virtual bool __do_run_nested_pump_loop_for_extern_waiting(std::function<bool()>&& extern_pred_fn) override;
+	virtual void __do_notify_nested_pump_loop_for_extern_waiting() override;
 
 private:
 	struct _THREAD_POOL_APARTMENT_DATA;
@@ -86,14 +88,12 @@ private:
 	enum class _STATE { NOT_START, RUNNING, STOPPING, STOPPED };
 
 	struct _THREAD_ITEM {
-		std::shared_ptr<std::thread> thread;
 		uint64_t thread_sn;
+	};
+	struct _DELAYING_THREAD_ITEM {
 	};
 
 	struct _THREAD_POOL_APARTMENT_DATA {
-#if __KS_APARTMENT_ATFORK_ENABLED
-		ks_shared_mutex busy_shared_mutex;
-#endif
 		ks_mutex mutex;
 
 		//prior简化为三级：>0为高优先，=0为普通，<0为低且简单地加入到idle队列
@@ -103,7 +103,7 @@ private:
 		ks_condition_variable now_fn_queue_cv{};
 
 		std::deque<_THREAD_ITEM> thread_pool;
-		std::shared_ptr<std::thread> delaying_trigger_thread;
+		std::shared_ptr< _DELAYING_THREAD_ITEM> delaying_trigger_thread_opt;
 		size_t living_any_thread_total = 0; //now和delaying存活线程的总个数
 		size_t max_thread_count = 0; //const-like
 		size_t busy_thread_count = 0;
@@ -122,8 +122,12 @@ private:
 		std::string name; //const-like
 		uint flags; //const-like
 		volatile _STATE state_v = _STATE::NOT_START;
+
 #if __KS_APARTMENT_ATFORK_ENABLED
-		volatile bool atfork_prepared_flag_v = false;
+		volatile size_t working_rc_v = 0;
+		ks_condition_variable working_done_cv{};
+		volatile bool atforking_flag_v = false;
+		ks_condition_variable atforking_done_cv{};
 #endif
 	};
 

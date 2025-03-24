@@ -3,6 +3,10 @@
 #include "../ks_async_flow.h" //for flow_promise_wrapped
 #include <cstring>
 #include <string.h>
+#include <set>
+
+void __forcelink_to_ks_raw_flow_cpp() {}
+
 
 __KS_ASYNC_RAW_BEGIN
 
@@ -121,7 +125,7 @@ void ks_raw_async_flow::set_j(size_t j) {
 		m_j = size_t(-1);
 }
 
-void ks_raw_async_flow::set_default_apartment(ks_apartment* apartment) {
+void ks_raw_async_flow::__set_default_apartment(ks_apartment* apartment) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 	m_default_apartment = apartment;
 	if (m_default_apartment == nullptr)
@@ -422,10 +426,14 @@ void ks_raw_async_flow::try_cancel() {
 	m_cancelled_flag_v = true;
 }
 
-void ks_raw_async_flow::wait() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-	while (m_flow_status != status_t::succeeded && m_flow_status != status_t::failed)
-		m_flow_completed_cv.wait(lock);
+void ks_raw_async_flow::__wait() {
+	if (true) {
+		std::unique_lock<ks_mutex> lock(m_mutex);
+		if (m_flow_status == status_t::succeeded || m_flow_status == status_t::failed)
+			return;
+	}
+
+	return this->get_flow_future_void()->__wait();
 }
 
 void ks_raw_async_flow::__force_cleanup() {
@@ -651,9 +659,6 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 		m_flow_promise_this_wrapped_keepper_until_completed.reset();
 	}
 
-	//unblock waiting
-	m_flow_completed_cv.notify_all();
-
 	//cleanup if need
 	if (m_force_cleanup_flag_v) {
 		do_force_cleanup_data_locked(lock);
@@ -743,9 +748,6 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	if (task_item->task_promise_opt != nullptr) {
 		task_item->task_promise_opt->try_complete(task_result);
 	}
-
-	//unblock waiting
-	task_item->task_completed_cv.notify_all();
 
 	//驱动下游任务
 	if (m_not_start_task_count != 0) {

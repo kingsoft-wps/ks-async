@@ -71,6 +71,7 @@ public:
 	static ks_error unexpected_error() { return ks_error::of(UNEXPECTED_ERROR_CODE); }
 	static ks_error timeout_error()    { return ks_error::of(TIMEOUT_ERROR_CODE); }
 	static ks_error cancelled_error()  { return ks_error::of(CANCELLED_ERROR_CODE); }
+	static ks_error interupted_error() { return ks_error::of(INTERUPTED_ERROR_CODE); }
 	static ks_error terminated_error() { return ks_error::of(TERMINATED_ERROR_CODE); }
 
 	static ks_error general_error()    { return ks_error::of(GENERAL_ERROR_CODE); }
@@ -83,7 +84,8 @@ public:
 	static constexpr HRESULT UNEXPECTED_ERROR_CODE    = 0xFF338001;
 	static constexpr HRESULT TIMEOUT_ERROR_CODE       = 0xFF338002;
 	static constexpr HRESULT CANCELLED_ERROR_CODE     = 0xFF338003;
-	static constexpr HRESULT TERMINATED_ERROR_CODE    = 0xFF338004;
+	static constexpr HRESULT INTERUPTED_ERROR_CODE    = 0xFF338004;
+	static constexpr HRESULT TERMINATED_ERROR_CODE    = 0xFF338005;
 
 	static constexpr HRESULT GENERAL_ERROR_CODE       = 0xFF339001;
 	static constexpr HRESULT EOF_ERROR_CODE           = 0xFF339002;

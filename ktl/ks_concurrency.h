@@ -23,15 +23,16 @@ limitations under the License.
 #include <thread>
 
 
+#ifndef __KS_MUTEX_DEF
+#define __KS_MUTEX_DEF
 using ks_mutex = std::mutex;
-
-#if __cplusplus < 201703L
-using ks_shared_mutex = std::shared_timed_mutex;
-#else
-using ks_shared_mutex = std::shared_mutex;
 #endif
 
+
+#ifndef __KS_CONDITION_VARIABLE_DEF
+#define __KS_CONDITION_VARIABLE_DEF
 using ks_condition_variable = std::condition_variable;
+#endif
 
 
 #ifndef __KS_SEMAPHORE_DEF

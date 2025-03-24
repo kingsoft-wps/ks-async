@@ -4,8 +4,8 @@
 Debug/
 Release/
 x64/
-out/
-build/
+out*/
+build*/
 compile_commands.json
 *.log
 *.swp

@@ -43,7 +43,8 @@ public:
 
 public:
 	enum { //feature consts
-		sequential_feature  = 0x01,
+		sequential_feature      = 0x0001,
+		nested_pump_loop_future = 0x0002,
 	};
 
 public:
@@ -67,12 +68,21 @@ public:
 	virtual void try_unschedule(uint64_t id) = 0;
 
 public:
-	virtual void atfork_prepare() { ASSERT(false); }
-	virtual void atfork_parent() { ASSERT(false); }
-	virtual void atfork_child() { ASSERT(false); }
+	virtual void atfork_prepare() { ASSERT(false); throw std::runtime_error("this apartment doesn't support fork"); }
+	virtual void atfork_parent() { ASSERT(false); throw std::runtime_error("this apartment doesn't support fork"); }
+	virtual void atfork_child() { ASSERT(false); throw std::runtime_error("this apartment doesn't support fork"); }
 
 public:
-	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用
+	//注：协助实现future::wait的内部方法。
+	//目前实现手段是开启一个新的消息循环，以便在wait时虽然卡住逻辑流程，但仍可继续泵任务。
+	//其存在的问题和隐患包括：
+	//1、若出现嵌套wait，则只能后入先出
+	//2、仍无法杜绝逻辑上的死锁，需要业务逻辑实现者自己保证
+	virtual bool __do_run_nested_pump_loop_for_extern_waiting(std::function<bool()>&& extern_pred_fn) { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
+	virtual void __do_notify_nested_pump_loop_for_extern_waiting() { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
+
+public:
+	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用。
 	KS_ASYNC_API static void __set_default_mta_max_thread_count(size_t max_thread_count);
 
 protected:

@@ -26,7 +26,7 @@ limitations under the License.
 class ks_deferrer {
 public:
 	ks_deferrer() {}
-	ks_deferrer(std::function<void()>&& fn) { this->add(std::move(fn)); }
+	explicit ks_deferrer(std::function<void()>&& fn) { this->add(std::move(fn)); }
 	_DISABLE_COPY_CONSTRUCTOR(ks_deferrer);
 
 	~ks_deferrer() { this->apply(); }

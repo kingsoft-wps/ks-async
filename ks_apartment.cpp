@@ -17,7 +17,7 @@ limitations under the License.
 #include "ks_single_thread_apartment_imp.h"
 #include "ks_thread_pool_apartment_imp.h"
 #include <thread>
-#include <unordered_map>
+#include <map>
 
 void __forcelink_to_ks_apartment_cpp() {}
 
@@ -27,7 +27,7 @@ static ks_apartment* g_master_sta = nullptr;
 static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
 
 static ks_mutex g_public_apartment_mutex {};
-static std::unordered_map<std::string, ks_apartment*> g_public_apartment_map {};
+static std::map<std::string, ks_apartment*> g_public_apartment_map {};
 
 static size_t g_default_mta_max_thread_count = 0;
 
@@ -41,7 +41,9 @@ ks_apartment* ks_apartment::master_sta() {
 }
 
 ks_apartment* ks_apartment::background_sta() {
-	static ks_single_thread_apartment_imp g_background_sta("background_sta", 0);
+	static ks_single_thread_apartment_imp g_background_sta(
+		"background_sta", 
+		ks_single_thread_apartment_imp::auto_register_flag | ks_single_thread_apartment_imp::endless_instance_flag);
 	return &g_background_sta;
 }
 
@@ -64,7 +66,10 @@ ks_apartment* ks_apartment::default_mta() {
 		}
 	};
 
-	static ks_thread_pool_apartment_imp g_default_mta("default_mta", _default_mta_options::max_thread_count(), 0);
+	static ks_thread_pool_apartment_imp g_default_mta(
+		"default_mta", 
+		_default_mta_options::max_thread_count(), 
+		ks_thread_pool_apartment_imp::auto_register_flag | ks_thread_pool_apartment_imp::endless_instance_flag);
 	return &g_default_mta;
 }
 

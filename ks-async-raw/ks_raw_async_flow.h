@@ -4,8 +4,8 @@
 #include "ks_raw_future.h"
 #include "ks_raw_promise.h"
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
+#include <map>
+#include <set>
 #include <regex>
 
 //for flow_future_wrapped
@@ -24,7 +24,8 @@ public:
 
 public:
 	KS_ASYNC_API void set_j(size_t j);
-	KS_ASYNC_API void set_default_apartment(ks_apartment* apartment);
+
+	KS_ASYNC_API void __set_default_apartment(ks_apartment* apartment);
 
 public:
 	KS_ASYNC_API bool add_task(
@@ -61,7 +62,7 @@ public:
 	KS_ASYNC_API void try_cancel();
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	KS_ASYNC_API void wait();
+	KS_ASYNC_API void __wait();
 
 	//强制清理，一般不需要调用，出现循环引用时可用
 	KS_ASYNC_API void __force_cleanup();
@@ -110,10 +111,9 @@ private:
 		const std::type_info* task_value_typeinfo; //const-like
 
 		int task_level = 0;
-		std::unordered_set<std::string> task_waiting_for_dependencies;
+		std::set<std::string> task_waiting_for_dependencies;
 
 		status_t task_status = status_t::not_start;
-		ks_condition_variable task_completed_cv{};
 
 		ks_raw_result task_pending_arg_void;
 		ks_raw_promise_ptr task_trigger_void;
@@ -158,13 +158,13 @@ private:
 	size_t m_j = size_t(-1);
 	ks_apartment* m_default_apartment = ks_apartment::default_mta();
 
-	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map{};
+	std::map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map{};
 
-	std::unordered_map<uint64_t, std::shared_ptr<_FLOW_OBSERVER_ITEM>> m_flow_observer_map{};
-	std::unordered_map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map{};
+	std::map<uint64_t, std::shared_ptr<_FLOW_OBSERVER_ITEM>> m_flow_observer_map{};
+	std::map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map{};
 	std::atomic<uint64_t> m_last_x_observer_id = { 0 };
 
-	std::unordered_map<std::string, ks_raw_value> m_raw_value_map{};
+	std::map<std::string, ks_raw_value> m_raw_value_map{};
 
 	size_t m_not_start_task_count = 0;
 	size_t m_pending_task_count = 0;
@@ -174,8 +174,6 @@ private:
 	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue{};
 
 	status_t m_flow_status = status_t::not_start;
-	ks_condition_variable m_flow_completed_cv{};
-
 	volatile bool m_cancelled_flag_v = false;
 	volatile bool m_force_cleanup_flag_v = false;
 
