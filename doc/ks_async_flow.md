@@ -87,6 +87,12 @@ std::string get_failed_task_name();
 <br>
 
 ```C++
+ks_result<T> peek_task_result<T>(const char* task_name);
+```
+#### 描述：查询task当前的结果（有可能是未完成状态的）。
+<br>
+
+```C++
 ks_future<T> get_task_future<T>(const char* task_name);
 ks_future<ks_async_flow> get_flow_future();
 ```

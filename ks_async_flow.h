@@ -21,25 +21,6 @@ public:
 	}
 
 public:
-	template <class T>
-	bool add_task(
-		const char* name_and_dependencies,
-		ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
-		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
-	}
-	template <class T>
-	bool add_task(
-		const char* name_and_dependencies,
-		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
-		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
-	}
-	template <class T>
-	bool add_task(
-		const char* name_and_dependencies,
-		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
-		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
-	}
-
 	template <class T, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T(const ks_async_flow& flow)>> ||
 		std::is_convertible_v<FN, std::function<ks_result<T>(const ks_async_flow& flow)>> ||
@@ -157,11 +138,18 @@ public:
 	}
 
 	template <class T>
-	ks_future<T> get_task_future(const char* task_name) const {
+	ks_result<T> peek_task_result(const char* task_name) const {
 		ASSERT(this->is_valid());
-		ks_raw_future_ptr raw_future = m_raw_flow->get_task_future(task_name);
+		ks_raw_future_ptr raw_future = m_raw_flow->peek_task_result(task_name, __typeinfo_of<T>());
 		return ks_future<T>::__from_raw(raw_future);
 	}
+	template <class T>
+	ks_future<T> get_task_future(const char* task_name) const {
+		ASSERT(this->is_valid());
+		ks_raw_future_ptr raw_future = m_raw_flow->get_task_future(task_name, __typeinfo_of<T>());
+		return ks_future<T>::__from_raw(raw_future);
+	}
+
 	ks_future<ks_async_flow> get_flow_future() const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->get_flow_future_wrapped();
@@ -239,7 +227,7 @@ private:
 
 private:
 	template <class T>
-	static const std::type_info* __typeinfo_of() {
+	static inline const std::type_info* __typeinfo_of() {
 #	ifdef _DEBUG
 		return &typeid(T);
 #	else

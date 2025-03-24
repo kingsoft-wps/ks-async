@@ -75,7 +75,9 @@ public:
 	KS_ASYNC_API ks_error get_last_error();
 	KS_ASYNC_API std::string get_failed_task_name();
 
+	KS_ASYNC_API ks_raw_result peek_task_result(const char* task_name, const std::type_info* value_typeinfo = nullptr);
 	KS_ASYNC_API ks_raw_future_ptr get_task_future(const char* task_name, const std::type_info* value_typeinfo = nullptr);
+
 	KS_ASYNC_API ks_raw_future_ptr  get_flow_future_void();
 	KS_ASYNC_API ks_future<ks_async_flow> get_flow_future_wrapped(); //由于future对象声明期管理的原因，这里会直接以ks_future<ks_async_flow>类型直接进行管理
 

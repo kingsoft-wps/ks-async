@@ -321,7 +321,7 @@ ks_raw_value ks_raw_async_flow::get_value(const char* name) {
 	auto it = m_raw_value_map.find(name);
 	if (it == m_raw_value_map.cend()) {
 		ASSERT(false);
-		throw std::runtime_error("no such named value");
+		throw std::runtime_error("no such value");
 	}
 
 	return it->second;
@@ -481,6 +481,20 @@ ks_error ks_raw_async_flow::get_last_error() {
 std::string ks_raw_async_flow::get_failed_task_name() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 	return m_1st_failed_task_name;
+}
+
+__ks_async_raw::ks_raw_result ks_raw_async_flow::peek_task_result(const char* task_name, const std::type_info* value_typeinfo) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+	auto it = m_task_map.find(task_name);
+	if (it == m_task_map.cend()) {
+		ASSERT(false);
+		throw std::runtime_error("no such task");
+	}
+
+	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
+	ASSERT(value_typeinfo == nullptr || *task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
+
+	return task_item->task_result;
 }
 
 __ks_async_raw::ks_raw_future_ptr ks_raw_async_flow::get_task_future(const char* task_name, const std::type_info* value_typeinfo) {
