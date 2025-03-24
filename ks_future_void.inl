@@ -24,6 +24,10 @@ public:
 	ks_future(ks_future&&) noexcept = default;
 	ks_future& operator=(ks_future&&) noexcept = default;
 
+	//让ks_future看起来像一个智能指针
+	ks_future* operator->() { return this; }
+	const ks_future* operator->() const { return this; }
+
 	using value_type = void;
 	using this_future_type = ks_future<void>;
 

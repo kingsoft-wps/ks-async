@@ -24,6 +24,10 @@ public:
 	ks_promise(ks_promise&&) noexcept = default;
 	ks_promise& operator=(ks_promise&&) noexcept = default;
 
+	//让ks_promise看起来像一个智能指针
+	ks_promise* operator->() { return this; }
+	const ks_promise* operator->() const { return this; }
+
 	using arg_type = void;
 	using value_type = void;
 	using this_promise_type = ks_promise<void>;
