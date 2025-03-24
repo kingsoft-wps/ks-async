@@ -67,7 +67,7 @@ void test_promise() {
 
     auto promise = ks_promise<std::string>::create();
     promise.get_future()
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
         });
@@ -87,7 +87,7 @@ void test_post() {
         return std::string("pass");
     });
 
-    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
     });
@@ -104,7 +104,7 @@ void test_post_pending() {
         return std::string("pass");
         }, & trigger);
 
-    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
         });
@@ -126,7 +126,7 @@ void test_post_delayed() {
         return ss.str();
     }, 400);
 
-    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+    future.on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
     });
@@ -154,7 +154,7 @@ void test_all() {
             ss << std::get<0>(valueTuple) << std::get<1>(valueTuple) << std::get<2>(valueTuple);
             return ss.str();
         })
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
         });
@@ -177,7 +177,7 @@ void test_any() {
     }, 120);
 
     ks_future_util::any(f1, f2, f3)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
         });
@@ -201,7 +201,7 @@ void test_periodic() {
 
     ks_future_util::repeat_periodic(
         ks_apartment::default_mta(), fn, 0, 100)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
             });
@@ -226,7 +226,7 @@ void test_repetitive() {
 
     ks_future_util::repeat(
         ks_apartment::default_mta(), fn)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
         });
@@ -362,7 +362,7 @@ void test_alive() {
             make_async_context().bind_owner(std::move(obj1)).bind_controller(nullptr),
             []() { std::cout << "->fn() "; }, 
             100
-        ).on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
+        ).on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             ks_future<void>::post_delayed(
                 ks_apartment::default_mta(), make_async_context(), []() {
                     g_exit_latch.count_down(); 

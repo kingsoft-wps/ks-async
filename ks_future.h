@@ -169,49 +169,58 @@ public: //flat_then, flat_transform
 	}
 
 public: //on_success, on_failure, on_completion
-	ks_future<T> on_success(ks_apartment* apartment, std::function<void(const T&)>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void(const T&)>>>>
+	ks_future<T> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::__virtual_inplace_apartment();
-		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value) -> void {
+		auto raw_fn = [fn = std::forward<FN>(fn)](const ks_raw_value& raw_value) -> void {
 			fn(raw_value.get<T>());
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->on_success(std::move(raw_fn), context, apartment);
 		return ks_future<T>::__from_raw(raw_future2);
 	}
-	ks_future<T> on_success(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const { //only for compat
-		return this->on_success(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<T> on_success(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_success(apartment, std::forward<FN>(fn), context);
 	}
 
-	ks_future<T> on_failure(ks_apartment* apartment, std::function<void(const ks_error&)>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void(const ks_error&)>>>>
+	ks_future<T> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::__virtual_inplace_apartment();
-		auto raw_fn = [fn = std::move(fn)](const ks_error& error) -> void {
+		auto raw_fn = [fn = std::forward<FN>(fn)](const ks_error& error) -> void {
 			fn(error);
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->on_failure(std::move(raw_fn), context, apartment);
 		return ks_future<T>::__from_raw(raw_future2);
 	}
-	ks_future<T> on_failure(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_error&)>&& fn) const { //only for compat
-		return this->on_failure(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<T> on_failure(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_failure(apartment, std::forward<FN>(fn), context);
 	}
 
-	ks_future<T> on_completion(ks_apartment* apartment, std::function<void(const ks_result<T>&)>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void(const ks_result<T>&)>>>>
+	ks_future<T> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::__virtual_inplace_apartment();
-		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result) -> void {
+		auto raw_fn = [fn = std::forward<FN>(fn)](const ks_raw_result& raw_result) -> void {
 			fn(ks_result<T>::__from_raw(raw_result));
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->on_completion(std::move(raw_fn), context, apartment);
 		return ks_future<T>::__from_raw(raw_future2);
 	}
-	ks_future<T> on_completion(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const { //only for compat
-		return this->on_completion(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<T> on_completion(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
 public: //cast, map, deliver_to_promise, set_timeout
@@ -222,11 +231,14 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
-	template <class R>
-	ks_future<R> map(std::function<R(const T&)>&& fn) const {
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R(const T&)>>>>
+	ks_future<R> map(FN&& fn) const {
 		ASSERT(this->is_valid());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
-			[fn = std::move(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(fn(value.get<T>())); },
+			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { 
+				return ks_raw_value::of<R>(fn(value.get<T>())); 
+			},
 			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
 	}

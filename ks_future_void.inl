@@ -381,37 +381,46 @@ public: //flat_then, flat_transform
 	}
 
 public: //on_success, on_failure, on_completion
-	ks_future<void> on_success(ks_apartment* apartment, std::function<void()>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void()>>>>
+	ks_future<void> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_success(
 			apartment, 
-			[fn = std::move(fn)](nothing_t) -> void { fn(); },
+			[fn = std::forward<FN>(fn)](nothing_t) -> void { fn(); },
 			context
 		); 
 	}
-	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, std::function<void()>&& fn) const { //only for compat
-		return this->on_success(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_success(apartment, std::forward<FN>(fn), context);
 	}
 
-	ks_future<void> on_failure(ks_apartment* apartment, std::function<void(const ks_error&)>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void(const ks_error&)>>>>
+	ks_future<void> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_failure(
 			apartment,
-			[fn = std::move(fn)](const ks_error& error) -> void { fn(error); },
+			[fn = std::forward<FN>(fn)](const ks_error& error) -> void { fn(error); },
 			context
 		);
 	}
-	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_error&)>&& fn) const { //only for compat
-		return this->on_failure(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_failure(apartment, std::forward<FN>(fn), context);
 	}
 
-	ks_future<void> on_completion(ks_apartment* apartment, std::function<void(const ks_result<void>&)>&& fn, const ks_async_context& context = {}) const {
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<void(const ks_result<void>&)>>>>
+	ks_future<void> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
 		return m_nothing_future.on_completion(
 			apartment, 
-			[fn = std::move(fn)](const ks_result<nothing_t>& result) -> void { fn(ks_result<void>::__from_other(result)); },
+			[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& result) -> void { fn(ks_result<void>::__from_other(result)); },
 			context
 		); 
 	}
-	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<void>&)>&& fn) const { //only for compat
-		return this->on_completion(apartment, std::move(fn), context);
+	template <class FN>
+	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
+		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
 public: //cast, map, deliver_to_promise, set_timeout
@@ -420,10 +429,11 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return m_nothing_future.template cast<R>();
 	}
 
-	template <class R>
-	ks_future<R> map(std::function<R()>&& fn) const {
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R()>>>>
+	ks_future<R> map(FN&& fn) const {
 		return m_nothing_future.template map<R>(
-			[fn = std::move(fn)](const nothing_t&) -> R { return fn(); }
+			[fn = std::forward<FN>(fn)](const nothing_t&) -> R { return fn(); }
 		);
 	}
 
