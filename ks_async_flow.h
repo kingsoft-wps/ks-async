@@ -9,15 +9,12 @@
 class ks_async_flow {
 public:
 	ks_async_flow() : m_raw_flow(ks_raw_async_flow::create()) {}
+	explicit ks_async_flow(nullptr_t) : m_raw_flow(nullptr) {}
+
 	ks_async_flow(ks_async_flow&&) noexcept = default;
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
 
 public:
-	void set_default_apartment(ks_apartment* apartment) const {
-		ASSERT(this->is_valid());
-		return m_raw_flow->set_default_apartment(apartment);
-	}
-
 	void set_j(size_t j) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->set_j(j);
@@ -136,17 +133,22 @@ public:
 		ASSERT(this->is_valid());
 		return m_raw_flow->get_last_error();
 	}
-	std::string get_failed_task_name() const {
+	std::string get_last_failed_task_name() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->get_failed_task_name();
+		return m_raw_flow->get_last_failed_task_name();
 	}
 
+	ks_error peek_task_error(const char* task_name) const {
+		ASSERT(this->is_valid());
+		return m_raw_flow->peek_task_error(task_name);
+	}
 	template <class T>
 	ks_result<T> peek_task_result(const char* task_name) const {
 		ASSERT(this->is_valid());
 		ks_raw_future_ptr raw_future = m_raw_flow->peek_task_result(task_name, __typeinfo_of<T>());
 		return ks_future<T>::__from_raw(raw_future);
 	}
+
 	template <class T>
 	ks_future<T> get_task_future(const char* task_name) const {
 		ASSERT(this->is_valid());
@@ -156,7 +158,7 @@ public:
 
 	ks_future<ks_async_flow> get_flow_future() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->get_flow_future_wrapped();
+		return m_raw_flow->get_flow_future_this_wrapped();
 	}
 
 private:
@@ -256,8 +258,8 @@ private:
 	static ks_async_flow __from_raw(ks_raw_async_flow_ptr&& raw_flow) { return ks_async_flow(std::move(raw_flow), 0); }
 	const ks_raw_async_flow_ptr& __get_raw() const { return m_raw_flow; }
 
-	static ks_future<ks_async_flow> __flow_future_wrapped_from_raw(const ks_raw_future_ptr& raw_flow_future_wrapped) {
-		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_wrapped);
+	static ks_future<ks_async_flow> __wrap_raw_flow_future(const ks_raw_future_ptr& raw_flow_future_this_wrapped) {
+		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_this_wrapped);
 	}
 
 	friend class __ks_async_raw::ks_raw_async_flow;

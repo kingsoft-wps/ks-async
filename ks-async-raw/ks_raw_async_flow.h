@@ -23,9 +23,8 @@ public:
 	KS_ASYNC_API static ks_raw_async_flow_ptr create();
 
 public:
-	KS_ASYNC_API void set_default_apartment(ks_apartment* apartment);
-
 	KS_ASYNC_API void set_j(size_t j);
+	KS_ASYNC_API void set_default_apartment(ks_apartment* apartment);
 
 public:
 	KS_ASYNC_API bool add_task(
@@ -75,13 +74,15 @@ public:
 	KS_ASYNC_API bool is_task_completed(const char* task_name);
 
 	KS_ASYNC_API ks_error get_last_error();
-	KS_ASYNC_API std::string get_failed_task_name();
+	KS_ASYNC_API std::string get_last_failed_task_name();
 
+	KS_ASYNC_API ks_error peek_task_error(const char* task_name);
 	KS_ASYNC_API ks_raw_result peek_task_result(const char* task_name, const std::type_info* value_typeinfo = nullptr);
+
 	KS_ASYNC_API ks_raw_future_ptr get_task_future(const char* task_name, const std::type_info* value_typeinfo = nullptr);
 
-	KS_ASYNC_API ks_raw_future_ptr  get_flow_future_void();
-	KS_ASYNC_API ks_future<ks_async_flow> get_flow_future_wrapped(); //由于future对象声明期管理的原因，这里会直接以ks_future<ks_async_flow>类型直接进行管理
+	KS_ASYNC_API ks_raw_future_ptr get_flow_future_void();
+	KS_ASYNC_API ks_future<ks_async_flow> get_flow_future_this_wrapped(); //由于future对象声明期管理的原因，这里会直接以ks_future<ks_async_flow>类型直接进行管理
 
 private:
 	enum __raw_ctor { v };
@@ -154,8 +155,8 @@ private:
 private:
 	ks_mutex m_mutex;
 
-	ks_apartment* m_default_apartment = ks_apartment::default_mta();
 	size_t m_j = size_t(-1);
+	ks_apartment* m_default_apartment = ks_apartment::default_mta();
 
 	std::unordered_map<std::string, std::shared_ptr<_TASK_ITEM>> m_task_map{};
 
@@ -185,8 +186,8 @@ private:
 
 	//flow_promise_ext本质上是ks_future<ks_async_flow>
 	//keeper仅在flow执行完成前才会保持，完成时清空，以避免循环引用
-	std::weak_ptr<ks_raw_promise> m_flow_promise_wrapped_weak = {};
-	ks_raw_promise_ptr m_flow_promise_wrapped_keepper_until_completed = nullptr;
+	std::weak_ptr<ks_raw_promise> m_flow_promise_this_wrapped_weak = {};
+	ks_raw_promise_ptr m_flow_promise_this_wrapped_keepper_until_completed = nullptr;
 
 	std::shared_ptr<ks_raw_async_flow> m_self_running_keeper = nullptr;
 };

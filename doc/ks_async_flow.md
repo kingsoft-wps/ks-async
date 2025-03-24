@@ -11,10 +11,9 @@
 # 一般成员方法
 
 ```C++
-void set_default_apartment(ks_apartment* apartment);
 void set_j(size_t j);
 ```
-#### 描述：设置各种选项。
+#### 描述：选项。
 <br>
 <br>
 
@@ -81,12 +80,13 @@ bool is_task_completed(const char* task_name);
 
 ```C++
 ks_error get_last_error();
-std::string get_failed_task_name();
+std::string get_last_failed_task_name();
 ```
 #### 描述：获取错误信息。
 <br>
 
 ```C++
+ks_error peek_task_error(const char* task_name);
 ks_result<T> peek_task_result<T>(const char* task_name);
 ```
 #### 描述：查询task当前的结果（有可能是未完成状态的）。
