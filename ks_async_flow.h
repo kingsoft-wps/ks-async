@@ -3,6 +3,7 @@
 #include "ks_async_base.h"
 #include "ks-async-raw/ks_raw_async_flow.h"
 #include "ks_future.h"
+#include "ks_promise.h"
 
 
 class ks_async_flow {
