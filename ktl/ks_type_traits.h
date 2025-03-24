@@ -122,6 +122,18 @@ namespace std {
 	template <class T>
 	constexpr bool is_nothing_v = is_nothing<T>::value;
 
+	//is_mutable
+	template <class T>
+	struct is_mutable : std::bool_constant<!std::is_const_v<T>> {};
+	template <class T>
+	constexpr bool is_mutable_v = is_mutable<T>::value;
+
+	//is_mutable_rvalue_reference
+	template <class T>
+	struct is_mutable_rvalue_reference : std::bool_constant<std::is_rvalue_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>> {};
+	template <class T>
+	constexpr bool is_mutable_rvalue_reference_v = is_mutable_rvalue_reference<T>::value;
+
 	//variadic_size
 	template <class... Ts>
 	struct variadic_size : std::tuple_size<std::tuple<Ts...>> {};
@@ -202,5 +214,22 @@ namespace std {
 	constexpr bool is_weak_pointer_v = is_weak_pointer<T>::value;
 
 }
+
+
+namespace std { //helper funcs
+	template <class T>
+	constexpr std::remove_cvref_t<T> dup(T&& arg) {
+		return std::forward<T>(arg);
+	}
+
+	template <class T>
+	constexpr void prune_if_rvalue(T&& arg) {
+		if (std::is_mutable_rvalue_reference_v<T&&>)
+			(void)(std::remove_cvref_t<T>(std::move(arg)));
+	}
+
+}
+
+
 
 #endif //__KS_TYPE_TRAITS_DEF

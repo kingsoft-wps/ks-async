@@ -363,6 +363,38 @@ ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>
 
 
 ```C++
+ks_future<void> parallel(
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
+    size_t count,
+		const ks_async_context& context = {});
+```
+#### 描述：并行执行count个异步过程，直至EOF或错误。
+#### 参数：
+  - apartment: 异步执行套间。
+  - fn: 异步函数。
+  - count: 个数。
+  - context: 异步任务执行时所需上下文。
+#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
+<br>
+
+```C++
+ks_future<void> sequential(
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
+    size_t count,
+		const ks_async_context& context = {});
+```
+#### 描述：串行执行count个异步过程，直至EOF或错误。
+#### 参数：
+  - apartment: 异步执行套间。
+  - fn: 异步函数。
+  - count: 个数。
+  - context: 异步任务执行时所需上下文。
+#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
+<br>
+<br>
+
+
+```C++
 ks_future<void> repeat(
 		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
 		const ks_async_context& context = {});
@@ -406,36 +438,6 @@ ks_future<void> ks_future_util::repeat_repetitive<V>(
   - produce_fn: 生产者异步函数。
   - consume_apartment: 消费者执行套间。
   - consume_fn: 消费者异步函数。
-  - context: 异步任务执行时所需上下文。
-#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
-<br>
-
-```C++
-ks_future<void> parallel(
-		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
-    size_t count,
-		const ks_async_context& context = {});
-```
-#### 描述：并行执行count个异步过程，直至EOF或错误。
-#### 参数：
-  - apartment: 异步执行套间。
-  - fn: 异步函数。
-  - count: 个数。
-  - context: 异步任务执行时所需上下文。
-#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
-<br>
-
-```C++
-ks_future<void> sequential(
-		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
-    size_t count,
-		const ks_async_context& context = {});
-```
-#### 描述：串行执行count个异步过程，直至EOF或错误。
-#### 参数：
-  - apartment: 异步执行套间。
-  - fn: 异步函数。
-  - count: 个数。
   - context: 异步任务执行时所需上下文。
 #### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
 <br>

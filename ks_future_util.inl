@@ -210,6 +210,76 @@ private:
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
+public: //parallel, sequential
+	template <class FN, class _ = std::enable_if_t <
+		std::is_convertible_v<FN, std::function<void()>> ||
+		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
+	static ks_future<void> parallel(
+		ks_apartment* apartment, FN&& fn, size_t count,
+		const ks_async_context& context = {}) {
+
+		if (count == 0) {
+			std::prune_if_rvalue(std::forward<FN>(fn));
+			return ks_future<void>::resolved(nothing);
+		}
+		else if (count == 1) {
+			return ks_future_util::post<void>(
+				apartment, std::forward<FN>(fn), context);
+		}
+		else {
+			std::vector<ks_future<void>> future_vec;
+			future_vec.reserve(count);
+			const std::remove_cvref_t<FN> fn2 = std::forward<FN>(fn);
+			for (size_t i = 0; i < count; ++i) {
+				future_vec.push_back(
+					ks_future_util::post<void>(apartment, fn2, context)
+				);
+			}
+
+			return ks_future_util::all(future_vec);
+		}
+	}
+
+	template <class FN, class _ = std::enable_if_t <
+		std::is_convertible_v<FN, std::function<void()>> ||
+		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
+	static ks_future<void> sequential(
+		ks_apartment* apartment, FN&& fn, size_t count,
+		const ks_async_context& context = {}) {
+
+		if (count == 0) {
+			std::prune_if_rvalue(std::forward<FN>(fn));
+			return ks_future<void>::resolved(nothing);
+		}
+		else if (count == 1) {
+			return ks_future_util::post<void>(
+				apartment, std::forward<FN>(fn), context);
+		}
+		else {
+			std::shared_ptr<size_t> index_p = std::make_shared<size_t>();
+			auto fn2 = [fn = __wrap_async_fn_0<void>(std::forward<FN>(fn)), index_p, count]()->ks_future<void> {
+				if ((*index_p)++ < count)
+					return fn();
+				else
+					return ks_future<void>::rejected(ks_error::eof_error());
+			};
+
+			return ks_future_util
+				::repeat(apartment, fn2, context)
+				.template then<void>(
+					apartment, 
+					[index_p, count]() -> ks_result<void> {
+						if ((*index_p) < count)
+							return ks_error::eof_error(); //若repeat返回成功，但index未达count，则意味着中间遇到了eof，那么我们还原为返回eof错误
+						else
+							return nothing;
+					},
+					make_async_context().set_priority(0x10000));
+		}
+	}
+
 public: //repeat, repeat_periodic, repeat_productive
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void()>> ||
@@ -432,72 +502,6 @@ private:
 							}
 						},
 						make_async_context().set_priority(0x10000));
-	}
-
-public: //parallel, sequential
-	template <class FN, class _ = std::enable_if_t <
-		std::is_convertible_v<FN, std::function<void()>> ||
-		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
-		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
-	static ks_future<void> parallel(
-		ks_apartment* apartment, FN&& fn, size_t count,
-		const ks_async_context& context = {}) {
-
-		if (count == 0) {
-			return ks_future<void>::resolved(nothing);
-		}
-		else if (count == 1) {
-			return ks_future_util::post<void>(apartment, std::forward<FN>(fn), context);
-		}
-		else {
-			const std::remove_cvref_t<FN> fn2 = std::forward<FN>(fn);
-			std::vector<ks_future<void>> future_vec;
-			future_vec.reserve(count);
-			for (size_t i = 0; i < count; ++i) {
-				future_vec.push_back(
-					ks_future_util::post<void>(apartment, fn2, context));
-			}
-
-			return ks_future_util::all(future_vec);
-		}
-	}
-
-	template <class FN, class _ = std::enable_if_t <
-		std::is_convertible_v<FN, std::function<void()>> ||
-		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
-		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
-	static ks_future<void> sequential(
-		ks_apartment* apartment, FN&& fn, size_t count,
-		const ks_async_context& context = {}) {
-
-		if (count == 0) {
-			return ks_future<void>::resolved(nothing);
-		}
-		else if (count == 1) {
-			return ks_future_util::post<void>(apartment, std::forward<FN>(fn), context);
-		}
-		else {
-			std::shared_ptr<size_t> index_p = std::make_shared<size_t>();
-			std::function<ks_future<void>()> fn2 = [fn = __wrap_async_fn_0<void>(std::forward<FN>(fn)), index_p, count]()->ks_future<void> {
-				if ((*index_p)++ < count)
-					return fn();
-				else
-					return ks_future<void>::rejected(ks_error::eof_error());
-			};
-
-			return ks_future_util
-				::repeat(apartment, fn2, context)
-				.template then<void>(
-					apartment, 
-					[index_p, count]() -> ks_result<void> {
-						//若repeat返回成功，但index未达到count，则意味着中间遇到了eof，那么我们恢复为返回为eof错误
-						if ((*index_p) < count)
-							return ks_error::eof_error();
-						else
-							return nothing;
-					},
-					make_async_context().set_priority(0x10000));
-		}
 	}
 
 private:
