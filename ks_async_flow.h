@@ -8,9 +8,7 @@
 class ks_async_flow {
 public:
 	ks_async_flow() : m_raw_flow(ks_raw_async_flow::create()) {}
-
 	ks_async_flow(ks_async_flow&&) noexcept = default;
-	ks_async_flow& operator =(ks_async_flow&&) noexcept = default;
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
 
 public:
@@ -193,32 +191,72 @@ private:
 	template <class T, class FN>
 	bool __choose_add_task(
 		const char* name_and_dependencies,
-		ks_apartment* apartment, FN&& fn, const ks_async_context& context) const;
+		ks_apartment* apartment, FN&& fn, const ks_async_context& context) const {
+
+		ASSERT(this->is_valid());
+
+		constexpr int ret_mode =
+			std::is_void_v<std::invoke_result_t<FN, const ks_async_flow&>> ? -1 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, ks_future<T>> ? 3 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, T> ? 1 : 0;
+		static_assert(ret_mode != 0, "illegal task_fn's ret");
+
+		return __choose_add_task_by_ret<T>(
+			std::integral_constant<int, ret_mode>(),
+			name_and_dependencies,
+			apartment, FN(std::forward<FN>(fn)), context,
+			__typeinfo_of<T>());
+	}
 
 	template <class T>
 	bool __choose_add_task_by_ret(
 		std::integral_constant<int, -1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-		const std::type_info* value_typeinfo) const;
+		const std::type_info* value_typeinfo) const {
+		auto raw_fn = ;
+		return m_raw_flow->add_task(
+			name_and_dependencies, apartment,
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of((fn(ks_async_flow::__from_raw(flow)), nothing)); },
+			context, value_typeinfo);
+	}
+
 	template <class T>
 	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-		const std::type_info* value_typeinfo) const;
+		const std::type_info* value_typeinfo) const {
+		return m_raw_flow->add_task(
+			name_and_dependencies, apartment,
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of(fn(ks_async_flow::__from_raw(flow))); },
+			context, value_typeinfo);
+	}
+
 	template <class T>
 	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 2>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-		const std::type_info* value_typeinfo) const;
+		const std::type_info* value_typeinfo) const {
+		return m_raw_flow->add_task(
+			name_and_dependencies, apartment,
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return fn(ks_async_flow::__from_raw(flow)); },
+			context, value_typeinfo);
+	}
+
 	template <class T>
 	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 3>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-		const std::type_info* value_typeinfo) const;
+		const std::type_info* value_typeinfo) const {
+		return m_raw_flow->add_flat_task(
+			name_and_dependencies, apartment,
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_future_ptr { return fn(ks_async_flow::__from_raw(flow)).__get_raw(); },
+			context, value_typeinfo);
+	}
 
 private:
 	template <class T>
@@ -254,77 +292,3 @@ private:
 private:
 	ks_raw_async_flow_ptr m_raw_flow;
 };
-
-
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-//ks_async_flow::模板方法实现...
-template <class T, class FN>
-bool ks_async_flow::__choose_add_task(
-	const char* name_and_dependencies,
-	ks_apartment* apartment, FN&& fn, const ks_async_context& context) const {
-
-	ASSERT(this->is_valid());
-
-	constexpr int ret_mode =
-		std::is_void_v<std::invoke_result_t<FN, const ks_async_flow&>> ? -1 :
-		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, ks_future<T>> ? 3 :
-		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, ks_result<T>> ? 2 :
-		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, T> ? 1 : 0;
-	static_assert(ret_mode != 0, "illegal task_fn's ret");
-
-	return __choose_add_task_by_ret<T>(
-		std::integral_constant<int, ret_mode>(),
-		name_and_dependencies,
-		apartment, FN(std::forward<FN>(fn)), context,
-		__typeinfo_of<T>());
-}
-
-template <class T> 
-bool ks_async_flow::__choose_add_task_by_ret(
-	std::integral_constant<int, -1>,
-	const char* name_and_dependencies,
-	ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-	const std::type_info* value_typeinfo) const {
-	auto raw_fn = ;
-	return m_raw_flow->add_task(
-		name_and_dependencies, apartment, 
-		[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of((fn(ks_async_flow::__from_raw(flow)), nothing)); },
-		context, value_typeinfo);
-}
-
-template <class T>
-bool ks_async_flow::__choose_add_task_by_ret(
-	std::integral_constant<int, 1>,
-	const char* name_and_dependencies, 
-	ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-	const std::type_info* value_typeinfo) const {
-	return m_raw_flow->add_task(
-		name_and_dependencies, apartment, 
-		[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of(fn(ks_async_flow::__from_raw(flow))); },
-		context, value_typeinfo);
-}
-
-template <class T>
-bool ks_async_flow::__choose_add_task_by_ret(
-	std::integral_constant<int, 2>,
-	const char* name_and_dependencies, 
-	ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-	const std::type_info* value_typeinfo) const {
-	return m_raw_flow->add_task(
-		name_and_dependencies, apartment, 
-		[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return fn(ks_async_flow::__from_raw(flow)); },
-		context, value_typeinfo);
-}
-
-template <class T>
-bool ks_async_flow::__choose_add_task_by_ret(
-	std::integral_constant<int, 3>,
-	const char* name_and_dependencies, 
-	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
-	const std::type_info* value_typeinfo) const {
-	return m_raw_flow->add_flat_task(
-		name_and_dependencies, apartment, 
-		[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_future_ptr { return fn(ks_async_flow::__from_raw(flow)).__get_raw(); },
-		context, value_typeinfo);
-}

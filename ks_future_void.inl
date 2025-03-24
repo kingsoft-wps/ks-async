@@ -474,56 +474,36 @@ public: //then, transform
 public: //flat_then, flat_transform
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, std::function<ks_future<R>()>&& fn, const ks_async_context& context = {}) const { //explicit flat
-		return m_nothing_future.flat_then<R>(
-			apartment,
-			[fn = std::move(fn)](const nothing_t&)->ks_future<R> { return fn(); },
-			context);
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, std::function<ks_future<R>(ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const { //explicit flat
-		return m_nothing_future.flat_then<R>(
-			apartment,
-			[fn = std::move(fn)](const nothing_t&)->ks_future<R> { return fn(ks_cancel_inspector::__for_future()); },
-			context);
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>()>&& fn) const { //explicit flat, only for compat
-		return m_nothing_future.flat_then<R>(
-			apartment, context,
-			[fn = std::move(fn)](const nothing_t&)->ks_future<R> { return fn(); });
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(ks_cancel_inspector*)>&& fn) const { //explicit flat, only for compat
-		return m_nothing_future.flat_then<R>(
-			apartment, context,
-			[fn = std::move(fn)](const nothing_t&)->ks_future<R> { return fn(ks_cancel_inspector::__for_future()); });
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, std::function<ks_future<R>(const ks_result<void>&)>&& fn, const ks_async_context& context = {}) const { //explicit flat
-		return m_nothing_future.flat_transform<R>(
-			apartment, 
-			[fn = std::move(fn)](const ks_result<nothing_t>& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result)); },
-			context);
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, std::function<ks_future<R>(const ks_result<void>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const { //explicit flat
-		return m_nothing_future.flat_transform<R>(
-			apartment,
-			[fn = std::move(fn)](const ks_result<nothing_t>& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result), ks_cancel_inspector::__for_future()); },
-			context);
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const ks_result<void>&)>&& fn) const { //explicit flat, only for compat
-		return m_nothing_future.flat_transform<R>(
-			apartment, context,
-			[fn = std::move(fn)](const ks_result<nothing_t>& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result)); });
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const ks_result<void>&, ks_cancel_inspector*)>&& fn) const { //explicit flat, only for compat
-		return m_nothing_future.flat_transform<R>(
-			apartment, context,
-			[fn = std::move(fn)](const ks_result<nothing_t>& result)->ks_future<R> { return fn(ks_result<void>::__from_other(result), ks_cancel_inspector::__for_future()); });
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 
 public: //on_success, on_failure, on_completion
@@ -535,10 +515,7 @@ public: //on_success, on_failure, on_completion
 		); 
 	}
 	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, std::function<void()>&& fn) const { //only for compat
-		return m_nothing_future.on_success(
-			apartment, context,
-			[fn = std::move(fn)](nothing_t) -> void { fn(); }
-		);
+		return this->on_success(apartment, std::move(fn), context);
 	}
 
 	ks_future<void> on_failure(ks_apartment* apartment, std::function<void(const ks_error&)>&& fn, const ks_async_context& context = {}) const {
@@ -549,10 +526,7 @@ public: //on_success, on_failure, on_completion
 		);
 	}
 	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_error&)>&& fn) const { //only for compat
-		return m_nothing_future.on_failure(
-			apartment, context,
-			[fn = std::move(fn)](const ks_error& error) -> void { fn(error); }
-		);
+		return this->on_failure(apartment, std::move(fn), context);
 	}
 
 	ks_future<void> on_completion(ks_apartment* apartment, std::function<void(const ks_result<void>&)>&& fn, const ks_async_context& context = {}) const {
@@ -563,10 +537,7 @@ public: //on_success, on_failure, on_completion
 		); 
 	}
 	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<void>&)>&& fn) const { //only for compat
-		return m_nothing_future.on_completion(
-			apartment, context,
-			[fn = std::move(fn)](const ks_result<nothing_t>& result) -> void { fn(ks_result<void>::__from_other(result)); }
-		);
+		return this->on_completion(apartment, std::move(fn), context);
 	}
 
 public: //cast, deliver_to_promise, set_timeout

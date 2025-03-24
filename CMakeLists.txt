@@ -44,7 +44,6 @@ set(MY_SOURCE_FILES
 
 	#about async-flow
 	ks_async_flow.h
-	ks_async_flow.cpp
 
 	#about notificiation-center
 	ks_notification_center.h
@@ -68,6 +67,8 @@ set(MY_ASYNC_RAW_SOURCE_FILES
 	ks-async-raw/ks_raw_value.h
 	ks-async-raw/ks_raw_result.h
 	ks-async-raw/ks_raw_internal_helper.h
+	ks-async-raw/ks_raw_async_flow.h
+	ks-async-raw/ks_raw_async_flow.cpp
 )
 
 set(MY_KTL_SOURCE_FILES
@@ -121,6 +122,7 @@ set(PUBLIC_ASYNC_RAW_HEADER_FILES
 	ks-async-raw/ks_raw_promise.h
 	ks-async-raw/ks_raw_value.h
 	ks-async-raw/ks_raw_result.h
+	ks-async-raw/ks_raw_async_flow.h
 )
 
 set(PUBLIC_KTL_HEADER_FILES

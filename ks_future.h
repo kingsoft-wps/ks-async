@@ -42,7 +42,6 @@ public: //resolved, rejected
 		ks_raw_future_ptr raw_future = ks_raw_future::resolved(ks_raw_value::of(value), apartment_hint);
 		return ks_future<T>::__from_raw(raw_future);
 	}
-
 	static ks_future<T> resolved(T&& value) {
 		ks_apartment* apartment_hint = ks_apartment::default_mta();
 		ks_raw_future_ptr raw_future = ks_raw_future::resolved(ks_raw_value::of(std::move(value)), apartment_hint);
@@ -275,11 +274,11 @@ public: //flat_then, flat_transform
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const T&)>&& fn) const { //explicit flat, only for compat
-		return this->flat_then<R>(apartment, std::move(fn), context);
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_then(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>&& fn) const { //explicit flat, only for compat
-		return this->flat_then<R>(apartment, std::move(fn), context);
+		return this->then<R>(apartment, std::move(fn), context);
 	}
 
 	template <class R>
@@ -292,11 +291,11 @@ public: //flat_then, flat_transform
 	}
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const ks_result<T>&)>&& fn) const { //explicit flat, only for compat
-		return this->flat_transform<R>(apartment, std::move(fn), context);
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 	template <class R>
 	ks_future<R> flat_transform(ks_apartment* apartment, const ks_async_context& context, std::function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const { //explicit flat, only for compat
-		return this->flat_transform<R>(apartment, std::move(fn), context);
+		return this->transform<R>(apartment, std::move(fn), context);
 	}
 
 public: //on_success, on_failure, on_completion
@@ -944,10 +943,32 @@ private:
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>> //相当于then<void>特化
-	ks_future<void> __then_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const;
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>> //相当于then<void>特化
-	ks_future<void> __then_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&, ks_cancel_inspector*)>&& fn) const;
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
+	ks_future<void> __then_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const {
+		ASSERT(this->is_valid());
+		ASSERT(apartment != nullptr);
+		if (apartment == nullptr)
+			apartment = ks_apartment::default_mta();
+		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
+			fn(raw_value.get<T>());
+			return ks_raw_value::of(nothing);
+		};
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		return ks_future<void>::__from_raw(raw_future2);
+	}
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
+	ks_future<void> __then_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&, ks_cancel_inspector*)>&& fn) const {
+		ASSERT(this->is_valid());
+		ASSERT(apartment != nullptr);
+		if (apartment == nullptr)
+			apartment = ks_apartment::default_mta();
+		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
+			fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
+			return ks_raw_value::of(nothing);
+		};
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		return ks_future<void>::__from_raw(raw_future2);
+	}
 
 
 	template <class R>
@@ -1029,10 +1050,32 @@ private:
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>> //相当于transform<void>特化
-	ks_future<void> __transform_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const;
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>> //相当于transform<void>特化
-	ks_future<void> __transform_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const;
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
+	ks_future<void> __transform_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const {
+		ASSERT(this->is_valid());
+		ASSERT(apartment != nullptr);
+		if (apartment == nullptr)
+			apartment = ks_apartment::default_mta();
+		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
+			fn(ks_result<T>::__from_raw(raw_result));
+			return ks_raw_value::of(nothing);
+		};
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		return ks_future<void>::__from_raw(raw_future2);
+	}
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
+	ks_future<void> __transform_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const {
+		ASSERT(this->is_valid());
+		ASSERT(apartment != nullptr);
+		if (apartment == nullptr)
+			apartment = ks_apartment::default_mta();
+		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
+			fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
+			return ks_raw_value::of(nothing);
+		};
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		return ks_future<void>::__from_raw(raw_future2);
+	}
 
 private:
 	using __cast_mode_t = typename ks_result<T>::__cast_mode_t;
@@ -1091,65 +1134,3 @@ private:
 
 #include "ks_future_void.inl"
 #include "ks_future_util.inl"
-
-
-//////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////
-//ks_future::then<void>和transform<void>特化实现...
-template <class T>
-template <class R, class _ /*= std::enable_if_t<std::is_void_v<R>>*/>
-inline ks_future<void> ks_future<T>::__then_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const {
-	ASSERT(this->is_valid());
-	ASSERT(apartment != nullptr);
-	if (apartment == nullptr)
-		apartment = ks_apartment::default_mta();
-	auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
-		fn(raw_value.get<T>());
-		return ks_raw_value::of(nothing);
-	};
-	ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-	return ks_future<void>::__from_raw(raw_future2);
-}
-template <class T>
-template <class R, class _ /*= std::enable_if_t<std::is_void_v<R>>*/>
-inline ks_future<void> ks_future<T>::__then_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&, ks_cancel_inspector*)>&& fn) const {
-	ASSERT(this->is_valid());
-	ASSERT(apartment != nullptr);
-	if (apartment == nullptr)
-		apartment = ks_apartment::default_mta();
-	auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
-		fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
-		return ks_raw_value::of(nothing);
-	};
-	ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-	return ks_future<void>::__from_raw(raw_future2);
-}
-
-template <class T>
-template <class R, class _ /*= std::enable_if_t<std::is_void_v<R>>*/>
-ks_future<void> ks_future<T>::__transform_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const {
-	ASSERT(this->is_valid());
-	ASSERT(apartment != nullptr);
-	if (apartment == nullptr)
-		apartment = ks_apartment::default_mta();
-	auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
-		fn(ks_result<T>::__from_raw(raw_result));
-		return ks_raw_value::of(nothing);
-	};
-	ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-	return ks_future<void>::__from_raw(raw_future2);
-}
-template <class T>
-template <class R, class _ /*= std::enable_if_t<std::is_void_v<R>>*/>
-ks_future<void> ks_future<T>::__transform_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const {
-	ASSERT(this->is_valid());
-	ASSERT(apartment != nullptr);
-	if (apartment == nullptr)
-		apartment = ks_apartment::default_mta();
-	auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
-		fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
-		return ks_raw_value::of(nothing);
-	};
-	ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-	return ks_future<void>::__from_raw(raw_future2);
-}
