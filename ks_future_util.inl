@@ -208,7 +208,7 @@ public: //repetitive
 			consume_apartment = ks_apartment::default_mta();
 
 		ks_promise<void> final_promise = ks_promise<void>::create();
-		__do_pump_repetitive_once(
+		__do_pump_repetitive_once<V>(
 			produce_apartment, produce_fn,
 			consume_apartment, consume_fn,
 			context, final_promise);
@@ -248,7 +248,7 @@ private:
 				consume_apartment,
 				[produce_apartment, produce_fn, consume_apartment, consume_fn, context, final_promise](const ks_result<void>& result) -> void {
 					if (result.is_value()) {
-						__do_pump_repetitive_once(
+						__do_pump_repetitive_once<V>(
 							produce_apartment, produce_fn,
 							consume_apartment, consume_fn,
 							context, final_promise);

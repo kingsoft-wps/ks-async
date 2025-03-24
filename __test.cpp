@@ -191,7 +191,7 @@ void test_repetitive() {
 
     std::atomic<int> sn = { 0 };
 
-    auto producer = [p_sn = &sn]() -> ks_future<int> {
+    auto produce_fn = [p_sn = &sn]() -> ks_future<int> {
         int sn = ++(*p_sn);
         if (sn <= 5)
             return ks_future<int>::resolved(sn);
@@ -199,12 +199,14 @@ void test_repetitive() {
             return ks_future<int>::rejected(ks_error::terminated_error());
     };
 
-    auto consumer = [](const int& sn) -> ks_future<void> {
+    auto consume_fn = [](const int& sn) -> ks_future<void> {
         std::cout << sn << " ";
         return ks_future<void>::resolved();
     };
 
-    ks_future_util::repetitive<int>(ks_apartment::default_mta(), producer, ks_apartment::default_mta(), consumer)
+    ks_future_util::repetitive<int>(
+        ks_apartment::default_mta(), produce_fn, 
+        ks_apartment::default_mta(), consume_fn)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();

@@ -53,8 +53,8 @@ public:
 		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
-	template <class R>
-	ks_result<R> map(std::function<R(const T&)>&& fn) const {
+	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>>>
+	ks_result<R> map(FN&& fn) const {
 		if (this->is_value())
 			return ks_result<R>(fn(this->to_value()));
 		else if (this->is_error())
