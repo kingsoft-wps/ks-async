@@ -159,11 +159,16 @@ protected:
 			return true;
 		}
 		else {
+#if !__KS_APARTMENT_ATFORK_ENABLED
 			std::unique_lock<ks_mutex> lock(m_mutex);
 			while (!m_completed_result.is_completed()) {
-				//m_completed_result_cv.wait(lock);
+				m_completed_result_cv.wait(lock);
+			}
+#else
+			while (!m_completed_result.is_completed()) {
 				std::this_thread::yield();
 			}
+#endif
 
 			return true;
 		}
@@ -256,7 +261,9 @@ protected:
 
 		m_completed_result = result.require_completed_or_error();
 		m_completed_prefer_apartment = prefer_apartment;
-		//m_completed_result_cv.notify_all();
+#if !__KS_APARTMENT_ATFORK_ENABLED
+		m_completed_result_cv.notify_all();
+#endif
 
 		for (ks_apartment* apartment : m_waiting_for_me_apartment_set) {
 			apartment->__do_notify_nested_pump_loop_for_extern_waiting();
@@ -394,7 +401,9 @@ protected:
 	ks_mutex m_mutex;
 
 	ks_raw_result m_completed_result;
-	//ks_condition_variable m_completed_result_cv{}; //fork子进程中cv有几率死锁，故弃用！
+#if !__KS_APARTMENT_ATFORK_ENABLED
+	ks_condition_variable m_completed_result_cv{}; //fork子进程中cv有几率死锁，故若支持fork则弃用！
+#endif
 	ks_apartment* m_completed_prefer_apartment = nullptr;
 
 	ks_async_context m_living_context; //在complete后被自动清除
