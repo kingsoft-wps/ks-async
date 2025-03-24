@@ -34,9 +34,11 @@ public:
 	}
 
 	ks_raw_result(const ks_error& error) : m_state(_STATE::JUST_ERROR) {
+		ASSERT(error.get_code() != 0);
 		::new (this->__error_data_ptr()) ks_error(error);
 	}
 	ks_raw_result(ks_error&& error) noexcept : m_state(_STATE::JUST_ERROR) {
+		ASSERT(error.get_code() != 0);
 		::new (this->__error_data_ptr()) ks_error(std::move(error));
 	}
 
@@ -110,8 +112,6 @@ private:
 	enum class _STATE { NOT_COMPLETED, JUST_VALUE, JUST_ERROR };
 	_STATE m_state;
 	std::aligned_union_t<0, ks_raw_value, ks_error> m_data_memory;
-	//alignas(alignof(ks_raw_value) >= alignof(ks_error) ? alignof(ks_raw_value) : alignof(ks_error))
-	//	byte m_data_memory[sizeof(ks_raw_value) >= sizeof(ks_error) ? sizeof(ks_raw_value) : sizeof(ks_error)];
 };
 
 
