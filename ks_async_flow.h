@@ -22,13 +22,34 @@ public:
 	}
 
 public:
+	template <class T>
+	bool add_task(
+		const char* name_and_dependencies,
+		ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
+		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
+	}
+	template <class T>
+	bool add_task(
+		const char* name_and_dependencies,
+		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
+		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
+	}
+	template <class T>
+	bool add_task(
+		const char* name_and_dependencies,
+		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
+		return __choose_add_task<T>(name_and_dependencies, apartment, std::move(fn), context);
+	}
+
 	template <class T, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T(const ks_async_flow& flow)>> ||
 		std::is_convertible_v<FN, std::function<ks_result<T>(const ks_async_flow& flow)>> ||
 		std::is_convertible_v<FN, std::function<ks_future<T>(const ks_async_flow& flow)>>>>
 	bool add_task(
 		const char* name_and_dependencies,
-		ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const;
+		ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
+		return __choose_add_task<T>(name_and_dependencies, apartment, std::forward<FN>(fn), context);
+	}
 
 public:
 	uint64_t add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context = {}) const {
@@ -169,38 +190,44 @@ public:
 	}
 
 private:
-	template <class T>
+	template <class T, class FN>
 	bool __choose_add_task(
+		const char* name_and_dependencies,
+		ks_apartment* apartment, FN&& fn, const ks_async_context& context) const;
+
+	template <class T>
+	bool __choose_add_task_by_ret(
 		std::integral_constant<int, -1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 		const std::type_info* value_typeinfo) const;
 	template <class T>
-	bool __choose_add_task(
+	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 		const std::type_info* value_typeinfo) const;
 	template <class T>
-	bool __choose_add_task(
+	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 2>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 		const std::type_info* value_typeinfo) const;
 	template <class T>
-	bool __choose_add_task(
+	bool __choose_add_task_by_ret(
 		std::integral_constant<int, 3>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 		const std::type_info* value_typeinfo) const;
 
+private:
 	template <class T>
 	static const std::type_info* __typeinfo_of() {
-#ifdef _DEBUG
+#	ifdef _DEBUG
 		return &typeid(T);
-#else
+#	else
 		return nullptr;
-#endif
+#	endif
 	}
 
 private:
@@ -232,8 +259,8 @@ private:
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 //ks_async_flow::模板方法实现...
-template <class T, class FN, class _>
-bool ks_async_flow::add_task(
+template <class T, class FN>
+bool ks_async_flow::__choose_add_task(
 	const char* name_and_dependencies,
 	ks_apartment* apartment, FN&& fn, const ks_async_context& context) const {
 
@@ -246,7 +273,7 @@ bool ks_async_flow::add_task(
 		std::is_convertible_v<std::invoke_result_t<FN, const ks_async_flow&>, T> ? 1 : 0;
 	static_assert(ret_mode != 0, "illegal task_fn's ret");
 
-	return __choose_add_task<T>(
+	return __choose_add_task_by_ret<T>(
 		std::integral_constant<int, ret_mode>(),
 		name_and_dependencies,
 		apartment, FN(std::forward<FN>(fn)), context,
@@ -254,7 +281,7 @@ bool ks_async_flow::add_task(
 }
 
 template <class T> 
-bool ks_async_flow::__choose_add_task(
+bool ks_async_flow::__choose_add_task_by_ret(
 	std::integral_constant<int, -1>,
 	const char* name_and_dependencies,
 	ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
@@ -267,7 +294,7 @@ bool ks_async_flow::__choose_add_task(
 }
 
 template <class T>
-bool ks_async_flow::__choose_add_task(
+bool ks_async_flow::__choose_add_task_by_ret(
 	std::integral_constant<int, 1>,
 	const char* name_and_dependencies, 
 	ks_apartment* apartment, std::function<T(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
@@ -279,7 +306,7 @@ bool ks_async_flow::__choose_add_task(
 }
 
 template <class T>
-bool ks_async_flow::__choose_add_task(
+bool ks_async_flow::__choose_add_task_by_ret(
 	std::integral_constant<int, 2>,
 	const char* name_and_dependencies, 
 	ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
@@ -291,7 +318,7 @@ bool ks_async_flow::__choose_add_task(
 }
 
 template <class T>
-bool ks_async_flow::__choose_add_task(
+bool ks_async_flow::__choose_add_task_by_ret(
 	std::integral_constant<int, 3>,
 	const char* name_and_dependencies, 
 	ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
