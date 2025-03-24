@@ -78,6 +78,7 @@ public:
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
+	template <class _ = void>
 	_DECL_DEPRECATED void wait() const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->wait();
@@ -217,11 +218,8 @@ private:
 	static ks_async_flow __from_raw(ks_raw_async_flow_ptr&& raw_flow) { return ks_async_flow(std::move(raw_flow), 0); }
 	const ks_raw_async_flow_ptr& __get_raw() const { return m_raw_flow; }
 
-	static ks_future<ks_async_flow> __wrap_raw_flow_future_ext(const ks_raw_future_ptr& raw_flow_future_ext) {
-		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_ext);
-	}
-	static ks_raw_future_ptr __unwrap_raw_flow_future_void(const ks_future<void>& flow_future_void) {
-		return flow_future_void.__get_raw();
+	static ks_future<ks_async_flow> __flow_future_wrapped_from_raw(const ks_raw_future_ptr& raw_flow_future_wrapped) {
+		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_wrapped);
 	}
 
 	friend class __ks_async_raw::ks_raw_async_flow;

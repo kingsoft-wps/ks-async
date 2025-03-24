@@ -188,7 +188,7 @@ private:
 					return fut;
 				},
 				context)
-			.flat_then<void>(
+			.template flat_then<void>(
 				apartment, 
 				[consumer](const T& value) -> ks_future<void> {
 					ks_future<void> fut = consumer(value);

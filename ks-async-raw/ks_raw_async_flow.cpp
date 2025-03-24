@@ -597,7 +597,7 @@ ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_wrapped() {
 
 	if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
 		ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
-		return ks_async_flow::__wrap_raw_flow_future_ext(m_flow_promise_wrapped_keepper_until_completed->get_future());
+		return ks_async_flow::__flow_future_wrapped_from_raw(m_flow_promise_wrapped_keepper_until_completed->get_future());
 	}
 
 	ks_raw_promise_ptr flow_promise_ext = m_flow_promise_wrapped_weak.lock();
@@ -621,7 +621,7 @@ ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_wrapped() {
 		}
 	}
 
-	return ks_async_flow::__wrap_raw_flow_future_ext(flow_promise_ext->get_future());
+	return ks_async_flow::__flow_future_wrapped_from_raw(flow_promise_ext->get_future());
 }
 
 
