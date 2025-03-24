@@ -283,10 +283,11 @@ void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_l
 void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__tls_set_current_thread_apartment(this);
-
 	tls_current_now_thread_sn = thread_sn;
 
-	std::string thread_name = (std::stringstream() << "mta-thread of: " << m_d->name << " (work-" << thread_sn << "/" << m_d->max_thread_count << ")").str();
+	std::stringstream thread_name_ss;
+	thread_name_ss << "mta-thread of: " << m_d->name << " (work-" << thread_sn << "/" << m_d->max_thread_count << ")";
+	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
@@ -378,7 +379,9 @@ void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::
 }
 
 void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
-	std::string thread_name = (std::stringstream() << "mta-thread of: " << m_d->name << " (timer)").str();
+	std::stringstream thread_name_ss;
+	thread_name_ss << "mta-thread of: " << m_d->name << " (timer)";
+	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
 	static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
