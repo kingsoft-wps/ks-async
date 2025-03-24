@@ -191,16 +191,16 @@ void test_periodic() {
 
     std::atomic<int> sn = { 0 };
 
-    auto fn = [p_sn = &sn]() -> ks_future<void> {
+    auto fn = [p_sn = &sn]() -> ks_result<void> {
         int sn = ++(*p_sn);
         if (sn <= 5)
-            return ks_future<void>::resolved();
+            return nothing;
         else
-            return ks_future<void>::rejected(ks_error::eof_error());
+            return ks_error::eof_error();
     };
 
-    ks_future_util::periodic(
-        ks_apartment::default_mta(), fn, 100)
+    ks_future_util::repeat_periodic(
+        ks_apartment::default_mta(), fn, 0, 100)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
@@ -215,22 +215,17 @@ void test_repetitive() {
 
     std::atomic<int> sn = { 0 };
 
-    auto produce_fn = [p_sn = &sn]() -> ks_future<int> {
+    auto fn = [p_sn = &sn]() -> ks_result<void> {
         int sn = ++(*p_sn);
-        if (sn <= 5)
-            return ks_future<int>::resolved(sn);
-        else
-            return ks_future<int>::rejected(ks_error::eof_error());
-    };
-
-    auto consume_fn = [](const int& sn) -> ks_future<void> {
         std::cout << sn << " ";
-        return ks_future<void>::resolved();
+        if (sn <= 5)
+            return nothing;
+        else
+            return ks_error::eof_error();
     };
 
-    ks_future_util::repetitive<int>(
-        ks_apartment::default_mta(), produce_fn, 
-        ks_apartment::default_mta(), consume_fn)
+    ks_future_util::repeat(
+        ks_apartment::default_mta(), fn)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();

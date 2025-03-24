@@ -46,6 +46,11 @@ public: //resolved, rejected
 		return ks_future<T>::rejected(error);
 	}
 
+	template <class T>
+	static ks_future<T> __from_result(const ks_result<T>& result) {
+		return ks_future<T>::__from_result(result);
+	}
+
 public: //post, post_delayed, post_pending
 	template <class T, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T()>> || 
@@ -205,21 +210,43 @@ private:
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
-public: //periodic, repetitive
-	static ks_future<void> periodic(
-		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
-		int64_t interval, int64_t first_delay = 0,
+public: //repeat, repeat_periodic, repeat_repetitive
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
+	static ks_future<void> repeat(
+		ks_apartment* apartment, FN&& fn,
+		const ks_async_context& context = {}) {
+
+		//repeat可以简单地变换为repeat_repetitive，一个空的produce，后接fn
+		return ks_future_util::repeat_repetitive<nothing_t>(
+			apartment, []() -> nothing_t { return nothing; },
+			apartment, [fn = std::forward<FN>(fn)](const nothing_t&) -> auto { return fn(); },
+			context);
+	}
+
+	template <class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
+	static ks_future<void> repeat_periodic(
+		ks_apartment* apartment, FN&& fn, 
+		int64_t delay, int64_t interval,
 		const ks_async_context& context = {}) {
 
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::default_mta();
 
+		if (delay == 0 && interval == 0) {
+			//如果delay和interval都为0，则等价于repeat
+			return ks_future_util::repeat(apartment, fn, context);
+		}
+
 		std::shared_ptr<__periodic_data_t> data = std::make_shared<__periodic_data_t>();
 		data->apartment = apartment;
-		data->fn = std::move(fn);
+		data->fn = __wrap_async_fn_0<void>(std::forward<FN>(fn));
+		data->delay = delay;
 		data->interval = interval;
-		data->first_delay = first_delay;
 		data->context = context;
 		data->create_time = std::chrono::steady_clock::now();
 		data->raw_final_promise_void = ks_raw_promise::create(apartment);
@@ -235,15 +262,22 @@ public: //periodic, repetitive
 			},
 			make_async_context().set_priority(0x10000), apartment);
 
-		__schedule_periodic_once(data, first_delay);
+		__schedule_periodic_once(data, delay);
 
 		return ks_future<void>::__from_raw(data->raw_final_promise_void->get_future());
 	}
 
-	template <class V>
-	static ks_future<void> repetitive(
-		ks_apartment* produce_apartment, std::function<ks_future<V>()>&& produce_fn,
-		ks_apartment* consume_apartment, std::function<ks_future<void>(const V&)>&& consume_fn,
+	template <class V, class PRODUCE_FN, class CONSUME_FN, 
+		class __PRODUCE_FN_VERIFY__ = std::enable_if_t<
+			std::is_convertible_v<PRODUCE_FN, std::function<ks_result<V>()>> ||
+			std::is_convertible_v<PRODUCE_FN, std::function<ks_future<V>()>>>,
+		class __CONSUME_FN_VERIFY__ = std::enable_if_t <
+			std::is_convertible_v<CONSUME_FN, std::function<void(const V&)>> ||
+			std::is_convertible_v<CONSUME_FN, std::function<ks_result<void>(const V&)>> ||
+			std::is_convertible_v<CONSUME_FN, std::function<ks_future<void>(const V&)>>>>
+	static ks_future<void> repeat_repetitive(
+		ks_apartment* produce_apartment, PRODUCE_FN&& produce_fn,
+		ks_apartment* consume_apartment, CONSUME_FN&& consume_fn,
 		const ks_async_context& context = {}) {
 
 		ASSERT(produce_apartment != nullptr);
@@ -251,13 +285,13 @@ public: //periodic, repetitive
 		if (produce_apartment == nullptr)
 			produce_apartment = ks_apartment::default_mta();
 		if (consume_apartment == nullptr)
-			consume_apartment = ks_apartment::default_mta();
+			consume_apartment = ks_apartment::__virtual_inplace_apartment();
 
 		std::shared_ptr<__repetitive_data_t<V>> data = std::make_shared<__repetitive_data_t<V>>();
 		data->produce_apartment = produce_apartment;
 		data->consume_apartment = consume_apartment;
-		data->produce_fn = std::move(produce_fn);
-		data->consume_fn = std::move(consume_fn);
+		data->produce_fn = __wrap_async_fn_0<V>(std::forward<PRODUCE_FN>(produce_fn));
+		data->consume_fn = __wrap_async_fn_1<void, V>(std::forward<CONSUME_FN>(consume_fn));
 		data->context = context;
 		data->create_time = std::chrono::steady_clock::now();
 		data->raw_final_promise_void = ks_raw_promise::create(consume_apartment);
@@ -282,8 +316,8 @@ private:
 	struct __periodic_data_t {
 		ks_apartment* apartment;
 		std::function<ks_future<void>()> fn;
+		int64_t delay;
 		int64_t interval;
-		int64_t first_delay;
 		ks_async_context context;
 
 		std::chrono::steady_clock::time_point create_time{};
@@ -292,7 +326,7 @@ private:
 		ks_raw_promise_ptr raw_final_promise_void = nullptr;
 	};
 
-	static void __schedule_periodic_once(const std::shared_ptr<__periodic_data_t>& data, int64_t delay) {
+	static void __schedule_periodic_once(const std::shared_ptr<__periodic_data_t>& data, int64_t next_delay) {
 		ks_future_util
 			::post_delayed<void>(
 				data->apartment,
@@ -302,7 +336,7 @@ private:
 					else
 						return nothing;
 				},
-				delay, data->context)
+				next_delay, data->context)
 			.on_completion(
 				data->apartment,
 				[data](const ks_result<void>& schedule_result) {
@@ -316,17 +350,15 @@ private:
 			data->raw_final_promise_void->try_complete(__last_error_to_raw_result_void(schedule_result.to_error()));
 			return;
 		}
-		ks_future_util
-			::post<void>(data->apartment, data->fn);
 
 		ks_future_util
 			::post<void>(data->apartment, data->fn)
 			.on_success(
-				data->apartment, 
+				data->apartment,
 				[data]() {
 					data->rounds++;
 					const std::chrono::steady_clock::time_point now_time = std::chrono::steady_clock::now();
-					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds(data->first_delay + data->interval * data->rounds);
+					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds(data->delay + data->interval * data->rounds);
 					const int64_t next_delay = std::chrono::duration_cast<std::chrono::milliseconds>(next_time - now_time).count();
 					__schedule_periodic_once(data, next_delay);
 				},
@@ -364,7 +396,7 @@ private:
 						return ks_future<V>::rejected(ks_error::cancelled_error());
 					ks_future<V> fut = data->produce_fn();
 					ASSERT(fut.is_valid());
-					if (!fut.is_valid()) 
+					if (!fut.is_valid())
 						fut = ks_future<V>::rejected(ks_error::unexpected_error());
 					return fut;
 				},
@@ -381,24 +413,107 @@ private:
 					return fut;
 				},
 				data->context)
-			.on_completion(
-				data->consume_apartment,
-				[data](const ks_result<void>& result) {
-					if (result.is_value()) {
-						data->rounds++;
-						__pump_repetitive_once<V>(data);
-					}
-					else {
-						ks_error error = result.to_error();
-						if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
-							data->raw_final_promise_void->resolve(ks_raw_value::of(nothing));
-						else
-							data->raw_final_promise_void->reject(error);
-					}
-				},
-				make_async_context().set_priority(0x10000));
+					.on_completion(
+						data->consume_apartment,
+						[data](const ks_result<void>& result) {
+							if (result.is_value()) {
+								data->rounds++;
+								__pump_repetitive_once<V>(data);
+							}
+							else {
+								ks_error error = result.to_error();
+								if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
+									data->raw_final_promise_void->resolve(ks_raw_value::of(nothing));
+								else
+									data->raw_final_promise_void->reject(error);
+							}
+						},
+						make_async_context().set_priority(0x10000));
 	}
 
+private:
+	template <class T, class FN>
+	static std::function<ks_future<T>()> __wrap_async_fn_0(FN&& fn) {
+		constexpr int ret_mode =
+			std::is_void_v<std::invoke_result_t<FN>> ? -1 :
+			std::is_convertible_v<std::invoke_result_t<FN>, ks_future<T>> ? 3 :
+			std::is_convertible_v<std::invoke_result_t<FN>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN>, T> ? 1 : 0;
+		static_assert(ret_mode != 0, "illegal async-fn's ret");
+		return __wrap_async_fn_0_by_ret<T>(std::forward<FN>(fn), std::integral_constant<int, ret_mode>());
+	}
+
+	template <class T, class FN>
+	static std::function<ks_future<void>()> __wrap_async_fn_0_by_ret(FN&& fn, std::integral_constant<int, -1>) {
+		return[fn = std::forward<FN>(fn)]() -> ks_future<void> {
+			fn();
+			return ks_future<void>::resolved(nothing);
+		};
+	}
+	template <class T, class FN>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_ret(FN&& fn, std::integral_constant<int, 1>) {
+		return[fn = std::forward<FN>(fn)]()->ks_future<T> {
+			T value = fn();
+			return ks_future<T>::resolved(std::move(value));
+		};
+	}
+	template <class T, class FN>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_ret(FN&& fn, std::integral_constant<int, 2>) {
+		return[fn = std::forward<FN>(fn)]()->ks_future<T> {
+			ks_result<T> result = fn();
+			return ks_future<T>::__from_result(result);
+		};
+	}
+	template <class T, class FN>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_ret(FN&& fn, std::integral_constant<int, 3>) {
+		return[fn = std::forward<FN>(fn)]()->ks_future<T> {
+			ks_future<T> future = fn();
+			return future;
+		};
+	}
+
+private:
+	template <class T, class ARG1, class FN>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1(FN&& fn) {
+		constexpr int ret_mode =
+			std::is_void_v<std::invoke_result_t<FN, const ARG1&>> ? -1 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ARG1&>, ks_future<T>> ? 3 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ARG1&>, ks_result<T>> ? 2 :
+			std::is_convertible_v<std::invoke_result_t<FN, const ARG1&>, T> ? 1 : 0;
+		static_assert(ret_mode != 0, "illegal async-fn's ret");
+		return __wrap_async_fn_1_by_ret<T, ARG1>(std::forward<FN>(fn), std::integral_constant<int, ret_mode>());
+	}
+
+	template <class T, class ARG1, class FN>
+	static std::function<ks_future<void>(const ARG1&)> __wrap_async_fn_1_by_ret(FN&& fn, std::integral_constant<int, -1>) {
+		return[fn = std::forward<FN>(fn)](const ARG1& arg1)->ks_future<void> {
+			fn(arg1);
+			return ks_future<void>::resolved(nothing);
+		};
+	}
+	template <class T, class ARG1, class FN>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_ret(FN&& fn, std::integral_constant<int, 1>) {
+		return[fn = std::forward<FN>(fn)](const ARG1& arg1)->ks_future<T> {
+			T value = fn(arg1);
+			return ks_future<T>::resolved(std::move(value));
+		};
+	}
+	template <class T, class ARG1, class FN>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_ret(FN&& fn, std::integral_constant<int, 2>) {
+		return[fn = std::forward<FN>(fn)](const ARG1& arg1)->ks_future<T> {
+			ks_result<T> result = fn(arg1);
+			return ks_future<T>::__from_result(result);
+		};
+	}
+	template <class T, class ARG1, class FN>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_ret(FN&& fn, std::integral_constant<int, 3>) {
+		return[fn = std::forward<FN>(fn)](const ARG1& arg1)->ks_future<T> {
+			ks_future<T> future = fn(arg1);
+			return future;
+		};
+	}
+
+private:
 	static ks_raw_result __last_error_to_raw_result_void(const ks_error& error) {
 		if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
 			return ks_raw_value::of(nothing);

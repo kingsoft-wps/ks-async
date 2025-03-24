@@ -35,6 +35,7 @@ protected:
 public:
 	KS_ASYNC_API static ks_raw_future_ptr resolved(const ks_raw_value& value, ks_apartment* apartment);
 	KS_ASYNC_API static ks_raw_future_ptr rejected(const ks_error& error, ks_apartment* apartment);
+	KS_ASYNC_API static ks_raw_future_ptr __from_result(const ks_raw_result& result, ks_apartment* apartment);
 
 	KS_ASYNC_API static ks_raw_future_ptr post(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment);
 	KS_ASYNC_API static ks_raw_future_ptr post_delayed(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment, int64_t delay);

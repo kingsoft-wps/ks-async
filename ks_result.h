@@ -33,7 +33,9 @@ public:
 	ks_result& operator=(const ks_result&) = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
 
-	static ks_result __bare() { return ks_result(__raw_ctor::v); }
+	static ks_result<T> __bare() { return ks_result(__raw_ctor::v); }
+	static ks_result<T> __either(const T& value, const ks_error& error) { return error.get_code() == 0 ? ks_result<T>(value) : ks_result<T>(error); }
+	static ks_result<T> __either(const T* value, const ks_error* error) { return value != nullptr && (error == nullptr || error->get_code() == 0) ? ks_result<T>(*value) : (error != nullptr ? ks_result<T>(*error) : ks_result<T>::__bare()); }
 
 	using value_type = T;
 	using this_result_type = ks_result<T>;

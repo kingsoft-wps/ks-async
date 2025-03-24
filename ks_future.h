@@ -58,6 +58,12 @@ public: //resolved, rejected
 		return ks_future<T>::__from_raw(raw_future);
 	}
 
+	static ks_future<T> __from_result(const ks_result<T>& result) {
+		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_raw_future_ptr raw_future = ks_raw_future::__from_result(result.__get_raw(), apartment_hint);
+		return ks_future<T>::__from_raw(raw_future);
+	}
+
 public: //post, post_delayed, post_pending
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T()>> ||

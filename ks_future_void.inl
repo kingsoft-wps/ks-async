@@ -40,6 +40,12 @@ public: //resolved, rejected
 		return ks_future<nothing_t>::rejected(error).template cast<void>();
 	}
 
+	static ks_future<void> __from_result(const ks_result<void>& result) {
+		ks_apartment* apartment_hint = ks_apartment::default_mta();
+		ks_raw_future_ptr raw_future = ks_raw_future::__from_result(result.__get_raw(), apartment_hint);
+		return ks_future<void>::__from_raw(raw_future);
+	}
+
 private: //__wrap_task_fn
 	template <class FN>
 	static auto __wrap_task_fn(FN&& task_fn) {

@@ -1053,6 +1053,14 @@ ks_raw_future_ptr ks_raw_future::rejected(const ks_error& error, ks_apartment* a
 	return promise_future;
 }
 
+ks_raw_future_ptr ks_raw_future::__from_result(const ks_raw_result& result, ks_apartment* apartment) {
+	ASSERT(result.is_completed());
+	auto promise_future = std::make_shared<ks_raw_promise_future>(ks_raw_future_mode::DX, apartment);
+	promise_future->do_complete(result.is_completed() ? result : ks_raw_result(ks_error::unexpected_error()), nullptr, false);
+	return promise_future;
+}
+
+
 ks_raw_future_ptr ks_raw_future::post(function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment) {
 	auto task_future = std::make_shared<ks_raw_task_future>(ks_raw_future_mode::TASK, apartment, std::move(task_fn), context, 0);
 	task_future->submit();
