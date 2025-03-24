@@ -1,6 +1,7 @@
 ﻿#include "ks_raw_async_flow.h"
 #include "ks_raw_internal_helper.h"
-#include "../ks_async_flow.h" //for flow_promise_ext
+#include "../ks_async_flow.h" //for flow_promise_wrapped
+#include <cstring>
 
 __KS_ASYNC_RAW_BEGIN
 

@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "ks_single_thread_apartment_imp.h"
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #if defined(_WIN32)
 #	include <Windows.h>
