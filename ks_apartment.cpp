@@ -19,6 +19,13 @@ limitations under the License.
 #include <thread>
 #include <map>
 
+#if defined(_WIN32)
+#	include <Windows.h>
+#else
+#	include <pthread.h>
+#endif
+
+
 void __forcelink_to_ks_apartment_cpp() {}
 
 
@@ -184,4 +191,18 @@ void ks_apartment::__unregister_public_apartment(const char* name, ks_apartment*
 			g_public_apartment_map.erase(it);
 		}
 	}
+}
+
+void ks_apartment::__native_set_current_thread_name(const char* thread_name) {
+#if defined(_WIN32)
+	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
+	static PFN_SetThreadDescription __pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
+	ASSERT(__pfnSetThreadDescription != nullptr);
+	if (__pfnSetThreadDescription != nullptr)
+		__pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name, thread_name + strlen(thread_name)).c_str());
+#elif defined(__APPLE__)
+	pthread_setname_np(thread_name);
+#else
+	pthread_setname_np(pthread_self(), thread_name);
+#endif
 }

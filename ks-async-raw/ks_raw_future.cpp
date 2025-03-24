@@ -19,8 +19,26 @@ limitations under the License.
 #include "../ktl/ks_concurrency.h"
 #include <algorithm>
 #include <set>
+
 #if __KS_APARTMENT_ATFORK_ENABLED
-#include <unistd.h>
+#	if defined(_WIN32)
+#		include <Windows.h>
+#		include <processthreadsapi.h>
+		using __native_pid_t = DWORD;
+		static inline __native_pid_t __native_get_current_pid() { return ::GetCurrentProcessId(); }
+#	elif defined(__APPLE__)
+#		include <sys/proc.h>
+		using __native_pid_t = int;
+		static inline __native_pid_t __native_get_current_pid() { return proc_selfpid(); }
+#	else
+#		include <unistd.h>
+		using __native_pid_t = pid_t;
+		static inline __native_pid_t __native_get_current_pid() { return getpid(); }
+
+#	endif
+#else
+	using __native_pid_t = int;
+	static inline __native_pid_t __native_get_current_pid() { return nullptr; }
 #endif
 
 template <class FN>
@@ -45,10 +63,7 @@ enum class ks_raw_future_mode {
 class ks_raw_future_baseimp : public ks_raw_future, public std::enable_shared_from_this<ks_raw_future> {
 protected:
 	explicit ks_raw_future_baseimp(ks_raw_future_mode mode, bool cancelable, ks_apartment* spec_apartment, const ks_async_context& living_context)
-		: m_spec_apartment(spec_apartment), m_create_time(std::chrono::steady_clock::now()), m_living_context(living_context)
-#if __KS_APARTMENT_ATFORK_ENABLED
-		, m_belong_pid(getpid())
-#endif
+		: m_spec_apartment(spec_apartment), m_create_time(std::chrono::steady_clock::now()), m_belong_pid(__native_get_current_pid()), m_living_context(living_context)
 		, m_mode(mode), m_cancelable(cancelable), m_living_context_controller_available_v(living_context.__is_controller_present()) {}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future_baseimp);
@@ -169,13 +184,7 @@ protected:
 			if (m_completed_result.is_completed())
 				return true;
 
-			bool should_completed_cv_wait = true;
-#if __KS_APARTMENT_ATFORK_ENABLED
-			if (m_belong_pid != getpid())
-				should_completed_cv_wait = false;
-#endif
-			
-			if (should_completed_cv_wait) {
+			if (m_belong_pid == __native_get_current_pid()) {
 				++m_completed_result_cv_waiting_rc;
 				while (!m_completed_result.is_completed()) {
 					m_completed_result_cv.wait(lock);
@@ -281,18 +290,7 @@ protected:
 		m_completed_result = result.require_completed_or_error();
 		m_completed_prefer_apartment = prefer_apartment;
 
-		bool should_completed_cv_notify = true;
-		if (m_completed_result_cv_waiting_rc == 0) {
-			should_completed_cv_notify = false;
-		}
-		else {
-#if __KS_APARTMENT_ATFORK_ENABLED
-			if (m_belong_pid != getpid())
-				should_completed_cv_notify = false;
-#endif
-		}
-
-		if (should_completed_cv_notify) {
+		if (m_completed_result_cv_waiting_rc != 0 && m_belong_pid == __native_get_current_pid()) {
 			m_completed_result_cv.notify_all();
 		}
 
@@ -428,9 +426,7 @@ protected:
 	//const bool m_cancelable;  //const-like  //被移动位置，使内存更紧凑
 	const std::add_const_t<ks_apartment*> m_spec_apartment;  //const-like
 	const std::chrono::steady_clock::time_point m_create_time;  //const-like
-#if __KS_APARTMENT_ATFORK_ENABLED
-	const pid_t m_belong_pid;  //const-like
-#endif
+	const __native_pid_t m_belong_pid;  //const-like
 
 	ks_mutex m_mutex;
 
@@ -510,7 +506,6 @@ protected:
 	virtual bool is_with_upstream_future() override {
 		return false;
 	}
-
 };
 
 

@@ -100,4 +100,6 @@ protected:
 
 	KS_ASYNC_API static void __register_public_apartment(const char* name, ks_apartment* apartment);
 	KS_ASYNC_API static void __unregister_public_apartment(const char* name, ks_apartment* apartment);
+
+	KS_ASYNC_API static void __native_set_current_thread_name(const char* thread_name);
 };

@@ -18,13 +18,6 @@ limitations under the License.
 #include <thread>
 #include <algorithm>
 #include <sstream>
-#include <cstring>
-#include <string.h>
-#if defined(_WIN32)
-#	include <Windows.h>
-#else
-#	include <pthread.h>
-#endif
 
 void __forcelink_to_ks_single_thread_apartment_imp_cpp() {}
 
@@ -272,17 +265,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 	if (true) {
 		std::stringstream thread_name_ss;
 		thread_name_ss << d->name << "(sta)'s thread";
-		std::string thread_name = thread_name_ss.str();
-#if defined(_WIN32)
-		typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
-		static PFN_SetThreadDescription _pfnSetThreadDescription = (PFN_SetThreadDescription)::GetProcAddress(::GetModuleHandleW(L"Kernel32.dll"), "SetThreadDescription");
-		if (_pfnSetThreadDescription != nullptr) 
-			_pfnSetThreadDescription(::GetCurrentThread(), std::wstring(thread_name.cbegin(), thread_name.cend()).c_str());
-#elif defined(__APPLE__)
-		pthread_setname_np(thread_name.c_str());
-#else
-		pthread_setname_np(pthread_self(), thread_name.c_str());
-#endif
+		ks_apartment::__native_set_current_thread_name(thread_name_ss.str().c_str());
 	}
 
 	while (true) {
