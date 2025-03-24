@@ -281,7 +281,7 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(ks_thread_pool_apartment_imp
 	tls_current_now_thread_sn = thread_sn;
 
 	std::stringstream thread_name_ss;
-	thread_name_ss << "mta-thread of: " << d->name << " (work-" << thread_sn << "/" << d->max_thread_count << ")";
+	thread_name_ss << d->name << "(mta)'s thread [worker: " << thread_sn << "/" << d->max_thread_count << "]";
 	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
@@ -376,7 +376,7 @@ void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(ks_th
 
 void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d) {
 	std::stringstream thread_name_ss;
-	thread_name_ss << "mta-thread of: " << d->name << " (timer)";
+	thread_name_ss << d->name << "(mta)'s thread [timer]";
 	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
@@ -485,46 +485,6 @@ void ks_thread_pool_apartment_imp::_do_put_fn_item_into_delaying_list_locked(con
 		//参见_thread_proc中对于delayed的调度算法。
 		d->delaying_fn_queue_cv.notify_one();
 	}
-}
-
-
-bool ks_thread_pool_apartment_imp::__try_pump_once() {
-	ASSERT(ks_apartment::current_thread_apartment() == this);
-
-	std::unique_lock<ks_mutex> lock(m_d->mutex);
-
-	//try next now_fn
-	//注：主动泵不必去执行idle任务
-	auto* now_fn_queue_sel = !m_d->now_fn_queue_prior.empty() ? &m_d->now_fn_queue_prior : &m_d->now_fn_queue_normal;
-	if (now_fn_queue_sel->empty()) 
-		return false; //check stop, end
-
-	//pop and exec a fn
-	_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
-	now_fn_queue_sel->pop_front();
-
-	//++m_d->busy_thread_count;
-	//if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-	//	++m_d->busy_thread_count_for_idle;
-	lock.unlock();
-
-	//try {
-		now_fn_item.fn();
-	//}
-	//catch (...) {
-	//	//TODO dump exception ...
-	//	ASSERT(false);
-	//	//abort();
-	//	throw;
-	//}
-
-	//注：无事待做，无需重锁
-	//lock.lock();
-	//--m_d->busy_thread_count;
-	//if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-	//	--m_d->busy_thread_count_for_idle;
-
-	return true;
 }
 
 

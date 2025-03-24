@@ -24,11 +24,10 @@ void __forcelink_to_ks_apartment_cpp() {}
 
 static ks_apartment* g_ui_sta = nullptr;
 static ks_apartment* g_master_sta = nullptr;
-
-static ks_mutex g_public_apartment_mutex = {};
-static std::unordered_map<std::string, ks_apartment*> g_public_apartment_map = {};
-
 static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
+
+static ks_mutex g_public_apartment_mutex {};
+static std::unordered_map<std::string, ks_apartment*> g_public_apartment_map {};
 
 static size_t g_default_mta_max_thread_count = 0;
 
@@ -114,6 +113,12 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 }
 
 
+void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
+	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
+	g_default_mta_max_thread_count = max_thread_count;
+}
+
+
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
 	ASSERT(ui_sta != nullptr && (ui_sta->features() & sequential_feature) != 0);
 	ASSERT(g_ui_sta == nullptr || g_ui_sta == ui_sta);
@@ -174,16 +179,4 @@ void ks_apartment::__unregister_public_apartment(const char* name, ks_apartment*
 			g_public_apartment_map.erase(it);
 		}
 	}
-}
-
-
-void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
-	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
-	g_default_mta_max_thread_count = max_thread_count;
-}
-
-bool ks_apartment::__try_pump_current_thread_apartment_once() {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	ASSERT(cur_apartment != nullptr);
-	return cur_apartment->__try_pump_once();
 }

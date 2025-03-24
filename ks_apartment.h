@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "ks_async_base.h"
 #include "ktl/ks_functional.h"
+#include "ktl/ks_concurrency.h"
 
 
 class ks_apartment {
@@ -42,7 +43,7 @@ public:
 
 public:
 	enum { //feature consts
-		sequential_feature = 0x01,
+		sequential_feature  = 0x01,
 	};
 
 public:
@@ -61,6 +62,7 @@ public:
 	//注：schedule方法的uint返回值代表异步过程的id，且成功时要求返回一个“非零值”，后续可被用于try_unschedule调用传参。
 	virtual uint64_t schedule(std::function<void()>&& fn, int priority) = 0;
 	virtual uint64_t schedule_delayed(std::function<void()>&& fn, int priority, int64_t delay) = 0;
+
 	//注：try_unschedule方法会尝试取消指定的异步过程，其前提是指定的异步过程还未开始执行，若已开始（甚至已完成）则不会再被取消了。
 	virtual void try_unschedule(uint64_t id) = 0;
 
@@ -69,13 +71,14 @@ public:
 	virtual void atfork_parent() { ASSERT(false); }
 	virtual void atfork_child() { ASSERT(false); }
 
-protected:
-	//注：主动泵下一条异步任务。
-	virtual bool __try_pump_once() { ASSERT(false); return false; }
-
 public:
+	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用
+	KS_ASYNC_API static void __set_default_mta_max_thread_count(size_t max_thread_count);
+
+protected:
 	//注：ui_sta和master_sta由APP框架提供。
 	//注意：current_thread_apartment是TLS变量，各色套间线程实现者务必对其进行正确初始化。
+	//以下方法仅被各ks_apartment的派生类内部调用。
 	KS_ASYNC_API static void __set_ui_sta(ks_apartment* ui_sta);
 	KS_ASYNC_API static void __set_master_sta(ks_apartment* master_sta);
 	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
@@ -86,10 +89,4 @@ public:
 
 	KS_ASYNC_API static void __register_public_apartment(const char* name, ks_apartment* apartment);
 	KS_ASYNC_API static void __unregister_public_apartment(const char* name, ks_apartment* apartment);
-
-public:
-	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用
-	KS_ASYNC_API static void __set_default_mta_max_thread_count(size_t max_thread_count);
-	//注：主动泵当前线程所属套间的下一条异步任务
-	KS_ASYNC_API static bool __try_pump_current_thread_apartment_once();
 };

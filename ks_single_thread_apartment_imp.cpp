@@ -275,7 +275,7 @@ void ks_single_thread_apartment_imp::_single_thread_proc(ks_single_thread_apartm
 	ks_apartment::__tls_set_current_thread_apartment(self);
 
 	std::stringstream thread_name_ss;
-	thread_name_ss << "sta-thread of: " << d->name << " (sole)";
+	thread_name_ss << d->name << "(sta)'s thread";
 	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT (WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
@@ -417,39 +417,6 @@ bool ks_single_thread_apartment_imp::_debug_check_fn_id_exists_locked(const std:
 		|| do_check_fn_exists(&d->now_fn_queue_normal, id)
 		|| do_check_fn_exists(&d->now_fn_queue_idle, id)
 		|| do_check_fn_exists(&d->delaying_fn_queue, id);
-}
-
-
-bool ks_single_thread_apartment_imp::__try_pump_once() {
-	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	ASSERT(ks_apartment::current_thread_apartment() == this);
-
-	//try next now_fn
-	//注：主动泵不必去执行idle任务
-	auto* now_fn_queue_sel = !m_d->now_fn_queue_prior.empty() ? &m_d->now_fn_queue_prior : &m_d->now_fn_queue_normal;
-	if (now_fn_queue_sel->empty()) 
-		return false; //check stop, end
-
-	//pop and exec a fn
-	_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
-	now_fn_queue_sel->pop_front();
-
-	lock.unlock();
-
-	//try {
-		now_fn_item.fn();
-	//}
-	//catch (...) {
-	//	//TODO dump exception ...
-	//	ASSERT(false);
-	//	//abort();
-	//	throw;
-	//}
-
-	//注：无事待做，无需重锁
-	//lock.lock();
-
-	return true;
 }
 
 
