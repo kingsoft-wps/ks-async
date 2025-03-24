@@ -328,20 +328,18 @@ static ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_fu
 ```C++
 	template <class T>
 	static ks_future<void> repetitive(
-		function<ks_future<T>()>&& producer,
-		function<ks_future<void>(const T&)>&& consumer,
-		ks_apartment* producer_apartment = ks_apartment::default_mta(),
-		ks_apartment* consumer_apartment = ks_apartment::default_mta(),
+		ks_apartment* producer_apartment, function<ks_future<T>()>&& producer_fn,
+		ks_apartment* consumer_apartment, function<ks_future<void>(const T&)>&& consumer_fn,
 		const ks_async_context& context = {});
 ```
 #### 描述：反复迭代一个异步的produce-consume过程，直至出现 “错误”。
 #### 模板参数：
   -- T: producer产生的、以及consumer消费的数据类型。
 #### 参数：
-  - producer: 生产者异步函数。
-  - consumer: 消费者异步函数。
-  - producer_apartment: 指定生产者执行套间。
-  - consumer_apartment: 指定消费者执行套间。
+  - producer_apartment: 生产者执行套间。
+  - producer_fn: 生产者异步函数。
+  - consumer_apartment: 消费者执行套间。
+  - consumer_fn: 消费者异步函数。
   - context: 异步任务执行时所需上下文。
 #### 返回值：代表迭代结束的一个future，因迭代过程是出现 “错误” 时结束，故返回的future的最终状态必为 “错误”。
 <br>

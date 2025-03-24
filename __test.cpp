@@ -204,7 +204,7 @@ void test_repetitive() {
         return ks_future<void>::resolved();
     };
 
-    ks_future_util::repetitive<int>(producer, consumer)
+    ks_future_util::repetitive<int>(ks_apartment::default_mta(), producer, ks_apartment::default_mta(), consumer)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
