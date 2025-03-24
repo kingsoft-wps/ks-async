@@ -32,12 +32,14 @@ public:
 		ks_apartment* apartment,
 		std::function<ks_raw_result(const ks_raw_async_flow_ptr& flow)>&& fn,
 		const ks_async_context& context,
+		bool need_apply_value = true,
 		const std::type_info* value_typeinfo = nullptr);
 	KS_ASYNC_API bool add_flat_task(
 		const char* name_and_dependencies,
 		ks_apartment* apartment,
 		std::function<ks_raw_future_ptr(const ks_raw_async_flow_ptr& flow)>&& fn,
 		const ks_async_context& context,
+		bool need_apply_value = true,
 		const std::type_info* value_typeinfo = nullptr);
 
 public:
@@ -48,6 +50,10 @@ public:
 	KS_ASYNC_API uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
 
 	KS_ASYNC_API bool remove_observer(uint64_t id);
+
+public:
+	KS_ASYNC_API ks_raw_value get_value(const char* name);
+	KS_ASYNC_API void set_value(const char* name, const ks_raw_value& value);
 
 public:
 	KS_ASYNC_API bool start();
@@ -65,13 +71,6 @@ public:
 
 	KS_ASYNC_API bool is_flow_completed();
 	KS_ASYNC_API bool is_task_completed(const char* task_name);
-
-	KS_ASYNC_API ks_raw_result get_task_result(const char* task_name, const std::type_info* value_typeinfo = nullptr);
-	KS_ASYNC_API ks_raw_value get_task_value(const char* task_name, const std::type_info* value_typeinfo = nullptr);
-	KS_ASYNC_API ks_error get_task_error(const char* task_name);
-
-	KS_ASYNC_API void set_user_data(const char* key, const ks_any& value);
-	KS_ASYNC_API ks_any get_user_data(const char* key);
 
 	KS_ASYNC_API ks_error get_last_error();
 	KS_ASYNC_API std::string get_failed_task_name();
@@ -102,6 +101,7 @@ private:
 		std::string task_name; //const-like
 		std::vector<std::string> task_dependencies; //const-like
 		ks_apartment* task_apartment; //const-like
+		bool need_apply_value; //const-like
 		const std::type_info* task_value_typeinfo; //const-like
 
 		int task_level = 0;
@@ -112,7 +112,7 @@ private:
 
 		ks_raw_result task_pending_arg_void;
 		ks_raw_promise_ptr task_trigger_void;
-		ks_raw_result task_result{}; //result<T>
+		ks_raw_result task_result{}; //ks_result<T>
 
 		ks_raw_promise_ptr task_promise_opt = nullptr;
 	};
@@ -159,7 +159,7 @@ private:
 	std::unordered_map<uint64_t, std::shared_ptr<_TASK_OBSERVER_ITEM>> m_task_observer_map{};
 	std::atomic<uint64_t> m_last_x_observer_id = { 0 };
 
-	std::unordered_map<std::string, ks_any> m_user_data_map{};
+	std::unordered_map<std::string, ks_raw_value> m_raw_value_map{};
 
 	size_t m_not_start_task_count = 0;
 	size_t m_pending_task_count = 0;

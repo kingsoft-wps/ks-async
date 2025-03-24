@@ -8,17 +8,16 @@
 <br>
 
 
-# 静态成员方法
+# 一般成员方法
 
 ```C++
-static ks_async_flow ks_async_flow();
+void set_default_apartment(ks_apartment* apartment);
+void set_j(size_t j);
 ```
-#### 描述：创建一个实例。
+#### 描述：设置各种选项。
 <br>
 <br>
 
-
-# 一般成员方法
 
 ```C++
 bool add_task<T>(
@@ -52,6 +51,16 @@ bool remove_observer(uint64_t id);
 
 
 ```C++
+T get_value<T>(const char* name);
+void set_value<T>(const char* name, const T& value);
+```
+#### 描述：设置/获取named-value。
+#### 特别说明：get_value方法也用于获取task的结果值。
+<br>
+<br>
+
+
+```C++
 bool start();
 void try_cancel();
 ```
@@ -71,21 +80,6 @@ bool is_task_completed(const char* task_name);
 <br>
 
 ```C++
-ks_result<T> get_task_result<T>(const char* task_name);
-T get_task_value<T>(const char* task_name);
-ks_error get_task_error(const char* task_name);
-```
-#### 描述：获取任务结果。
-<br>
-
-```C++
-void set_user_data(const char* key, const T& value);
-T get_user_data(const char* key);
-```
-#### 描述：设置/获取user-data。
-<br>
-
-```C++
 ks_error get_last_error();
 std::string get_failed_task_name();
 ```
@@ -99,13 +93,3 @@ ks_future<ks_async_flow> get_flow_future();
 #### 描述：获得代表task或flow的一个future。
 <br>
 <br>
-
-
-```C++
-void set_default_apartment(ks_apartment* apartment);
-void set_j(size_t j);
-```
-#### 描述：设置选项。
-<br>
-<br>
-

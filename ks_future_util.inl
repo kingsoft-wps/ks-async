@@ -33,6 +33,10 @@ private:
 
 public: //resolved, rejected
 	template <class T, class X = T, class _ = std::enable_if_t<std::is_void_v<T> ? std::is_nothing_v<X> : std::is_convertible_v<X, T>>>
+	static ks_future<T> resolved(const X& value) {
+		return ks_future<T>::resolved(value);
+	}
+	template <class T, class X = T, class _ = std::enable_if_t<std::is_void_v<T> ? std::is_nothing_v<X> : std::is_convertible_v<X, T>>>
 	static ks_future<T> resolved(X&& value) {
 		return ks_future<T>::resolved(std::forward<X>(value));
 	}

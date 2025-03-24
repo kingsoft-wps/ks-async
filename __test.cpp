@@ -374,6 +374,9 @@ void test_async_flow() {
     bool b;
     uint64_t id;
 
+    flow.set_value<int>("v1", 1);
+    ASSERT(flow.get_value<int>("v1") == 1);
+
     b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
         return "a1-tasktask";
         });

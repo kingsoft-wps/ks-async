@@ -130,6 +130,7 @@ bool ks_raw_async_flow::add_task(
 	ks_apartment* apartment,
 	std::function<ks_raw_result(const ks_raw_async_flow_ptr& flow)>&& fn,
 	const ks_async_context& context,
+	bool need_apply_value,
 	const std::type_info* value_typeinfo) {
 	return this->add_flat_task(
 		name_and_dependencies,
@@ -143,6 +144,7 @@ bool ks_raw_async_flow::add_task(
 				return ks_raw_future::rejected(result.to_error(), ks_apartment::current_thread_apartment());
 		},
 		context, 
+		need_apply_value,
 		value_typeinfo
 	);
 }
@@ -152,11 +154,12 @@ bool ks_raw_async_flow::add_flat_task(
 	ks_apartment* apartment,
 	std::function<ks_raw_future_ptr(const ks_raw_async_flow_ptr& flow)>&& fn,
 	const ks_async_context& context,
+	bool need_apply_value,
 	const std::type_info* value_typeinfo) {
 
 	if (name_and_dependencies == nullptr || name_and_dependencies[0] == 0) {
 		ASSERT(false);
-		return true;
+		return false;
 	}
 
 	const char* p_colon = strchr(name_and_dependencies, ':');
@@ -200,6 +203,7 @@ bool ks_raw_async_flow::add_flat_task(
 	task_item->task_name.swap(task_name);
 	task_item->task_dependencies.swap(task_dependencies);
 	task_item->task_apartment = apartment != nullptr ? apartment : m_default_apartment;
+	task_item->need_apply_value = need_apply_value;
 	task_item->task_value_typeinfo = value_typeinfo;
 
 	task_item->task_trigger_void = ks_raw_promise::create(task_item->task_apartment);
@@ -308,6 +312,24 @@ bool ks_raw_async_flow::remove_observer(uint64_t observer_id) {
 	if (m_task_observer_map.erase(observer_id) != 0)
 		return true;
 	return false;
+}
+
+
+ks_raw_value ks_raw_async_flow::get_value(const char* name) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+
+	auto it = m_raw_value_map.find(name);
+	if (it == m_raw_value_map.cend()) {
+		ASSERT(false);
+		throw std::runtime_error("no such named value");
+	}
+
+	return it->second;
+}
+
+void ks_raw_async_flow::set_value(const char* name, const ks_raw_value& value) {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+	m_raw_value_map[name] = value;
 }
 
 
@@ -449,100 +471,6 @@ bool ks_raw_async_flow::is_task_completed(const char* task_name) {
 
 	status_t task_status = it->second->task_status;
 	return task_status == status_t::succeeded || task_status == status_t::failed;
-}
-
-__ks_async_raw::ks_raw_result ks_raw_async_flow::get_task_result(const char* task_name, const std::type_info* value_typeinfo) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	auto it = m_task_map.find(task_name);
-	if (it == m_task_map.cend()) {
-		ASSERT(false);
-		return ks_raw_result();
-	}
-
-	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
-	ASSERT(value_typeinfo == nullptr || *task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
-
-	if (task_item->task_status != status_t::succeeded && task_item->task_status != status_t::failed) {
-		ASSERT(false);
-		return ks_raw_result();
-	}
-
-	const ks_raw_result& task_result = task_item->task_result;
-	if (!task_result.is_completed()) {
-		ASSERT(false);
-		return ks_raw_result();
-	}
-
-	return task_result;
-}
-
-ks_raw_value ks_raw_async_flow::get_task_value(const char* task_name, const std::type_info* value_typeinfo) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	auto it = m_task_map.find(task_name);
-	if (it == m_task_map.cend()) {
-		ASSERT(false);
-		throw std::runtime_error("no task");
-	}
-
-	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
-	ASSERT(value_typeinfo == nullptr || *task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
-
-	if (task_item->task_status != status_t::succeeded) {
-		ASSERT(false);
-		throw std::runtime_error("task not succeeded");
-	}
-
-	const ks_raw_result& task_result = task_item->task_result;
-	if (!task_result.is_value()) {
-		ASSERT(false);
-		throw std::runtime_error("task not value");
-	}
-
-	return task_result.to_value();
-}
-
-ks_error ks_raw_async_flow::get_task_error(const char* task_name) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	auto it = m_task_map.find(task_name);
-	if (it == m_task_map.cend()) {
-		ASSERT(false);
-		return ks_error();
-	}
-
-	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
-
-	if (task_item->task_status != status_t::failed) {
-		ASSERT(false);
-		return ks_error();
-	}
-
-	const ks_raw_result& task_result = task_item->task_result;
-	if (!task_result.is_error()) {
-		ASSERT(false);
-		return ks_error();
-	}
-
-	return task_result.to_error();
-}
-
-void ks_raw_async_flow::set_user_data(const char* key, const ks_any& value) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-	m_user_data_map[key] = value;
-}
-
-ks_any ks_raw_async_flow::get_user_data(const char* key) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	auto it = m_user_data_map.find(key);
-	if (it == m_user_data_map.cend()) {
-		ASSERT(false);
-		throw std::runtime_error("user data not found");
-	}
-
-	return it->second;
 }
 
 ks_error ks_raw_async_flow::get_last_error() {
@@ -761,6 +689,10 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	task_item->task_status = task_result.is_value() ? status_t::succeeded : status_t::failed;
 	task_item->task_result = task_result;
 
+	if (task_item->need_apply_value && task_result.is_value()) {
+		m_raw_value_map[task_item->task_name] = task_result.to_value();
+	}
+
 	if (task_result.is_error()) {
 		if (m_1st_failed_task_name.empty())
 			m_1st_failed_task_name = task_item->task_name;
@@ -977,7 +909,7 @@ void ks_raw_async_flow::do_force_cleanup_data_locked(std::unique_lock<ks_mutex>&
 	m_flow_observer_map.clear();
 	m_task_observer_map.clear();
 
-	m_user_data_map.clear();
+	m_raw_value_map.clear();
 
 	m_flow_promise_wrapped_weak.reset();
 	m_flow_promise_wrapped_keepper_until_completed.reset();

@@ -87,6 +87,19 @@ public:
 	}
 
 public:
+	template <class T, class X = T, class _ = std::enable_if_t<std::is_convertible_v<X, T>>>
+	void set_value(const char* name, const X& value) const {
+		ASSERT(this->is_valid());
+		return m_raw_flow->set_value(name, ks_raw_value::of<T>(value));
+	}
+
+	template <class T>
+	T get_value(const char* name) const {
+		ASSERT(this->is_valid());
+		return m_raw_flow->get_value(name).get<T>();
+	}
+
+public:
 	bool start() const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->start();
@@ -132,40 +145,6 @@ public:
 	bool is_task_completed(const char* task_name) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->is_task_running(task_name);
-	}
-
-	template <class T>
-	ks_result<T> get_task_result(const char* task_name) const {
-		ASSERT(this->is_valid());
-		ks_raw_result raw_result = m_raw_flow->get_task_result(task_name, __typeinfo_of<T>());
-		return ks_result<T>::__from_raw(raw_result);
-	}
-	template <class T>
-	T get_task_value(const char* task_name) const {
-		ASSERT(this->is_valid());
-		ks_raw_value raw_value = m_raw_flow->get_task_value(task_name, __typeinfo_of<T>());
-		return raw_value.get<T>();
-	}
-
-	ks_error get_task_error(const char* task_name) const {
-		ASSERT(this->is_valid());
-		return m_raw_flow->get_task_error(task_name);
-	}
-
-	template <class T>
-	void set_user_data(const char* key, const T& value) const {
-		ASSERT(this->is_valid());
-		return m_raw_flow->set_user_data(key, ks_any::of(value));
-	}
-	template <class T>
-	void set_user_data(const char* key, T&& value) const {
-		ASSERT(this->is_valid());
-		return m_raw_flow->set_user_data(key, ks_any::of(std::forward<T>(value)));
-	}
-	template <class T>
-	T get_user_data(const char* key) const {
-		ASSERT(this->is_valid());
-		return m_raw_flow->get_user_data(key).cast<T>();
 	}
 
 	ks_error get_last_error() const {
@@ -219,7 +198,7 @@ private:
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of<T>((fn(ks_async_flow::__from_raw(flow)), nothing)); },
-			context, value_typeinfo);
+			context, false, value_typeinfo);
 	}
 
 	template <class T>
@@ -231,7 +210,7 @@ private:
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of<T>(fn(ks_async_flow::__from_raw(flow))); },
-			context, value_typeinfo);
+			context, true, value_typeinfo);
 	}
 
 	template <class T>
@@ -243,7 +222,7 @@ private:
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return fn(ks_async_flow::__from_raw(flow)); },
-			context, value_typeinfo);
+			context, true, value_typeinfo);
 	}
 
 	template <class T>
@@ -255,7 +234,7 @@ private:
 		return m_raw_flow->add_flat_task(
 			name_and_dependencies, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_future_ptr { return fn(ks_async_flow::__from_raw(flow)).__get_raw(); },
-			context, value_typeinfo);
+			context, true, value_typeinfo);
 	}
 
 private:
