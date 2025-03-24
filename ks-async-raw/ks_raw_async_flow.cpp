@@ -2,6 +2,7 @@
 #include "ks_raw_internal_helper.h"
 #include "../ks_async_flow.h" //for flow_promise_wrapped
 #include <cstring>
+#include <string.h>
 
 __KS_ASYNC_RAW_BEGIN
 

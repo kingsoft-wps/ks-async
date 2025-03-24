@@ -17,9 +17,10 @@ limitations under the License.
 #include "ks_cxxbase.h"
 #include "ks_type_traits.h"
 #include <atomic>
-#include <cstring>
 #include <functional>
 #include <stdlib.h>
+#include <cstring>
+#include <string.h>
 
 #ifndef __KS_ANY_DEF
 #define __KS_ANY_DEF
