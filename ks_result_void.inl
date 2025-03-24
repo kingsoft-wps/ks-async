@@ -31,7 +31,7 @@ public:
 
 	static ks_result<void> __bare() { return ks_result(__raw_ctor::v); }
 	static ks_result<void> __either(const nothing_t& value, const ks_error& error) { return error.get_code() == 0 ? ks_result<void>(value) : ks_result<void>(error); }
-	static ks_result<void> __either(const nothing_t* value, const ks_error* error) { return value != nullptr && (error == nullptr || error->get_code() == 0) ? ks_result<void>(*value) : (error != nullptr ? ks_result<void>(*error) : ks_result<void>::__bare()); }
+	static ks_result<void> __either(const nothing_t* value, const ks_error* error) { return error == nullptr || error->get_code() == 0 ? (value != nullptr ? ks_result<void>(*value) : ks_result<void>::__bare()) : (error != nullptr ? ks_result<void>(*error) : ks_result<void>::__bare()); }
 
 	using value_type = void;
 	using this_result_type = ks_result<void>;
