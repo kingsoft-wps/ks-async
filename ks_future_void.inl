@@ -41,7 +41,7 @@ public: //resolved, rejected
 	}
 
 	static ks_future<void> __from_result(const ks_result<void>& result) {
-		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
 		ks_raw_future_ptr raw_future = ks_raw_future::__from_result(result.__get_raw(), apartment_hint);
 		return ks_future<void>::__from_raw(raw_future);
 	}

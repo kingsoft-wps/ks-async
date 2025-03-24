@@ -125,7 +125,7 @@ void ks_notification_center::__ks_notification_center_data::add_observer(const v
 	ASSERT(observer != nullptr);
 	ASSERT(apartment != nullptr);
 	if (apartment == nullptr)
-		apartment = ks_apartment::current_thread_apartment_or_master_sta();
+		apartment = ks_apartment::current_thread_apartment_or_default_mta();
 	if (notification_name == nullptr)
 		notification_name = "*";
 

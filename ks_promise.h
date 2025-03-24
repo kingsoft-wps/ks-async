@@ -41,7 +41,7 @@ public:
 
 public:
 	static ks_promise<T> create() {
-		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_master_sta();
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
 		ks_raw_promise_ptr raw_promise = ks_raw_promise::create(apartment_hint);
 		return ks_promise<T>::__from_raw(raw_promise);
 	}

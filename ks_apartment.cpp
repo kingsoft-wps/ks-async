@@ -51,11 +51,16 @@ ks_apartment* ks_apartment::default_mta() {
 		static size_t max_thread_count() {
 			size_t max_thread_count = g_default_mta_max_thread_count;
 			if (max_thread_count == 0) {
-				size_t cpu_count = (size_t)std::thread::hardware_concurrency();
-				max_thread_count = cpu_count;
-				if (max_thread_count < 2)
-					max_thread_count = 2;
+				int cpu_count = (int)std::thread::hardware_concurrency();
+				cpu_count -= 2; //留出2个核给其他线程
+				if (cpu_count < 2)
+					cpu_count = 2;  //至少2个线程
+				else if (cpu_count > 16)
+					cpu_count = 16; //至多16个线程
+
+				max_thread_count = (size_t)cpu_count;
 			}
+
 			return max_thread_count;
 		}
 	};
@@ -66,22 +71,6 @@ ks_apartment* ks_apartment::default_mta() {
 
 ks_apartment* ks_apartment::current_thread_apartment() {
 	return tls_current_thread_apartment;
-}
-
-ks_apartment* ks_apartment::current_thread_apartment_or_master_sta() {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	if (cur_apartment == nullptr)
-		cur_apartment = ks_apartment::master_sta();
-	ASSERT(cur_apartment != nullptr);
-	return cur_apartment;
-}
-
-ks_apartment* ks_apartment::current_thread_apartment_or_background_sta() {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	if (cur_apartment == nullptr)
-		cur_apartment = ks_apartment::background_sta();
-	ASSERT(cur_apartment != nullptr);
-	return cur_apartment;
 }
 
 ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {

@@ -235,7 +235,7 @@ public: //repeat, repeat_periodic, repeat_productive
 
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::current_thread_apartment_or_master_sta();
+			apartment = ks_apartment::current_thread_apartment_or_default_mta();
 
 		if (delay == 0 && interval == 0) {
 			//如果delay和interval都为0，则等价于repeat
@@ -283,7 +283,7 @@ public: //repeat, repeat_periodic, repeat_productive
 		ASSERT(produce_apartment != nullptr);
 		ASSERT(consume_apartment != nullptr);
 		if (produce_apartment == nullptr)
-			produce_apartment = ks_apartment::current_thread_apartment_or_master_sta();
+			produce_apartment = ks_apartment::current_thread_apartment_or_default_mta();
 		if (consume_apartment == nullptr)
 			consume_apartment = ks_apartment::__virtual_inplace_apartment();
 
