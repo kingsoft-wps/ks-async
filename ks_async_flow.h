@@ -216,7 +216,6 @@ private:
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)>&& fn, const ks_async_context& context,
 		const std::type_info* value_typeinfo) const {
-		auto raw_fn = ;
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of<T>((fn(ks_async_flow::__from_raw(flow)), nothing)); },

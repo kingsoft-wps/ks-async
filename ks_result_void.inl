@@ -74,7 +74,7 @@ private:
 
 	template <class R>
 	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
-		return  ks_result<nothing_t>::__determine_raw_cast_mode();
+		return  ks_result<nothing_t>::__determine_raw_cast_mode<R>();
 	}
 
 private:
