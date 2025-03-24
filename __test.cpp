@@ -196,7 +196,7 @@ void test_repetitive() {
         if (sn <= 5)
             return ks_future<int>::resolved(sn);
         else
-            return ks_future<int>::rejected(ks_error::was_terminated_error());
+            return ks_future<int>::rejected(ks_error::terminated_error());
     };
 
     auto consumer = [](const int& sn) -> ks_future<void> {

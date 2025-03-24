@@ -54,9 +54,9 @@ public:
 		);
 	}
 
-	template <class R, class X = R>
-	ks_result<R> map_value(X&& x) const {
-		return m_nothing_result.template map_value<R>(std::forward<X>(x));
+	template <class R, class X = R, class _ = std::enable_if_t<std::is_convertible_v<X, R>>>
+	ks_result<R> map_value(X&& other_value) const {
+		return m_nothing_result.template map_value<R>(std::forward<X>(other_value));
 	}
 
 private:

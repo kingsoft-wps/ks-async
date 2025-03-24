@@ -63,10 +63,10 @@ public:
 			return ks_result<R>::__bare();
 	}
 
-	template <class R, class X = R>
-	ks_result<R> map_value(X&& x) const {
+	template <class R, class X = R, class _ = std::enable_if_t<std::is_convertible_v<X, R>>>
+	ks_result<R> map_value(X&& other_value) const {
 		if (this->is_value())
-			return ks_result<R>(std::forward<X>(x));
+			return ks_result<R>(std::forward<X>(other_value));
 		else if (this->is_error())
 			return ks_result<R>(this->to_error());
 		else

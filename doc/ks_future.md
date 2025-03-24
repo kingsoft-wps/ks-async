@@ -228,19 +228,23 @@ ks_future<R> map<R>(function<R(const T&)>&& fn);
 #### 描述：将this的T类型的结果值经转换函数fn变换为R类型，得到一个新的ks_future<R>对象。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
+#### 参数：
+  - fn: 值转换函数（T类型 => R类型）。
 #### 返回值：新ks_future\<R>对象。
-#### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return fn(val); })`
+#### 特别说明：`f.map<R>(fn)` 相当于 `f.then<R>(..., [](const T& val) { return fn(val); })`，但要求fn必须是简单函数。
 <br>
 
 ```C++
 template <class R>
-ks_future<R> map_value<R>(const R& x);
+ks_future<R> map_value<R>(const R& other_value);
 ```
 #### 描述：将this的T类型的结果值变换为R类型新值，得到一个新的ks_future<R>对象。
 #### 模板参数：
   - R: 约定函数返回值类型为ks_future\<R>。
+#### 参数：
+  - other_value: 新值（R类型）。
 #### 返回值：新ks_future\<R>对象。
-#### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return x; })`
+#### 特别说明：`f.map_value<R>()` 相当于 `f.then<R>(..., [](const T& val) { return other_value; })`
 <br>
 <br>
 
@@ -299,10 +303,42 @@ void try_cancel();
 # ks_future_util工具集
 
 ```C++
-static ks_future<std::vector<T>> ks_future_util::all(const std::vector<ks_future<T>>& futures);
-static ks_future<std::tuple<T0, T1, ...>> ks_future_util::all(const ks_future<T0>& future0, const ks_future<T1>& future1, ...);
-static ks_future<void> ks_future_util::all(const std::vector<ks_future<void>>& futures);
-static ks_future<void> ks_future_util::all(const ks_future<void>& future0, const ks_future<void>& future1, ...);
+template <class T>
+ks_future<T> ks_future_util::resolved<T>(const T& value);
+template <class T>
+ks_future<T> ks_future_util::resolved<T>(const ks_error& error);
+
+template <class T>
+ks_future<T> ks_future_util::post<T>(ks_apartment* apartment, function<T()>&& task_fn, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post<T>(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post<T>(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, const ks_async_context& context = {});
+
+template <class T>
+ks_future<T> ks_future_util::post_delayed<T>(ks_apartment* apartment, function<T()>&& task_fn, int64_t delay, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post_delayed<T>(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, int64_t delay, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post_delayed<T>(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay, const ks_async_context& context = {});
+
+template <class T>
+ks_future<T> ks_future_util::post_pending<T>(ks_apartment* apartment, function<T()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post_pending<T>(ks_apartment* apartment, function<ks_result<T>()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+template <class T>
+ks_future<T> ks_future_util::post_pending<T>(ks_apartment* apartment, function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {});
+```
+#### 描述：包装ks_future<T>的resolved和post系列方法，直接以模板函数的形式提供能力。
+#### 特别说明：以resolved方法为例，`ks_future<int>::resolved(1)` 的等价形式为：`ks_future_util::resolved<int>(1)`。
+<br>
+<br>
+
+```C++
+ks_future<std::vector<T>> ks_future_util::all(const std::vector<ks_future<T>>& futures);
+ks_future<std::tuple<T0, T1, ...>> ks_future_util::all(const ks_future<T0>& future0, const ks_future<T1>& future1, ...);
+ks_future<void> ks_future_util::all(const std::vector<ks_future<void>>& futures);
+ks_future<void> ks_future_util::all(const ks_future<void>& future0, const ks_future<void>& future1, ...);
 ```
 #### 描述：创建一个ks_future对象，代表所有指定futures全部 “成功”。
 #### 参数：
@@ -313,8 +349,8 @@ static ks_future<void> ks_future_util::all(const ks_future<void>& future0, const
 <br>
 
 ```C++
-static ks_future<T> ks_future_util::any(const std::vector<ks_future<T>>& futures);
-static ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>& future1, ...);
+ks_future<T> ks_future_util::any(const std::vector<ks_future<T>>& futures);
+ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>& future1, ...);
 ```
 #### 描述：创建一个ks_future对象，代表任一（实际上就是最先）future “成功”。
 #### 参数：
@@ -326,20 +362,20 @@ static ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_fu
 <br>
 
 ```C++
-	template <class T>
-	static ks_future<void> repetitive(
-		ks_apartment* producer_apartment, function<ks_future<T>()>&& producer_fn,
-		ks_apartment* consumer_apartment, function<ks_future<void>(const T&)>&& consumer_fn,
-		const ks_async_context& context = {});
+template <class V>
+ks_future<void> ks_future_util::repetitive<V>(
+  ks_apartment* produce_apartment, function<ks_future<V>()>&& produce_fn,
+  ks_apartment* consume_apartment, function<ks_future<void>(const U&)>&& consume_fn,
+  const ks_async_context& context = {});
 ```
 #### 描述：反复迭代一个异步的produce-consume过程，直至出现 “错误”。
 #### 模板参数：
-  -- T: producer产生的、以及consumer消费的数据类型。
+  -- V: produce_fn每次产生的、以及consume_fn消费的数据类型。
 #### 参数：
-  - producer_apartment: 生产者执行套间。
-  - producer_fn: 生产者异步函数。
-  - consumer_apartment: 消费者执行套间。
-  - consumer_fn: 消费者异步函数。
+  - produce_apartment: 生产者执行套间。
+  - produce_fn: 生产者异步函数。
+  - consume_apartment: 消费者执行套间。
+  - consume_fn: 消费者异步函数。
   - context: 异步任务执行时所需上下文。
 #### 返回值：代表迭代结束的一个future，因迭代过程是出现 “错误” 时结束，故返回的future的最终状态必为 “错误”。
 <br>

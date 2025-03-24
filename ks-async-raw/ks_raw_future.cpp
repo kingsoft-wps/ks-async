@@ -116,14 +116,14 @@ protected:
 			if (!lock.owns_lock())
 				lock.lock();
 			if (m_living_context_controller_available_v && (m_living_context.__check_cancel_all_ctrl() || m_living_context.__check_owner_expired()))
-				return ks_error::was_cancelled_error();
+				return ks_error::cancelled_error();
 		}
 
 		if (m_timeout_schedule_id != 0) {
 			if (!lock.owns_lock())
 				lock.lock();
 			if (m_timeout_schedule_id != 0 && (m_timeout_time <= std::chrono::steady_clock::now()))
-				return ks_error::was_timeout_error();
+				return ks_error::timeout_error();
 		}
 
 		return def_error;
@@ -190,7 +190,7 @@ protected:
 			}, 0);
 			if (act_schedule_id == 0) {
 				lock.unlock();
-				next_future->do_complete(ks_error::was_terminated_error(), prefer_apartment, false);
+				next_future->do_complete(ks_error::terminated_error(), prefer_apartment, false);
 				lock.lock();
 			}
 		}
@@ -217,7 +217,7 @@ protected:
 			if (act_schedule_id == 0) {
 				lock.unlock();
 				for (auto& next_future : next_futures)
-					next_future->do_complete(ks_error::was_terminated_error(), prefer_apartment, false);
+					next_future->do_complete(ks_error::terminated_error(), prefer_apartment, false);
 				lock.lock();
 			}
 		}
@@ -288,9 +288,9 @@ protected:
 					ASSERT(lock.owns_lock());
 					lock.unlock();
 					if (t_next_future_0 != nullptr)
-						t_next_future_0->on_feeded_by_prev(ks_error::was_terminated_error(), this, prefer_apartment);
+						t_next_future_0->on_feeded_by_prev(ks_error::terminated_error(), this, prefer_apartment);
 					for (auto& next_future : t_next_future_more)
-						next_future->on_feeded_by_prev(ks_error::was_terminated_error(), this, prefer_apartment);
+						next_future->on_feeded_by_prev(ks_error::terminated_error(), this, prefer_apartment);
 					if (must_keep_locked)
 						lock.lock();
 				}
@@ -482,7 +482,7 @@ public:
 			ks_raw_result result;
 			try {
 				if (this->do_check_cancel_locking(lock2))
-					result = this->do_acquire_cancel_error_locking(ks_error::was_cancelled_error(), lock2);
+					result = this->do_acquire_cancel_error_locking(ks_error::cancelled_error(), lock2);
 				else {
 					std::function<ks_raw_result()> task_fn = std::move(m_task_fn);
 					lock2.unlock();
@@ -516,7 +516,7 @@ public:
 				: prefer_apartment->schedule_delayed(std::move(pending_schedule_fn), priority, m_delay);
 			if (m_pending_schedule_id == 0) {
 				//schedule失败，则立即将this标记为错误即可
-				this->do_complete_locked<false>(ks_error::was_terminated_error(), nullptr, false, lock);
+				this->do_complete_locked<false>(ks_error::terminated_error(), nullptr, false, lock);
 				return;
 			}
 		}
@@ -615,7 +615,7 @@ protected:
 			//若this已被cancel，则立即将this进行settle即可
 			ks_apartment* prefer_apartment = this->do_determine_prefer_apartment(prev_advice_apartment);
 			this->do_complete_locked<false>(
-				prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::was_cancelled_error(), lock),
+				prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::cancelled_error(), lock),
 				prefer_apartment, true, lock);
 			return;
 		}
@@ -639,7 +639,7 @@ protected:
 			ks_raw_result result;
 			try {
 				if (m_cancelable && this->do_check_cancel_locking(lock2))
-					result = prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::was_cancelled_error(), lock2);
+					result = prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::cancelled_error(), lock2);
 				else {
 					function<ks_raw_result(const ks_raw_result&)> fn_ex = std::move(m_fn_ex);
 					lock2.unlock();
@@ -672,7 +672,7 @@ protected:
 		uint64_t act_schedule_id = prefer_apartment->schedule(std::move(run_fn), priority);
 		if (act_schedule_id == 0) {
 			//schedule失败，则立即将this标记为错误即可
-			this->do_complete_locked<false>(ks_error::was_terminated_error(), prefer_apartment, true, lock);
+			this->do_complete_locked<false>(ks_error::terminated_error(), prefer_apartment, true, lock);
 			return;
 		}
 	}
@@ -742,7 +742,7 @@ public:
 			ks_error else_error = {};
 			try {
 				if (this->do_check_cancel_locking(lock2))
-					else_error = prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::was_cancelled_error(), lock2);
+					else_error = prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::cancelled_error(), lock2);
 				else {
 					function<ks_raw_future_ptr(const ks_raw_result&)> afn_ex = std::move(m_afn_ex);
 					lock2.unlock();
@@ -1002,7 +1002,7 @@ private:
 			//还有前序future仍未完成，但若this已被cancel，则立即将this进行settle即可，不再继续等待
 			ks_apartment* prefer_apartment = this->do_determine_prefer_apartment_from_prev_seq_locked(prev_advice_apartment, lock);
 			this->do_complete_locked<must_keep_locked>(
-				prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::was_cancelled_error(), lock),
+				prev_result.is_error() ? prev_result.to_error() : this->do_acquire_cancel_error_locking(ks_error::cancelled_error(), lock),
 				prefer_apartment, true, lock);
 			return;
 		}
@@ -1092,7 +1092,7 @@ ks_raw_future_ptr ks_raw_future::any(const std::vector<ks_raw_future_ptr>& futur
 }
 
 void ks_raw_future::try_cancel(bool backtrack) {
-	this->do_try_cancel(ks_error::was_cancelled_error(), backtrack); 
+	this->do_try_cancel(ks_error::cancelled_error(), backtrack);
 }
 
 bool ks_raw_future::check_current_future_cancel(bool with_extra) {
@@ -1121,7 +1121,7 @@ ks_error ks_raw_future::get_current_future_cancel_error(bool with_extra) {
 			ks_apartment* cur_apartment = cur_future->get_spec_apartment();
 			if (cur_apartment != nullptr) {
 				if (cur_apartment->is_stopping_or_stopped())
-					return ks_error::was_terminated_error();
+					return ks_error::terminated_error();
 			}
 		}
 	}
@@ -1129,7 +1129,7 @@ ks_error ks_raw_future::get_current_future_cancel_error(bool with_extra) {
 }
 
 void ks_raw_future::set_timeout(int64_t timeout, bool backtrack) {
-	this->do_set_timeout(timeout, ks_error::was_timeout_error(), backtrack); 
+	this->do_set_timeout(timeout, ks_error::timeout_error(), backtrack); 
 }
 
 ks_raw_promise_ptr ks_raw_promise::create(ks_apartment* apartment) {

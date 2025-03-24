@@ -46,7 +46,7 @@ public:
 		return m_nothing_promise.get_future().cast<void>();
 	}
 
-	void resolve(nothing_t _ = nothing) const {
+	void resolve(nothing_t = nothing) const {
 		m_nothing_promise.resolve(nothing);
 	}
 

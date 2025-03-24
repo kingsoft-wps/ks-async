@@ -206,15 +206,15 @@ bool ks_raw_async_flow::add_flat_task(
 			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
 			if (this_ptr == nullptr) {
 				ASSERT(false);
-				return ks_raw_future::rejected(ks_error::was_terminated_error(), ks_apartment::current_thread_apartment());
+				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
 			if (this_ptr->m_force_cleanup_flag_v) {
-				return ks_raw_future::rejected(ks_error::was_terminated_error(), ks_apartment::current_thread_apartment());
+				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
 			if (this_ptr->m_cancelled_flag_v) {
-				return ks_raw_future::rejected(ks_error::was_cancelled_error(), ks_apartment::current_thread_apartment());
+				return ks_raw_future::rejected(ks_error::cancelled_error(), ks_apartment::current_thread_apartment());
 			}
 
 			return fn(this_ptr);
@@ -225,7 +225,7 @@ bool ks_raw_async_flow::add_flat_task(
 			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
 			if (this_ptr == nullptr) {
 				ASSERT(false);
-				return ks_error::was_terminated_error();
+				return ks_error::terminated_error();
 			}
 
 			std::unique_lock<ks_mutex> lock(this_ptr->m_mutex);
@@ -956,14 +956,14 @@ void ks_raw_async_flow::do_force_cleanup_data_locked(std::unique_lock<ks_mutex>&
 	if (m_flow_status == status_t::not_start) {
 		for (auto& entry : m_task_map) {
 			if (entry.second->task_promise_opt != nullptr) {
-				entry.second->task_promise_opt->reject(ks_error::was_terminated_error());
+				entry.second->task_promise_opt->reject(ks_error::terminated_error());
 				entry.second->task_promise_opt.reset();
 			}
 		}
 
 		if (m_flow_promise_wrapped_keepper_until_completed != nullptr) {
 			ASSERT(m_flow_promise_wrapped_keepper_until_completed == m_flow_promise_wrapped_weak.lock());
-			m_flow_promise_wrapped_keepper_until_completed->reject(ks_error::was_terminated_error());
+			m_flow_promise_wrapped_keepper_until_completed->reject(ks_error::terminated_error());
 			m_flow_promise_wrapped_keepper_until_completed.reset();
 			m_flow_promise_wrapped_weak.reset();
 		}

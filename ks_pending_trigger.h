@@ -35,7 +35,7 @@ public:
 		m_pending_promise->resolve(ks_raw_value::of(nothing));
 	}
 	void cancel() {
-		m_pending_promise->reject(ks_error::was_cancelled_error());
+		m_pending_promise->reject(ks_error::cancelled_error());
 	}
 
 private:

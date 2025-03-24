@@ -19,16 +19,53 @@ template <class T> class ks_future;
 template <class T> class ks_promise;
 
 
-class ks_future_util {
+class ks_future_util { //as namespace
 private:
 	ks_future_util() = delete;
 	_DISABLE_COPY_CONSTRUCTOR(ks_future_util);
 
 	using ks_raw_future = __ks_async_raw::ks_raw_future;
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
-
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
+
+public:
+	template <class T, class X = T, class _ = std::enable_if_t<std::is_void_v<T> ? std::is_nothing_v<X> : std::is_convertible_v<X, T>>>
+	static ks_future<T> resolved(X&& value) {
+		return ks_future<T>::resolved(std::forward<X>(value));
+	}
+	template <class T, class _ = std::enable_if_t<std::is_void_v<T>>>
+	static ks_future<void> resolved() {
+		return ks_future<void>::resolved();
+	}
+
+	template <class T>
+	static ks_future<T> rejected(const ks_error& error) {
+		return ks_future<T>::rejected(error);
+	}
+
+	template <class T, class FN>
+	static ks_future<T> post(ks_apartment* apartment, FN&& task_fn, const ks_async_context& context = {}) {
+		return ks_future<T>::post(apartment, context, std::forward<FN>(task_fn));
+	}
+	template <class T, class FN>
+	static ks_future<T> post_delayed(ks_apartment* apartment, FN&& task_fn, int64_t delay, const ks_async_context& context = {}) {
+		return ks_future<T>::post_delayed(apartment, std::forward<FN>(task_fn), delay, context);
+	}
+	template <class T, class FN>
+	static ks_future<T> post_pending(ks_apartment* apartment, FN&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
+		return ks_future<T>::post_pending(apartment, std::forward<FN>(task_fn), trigger, context);
+	}
+
+private:
+	template <class T, class X>
+	static ks_future<T> __choose_resolved(std::bool_constant<false> is_void_mode, X&& value) {
+		return ks_future<T>::resolved(std::forward<X>(value));
+	}
+	template <class T, class X>
+	static ks_future<void> __choose_resolved(std::bool_constant<true> is_void_mode, X&& value) {
+		return ks_future<void>::resolved(std::forward<X>(value));
+	}
 
 public: //tuple aggr
 	template <class... Ts, class _ = std::enable_if_t<!std::has_some_void_v<Ts...> && sizeof...(Ts) != 0>>
@@ -149,57 +186,58 @@ public: //vector aggr
 		return ks_future<T>::__from_raw(raw_future);
 	}
 
-public: //repetitive
-	template <class T>
-	static ks_future<void> repetitive(
-		ks_apartment* producer_apartment, std::function<ks_future<T>()>&& producer_fn,
-		ks_apartment* consumer_apartment, std::function<ks_future<void>(const T&)>&& consumer_fn,
-		const ks_async_context& context = {}) {
-
-		ASSERT(producer_apartment != nullptr);
-		ASSERT(consumer_apartment != nullptr);
-		if (producer_apartment == nullptr)
-			producer_apartment = ks_apartment::default_mta();
-		if (consumer_apartment == nullptr)
-			consumer_apartment = ks_apartment::default_mta();
-
-		ks_promise<void> final_promise = ks_promise<void>::create();
-		__do_pump_repetitive_once(
-			producer_apartment, producer_fn, 
-			consumer_apartment, consumer_fn,
-			context, final_promise);
-
-		return final_promise.get_future();
-	}
-
 private:
 	template <class... Ts, size_t... IDXs>
 	static std::tuple<Ts...> __convert_raw_value_vector_to_typed_value_tuple(const std::vector<ks_raw_value>& value_vec, std::index_sequence<IDXs...>) {
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
+
+public: //repetitive
+	template <class V>
+	static ks_future<void> repetitive(
+		ks_apartment* produce_apartment, std::function<ks_future<V>()>&& produce_fn,
+		ks_apartment* consume_apartment, std::function<ks_future<void>(const V&)>&& consume_fn,
+		const ks_async_context& context = {}) {
+
+		ASSERT(produce_apartment != nullptr);
+		ASSERT(consume_apartment != nullptr);
+		if (produce_apartment == nullptr)
+			produce_apartment = ks_apartment::default_mta();
+		if (consume_apartment == nullptr)
+			consume_apartment = ks_apartment::default_mta();
+
+		ks_promise<void> final_promise = ks_promise<void>::create();
+		__do_pump_repetitive_once(
+			produce_apartment, produce_fn,
+			consume_apartment, consume_fn,
+			context, final_promise);
+
+		return final_promise.get_future();
+	}
+
 private:
-	template <class T>
+	template <class V>
 	static void __do_pump_repetitive_once(
-		ks_apartment* producer_apartment, const std::function<ks_future<T>()>& producer_fn,
-		ks_apartment* consumer_apartment, const std::function<ks_future<void>(const T&)>& consumer_fn,
+		ks_apartment* produce_apartment, const std::function<ks_future<V>()>& produce_fn,
+		ks_apartment* consume_apartment, const std::function<ks_future<void>(const V&)>& consume_fn,
 		const ks_async_context& context, const ks_promise<void>& final_promise) {
 
-		ks_future<T>
-			::post(
-				producer_apartment,
-				[producer_fn]() -> ks_future<T> {
-					ks_future<T> fut = producer_fn();
+		ks_future_util
+			::post<V>(
+				produce_apartment,
+				[produce_fn]() -> ks_future<V> {
+					ks_future<V> fut = produce_fn();
 					ASSERT(fut.is_valid());
 					if (!fut.is_valid()) 
-						fut = ks_future<T>::rejected(ks_error::unexpected_error());
+						fut = ks_future<V>::rejected(ks_error::unexpected_error());
 					return fut;
 				},
 				context)
 			.template flat_then<void>(
-				consumer_apartment,
-				[consumer_fn](const T& value) -> ks_future<void> {
-					ks_future<void> fut = consumer_fn(value);
+				consume_apartment,
+				[consume_fn](const V& value) -> ks_future<void> {
+					ks_future<void> fut = consume_fn(value);
 					ASSERT(fut.is_valid());
 					if (!fut.is_valid())
 						fut = ks_future<void>::rejected(ks_error::unexpected_error());
@@ -207,19 +245,22 @@ private:
 				},
 				context)
 			.on_completion(
-				consumer_apartment,
-				[producer_apartment, producer_fn, consumer_apartment, consumer_fn, context, final_promise](const ks_result<void>& consume_res) -> void {
-					if (consume_res.is_value()) {
+				consume_apartment,
+				[produce_apartment, produce_fn, consume_apartment, consume_fn, context, final_promise](const ks_result<void>& result) -> void {
+					if (result.is_value()) {
 						__do_pump_repetitive_once(
-							producer_apartment, producer_fn, 
-							consumer_apartment, consumer_fn,
+							produce_apartment, produce_fn,
+							consume_apartment, consume_fn,
 							context, final_promise);
 					}
 					else {
-						final_promise.reject(consume_res.to_error());
+						ks_error error = result.to_error();
+						if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
+							final_promise.resolve();
+						else
+							final_promise.reject(error);
 					}
 				},
 				context);
 	}
-
 };
