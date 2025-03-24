@@ -353,12 +353,10 @@ protected:
 
 protected:
 	ks_apartment* do_determine_prefer_apartment(ks_apartment* advice_apartment) const {
-		if (m_spec_apartment != nullptr)
-			return m_spec_apartment;
-		else if (advice_apartment != nullptr)
-			return advice_apartment;
-		else
-			return ks_apartment::current_thread_apartment_or_default_mta();
+		ks_apartment* prefer_apartment = m_spec_apartment != nullptr ? m_spec_apartment : advice_apartment;
+		if (prefer_apartment == nullptr || prefer_apartment == ks_apartment::__virtual_inplace_apartment()) 
+			prefer_apartment = ks_apartment::current_thread_apartment_or_default_mta();
+		return prefer_apartment;
 	}
 
 	ks_apartment* do_determine_timeout_apartment() const {
@@ -462,7 +460,10 @@ public:
 		std::unique_lock<ks_mutex> lock(m_mutex);
 		int priority = m_living_context.__get_priority();
 		ks_apartment* prefer_apartment = this->do_determine_prefer_apartment(nullptr);
-		bool could_run_locally = m_mode == ks_raw_future_mode::TASK && priority >= 0x10000 && (m_spec_apartment == nullptr || m_spec_apartment == prefer_apartment);
+		bool could_run_locally = (priority >= 0x10000) && (
+			m_spec_apartment == nullptr ||
+			m_spec_apartment == ks_apartment::__virtual_inplace_apartment() ||
+			m_spec_apartment == prefer_apartment);
 
 		//pending_schedule_fn不对context进行捕获。
 		//这样做的意图是：对于delayed任务，当try_cancel时，即使apartment::try_unschedule失败，也不影响context的及时释放。
@@ -622,7 +623,10 @@ protected:
 
 		int priority = m_living_context.__get_priority();
 		ks_apartment* prefer_apartment = this->do_determine_prefer_apartment(prev_advice_apartment);
-		bool could_run_locally = priority >= 0x10000 && (m_spec_apartment == nullptr || m_spec_apartment == prefer_apartment);
+		bool could_run_locally = (priority >= 0x10000) && (
+			m_spec_apartment == nullptr || 
+			m_spec_apartment == ks_apartment::__virtual_inplace_apartment() || 
+			m_spec_apartment == prefer_apartment);
 
 		function<void()> run_fn = [this, this_shared = this->shared_from_this(), prev_result, prefer_apartment, context = m_living_context]() mutable -> void {
 			std::unique_lock<ks_mutex> lock2(m_mutex);

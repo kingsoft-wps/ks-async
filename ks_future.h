@@ -167,7 +167,7 @@ public: //on_success, on_failure, on_completion
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value) -> void {
 			fn(raw_value.get<T>());
 		};
@@ -182,7 +182,7 @@ public: //on_success, on_failure, on_completion
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_error& error) -> void {
 			fn(error);
 		};
@@ -197,7 +197,7 @@ public: //on_success, on_failure, on_completion
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result) -> void {
 			fn(ks_result<T>::__from_raw(raw_result));
 		};
@@ -750,7 +750,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			R typed_value2 = fn(raw_value.get<T>());
 			return ks_raw_value::of(std::move(typed_value2));
@@ -763,7 +763,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			ks_result<R> typed_result2 = fn(raw_value.get<T>());
 			return typed_result2.__get_raw();
@@ -776,7 +776,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_future_ptr {
 			ks_future<R> typed_future2 = fn(raw_value.get<T>());
 			return typed_future2.__get_raw();
@@ -790,7 +790,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			R typed_value2 = fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(std::move(typed_value2));
@@ -803,7 +803,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			ks_result<R> typed_result2 = fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
 			return typed_result2.__get_raw();
@@ -816,7 +816,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_future_ptr {
 			ks_future<R> typed_future2 = fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
 			return typed_future2.__get_raw();
@@ -830,7 +830,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			fn(raw_value.get<T>());
 			return ks_raw_value::of(nothing);
@@ -843,7 +843,7 @@ private: //__then
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_value& raw_value)->ks_raw_result {
 			fn(raw_value.get<T>(), ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(nothing);
@@ -858,7 +858,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			R typed_value2 = fn(ks_result<T>::__from_raw(raw_result));
 			return ks_raw_value::of(std::move(typed_value2));
@@ -871,7 +871,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			ks_result<R> typed_result2 = fn(ks_result<T>::__from_raw(raw_result));
 			return typed_result2.__get_raw();
@@ -884,7 +884,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_future_ptr {
 			ks_future<R> typed_future2 = fn(ks_result<T>::__from_raw(raw_result));
 			return typed_future2.__get_raw();
@@ -897,7 +897,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			R typed_value2 = fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(std::move(typed_value2));
@@ -910,7 +910,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			ks_result<R> typed_result2 = fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
 			return typed_result2.__get_raw();
@@ -923,7 +923,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_future_ptr {
 			ks_future<R> typed_future2 = fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
 			return typed_future2.__get_raw();
@@ -937,7 +937,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			fn(ks_result<T>::__from_raw(raw_result));
 			return ks_raw_value::of(nothing);
@@ -950,7 +950,7 @@ private: //__transform
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
-			apartment = ks_apartment::default_mta();
+			apartment = ks_apartment::__virtual_inplace_apartment();
 		auto raw_fn = [fn = std::move(fn)](const ks_raw_result& raw_result)->ks_raw_result {
 			fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
 			return ks_raw_value::of(nothing);

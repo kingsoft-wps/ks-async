@@ -38,6 +38,9 @@ public:
 	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name);
 
 public:
+	KS_ASYNC_INLINE_API static ks_apartment* __virtual_inplace_apartment() { return (ks_apartment*)(void*)(-1); }
+
+public:
 	enum { //feature consts
 		sequential_feature = 0x01,
 	};

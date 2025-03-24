@@ -304,8 +304,7 @@ private:
 						ks_future_util::post_delayed<void>(
 							data->apartment,
 							[data]() { __pump_periodic_once(data); },
-							data->interval,
-							data->context);
+							data->interval);
 					}
 					else {
 						ks_error error = result.to_error();
@@ -314,8 +313,7 @@ private:
 						else
 							data->raw_final_promise_void->reject(error);
 					}
-				},
-				data->context);
+				});
 	}
 
 	template <class V>
@@ -371,7 +369,6 @@ private:
 						else
 							data->raw_final_promise_void->reject(error);
 					}
-				},
-				data->context);
+				});
 	}
 };
