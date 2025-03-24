@@ -32,7 +32,7 @@ ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, siz
 	ASSERT(max_thread_count >= 1);
 	ASSERT((flags & ~__all_flags) == 0);
 
-	m_d = new _THREAD_POOL_APARTMENT_DATA();
+	m_d = std::make_shared<_THREAD_POOL_APARTMENT_DATA>();
 	m_d->name = name;
 	m_d->max_thread_count = max_thread_count;
 	m_d->flags = flags;
@@ -47,26 +47,24 @@ ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 
 	if (m_d->state_v != _STATE::STOPPED) {
 		this->async_stop();
-		this->wait();
+		//this->wait();  //这里不等了，因为在进程退出时自动析构的话，可能时机太晚，work线程以及被杀了
 	}
 
 	if (true) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
 
-		while (m_d->delaying_trigger_thread != nullptr) {
-			auto t_delaying_trigger_thread = std::move(m_d->delaying_trigger_thread);
+		if (m_d->delaying_trigger_thread != nullptr) {
+			m_d->delaying_trigger_thread->detach();  //这里也不要join了，只detach
 			m_d->delaying_trigger_thread = nullptr;
-			lock.unlock();
-			t_delaying_trigger_thread->join();
-			lock.lock();
 		}
 
-		while (!m_d->thread_pool.empty()) {
-			auto t_last_thread_item = std::move(m_d->thread_pool.back());
-			m_d->thread_pool.pop_back();
-			lock.unlock();
-			t_last_thread_item.thread->join();
-			lock.lock();
+		if (!m_d->thread_pool.empty()) {
+			for (auto& thread_item : m_d->thread_pool) {
+				thread_item.thread->detach();  //这里也不要join了，只detach
+				thread_item.thread = nullptr;
+			}
+
+			m_d->thread_pool.clear();
 		}
 	}
 
@@ -74,7 +72,7 @@ ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 		ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
 	}
 
-	delete m_d;
+	m_d.reset();
 }
 
 
@@ -144,7 +142,7 @@ uint64_t ks_thread_pool_apartment_imp::schedule(std::function<void()>&& fn, int 
 
 	uint64_t id = ++m_d->atomic_last_fn_id;
 	ASSERT(id != 0);
-	ASSERT(!_debug_check_fn_id_exists_locked(id, lock));
+	ASSERT(!_debug_check_fn_id_exists_locked(m_d, id, lock));
 
 	_FN_ITEM fn_item;
 	fn_item.fn = std::move(fn);
@@ -154,8 +152,8 @@ uint64_t ks_thread_pool_apartment_imp::schedule(std::function<void()>&& fn, int 
 	fn_item.until_time = std::chrono::steady_clock::time_point{};
 	fn_item.fn_id = id;
 
-	_do_put_fn_item_into_now_list_locked(std::move(fn_item), lock);
-	_prepare_now_thread_pool_locked(lock);
+	_do_put_fn_item_into_now_list_locked(m_d, std::move(fn_item), lock);
+	_prepare_now_thread_pool_locked(this, m_d, lock);
 
 	return id;
 }
@@ -171,7 +169,7 @@ uint64_t ks_thread_pool_apartment_imp::schedule_delayed(std::function<void()>&& 
 
 	uint64_t id = ++m_d->atomic_last_fn_id;
 	ASSERT(id != 0);
-	ASSERT(!_debug_check_fn_id_exists_locked(id, lock));
+	ASSERT(!_debug_check_fn_id_exists_locked(m_d, id, lock));
 
 	_FN_ITEM fn_item;
 	fn_item.fn = std::move(fn);
@@ -182,12 +180,12 @@ uint64_t ks_thread_pool_apartment_imp::schedule_delayed(std::function<void()>&& 
 	fn_item.fn_id = id;
 
 	if (delay <= 0) {
-		_do_put_fn_item_into_now_list_locked(std::move(fn_item), lock);
-		_prepare_now_thread_pool_locked(lock);
+		_do_put_fn_item_into_now_list_locked(m_d, std::move(fn_item), lock);
+		_prepare_now_thread_pool_locked(this, m_d, lock);
 	}
 	else {
-		_do_put_fn_item_into_delaying_list_locked(std::move(fn_item), lock);
-		_prepare_delaying_trigger_thread_locked(lock);
+		_do_put_fn_item_into_delaying_list_locked(m_d, std::move(fn_item), lock);
+		_prepare_delaying_trigger_thread_locked(this, m_d, lock);
 	}
 
 	return id;
@@ -248,45 +246,45 @@ void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& 
 }
 
 
-void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->thread_pool.size() >= m_d->max_thread_count)
+void ks_thread_pool_apartment_imp::_prepare_now_thread_pool_locked(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, std::unique_lock<ks_mutex>& lock) {
+	if (d->thread_pool.size() >= d->max_thread_count)
 		return;
 
 	size_t needed_thread_count = 0;
-	if (m_d->state_v == _STATE::RUNNING) {
-		needed_thread_count = m_d->thread_pool.size() + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size() + m_d->now_fn_queue_idle.size();
-		if (needed_thread_count > m_d->max_thread_count)
-			needed_thread_count = m_d->max_thread_count;
+	if (d->state_v == _STATE::RUNNING) {
+		needed_thread_count = d->thread_pool.size() + d->now_fn_queue_prior.size() + d->now_fn_queue_normal.size() + d->now_fn_queue_idle.size();
+		if (needed_thread_count > d->max_thread_count)
+			needed_thread_count = d->max_thread_count;
 		if (needed_thread_count == 0)
 			needed_thread_count = 1;
 	}
-	else if (m_d->state_v == _STATE::STOPPING) {
-		needed_thread_count = m_d->thread_pool.size() + m_d->now_fn_queue_prior.size() + m_d->now_fn_queue_normal.size();
-		if (needed_thread_count > m_d->max_thread_count)
-			needed_thread_count = m_d->max_thread_count;
+	else if (d->state_v == _STATE::STOPPING) {
+		needed_thread_count = d->thread_pool.size() + d->now_fn_queue_prior.size() + d->now_fn_queue_normal.size();
+		if (needed_thread_count > d->max_thread_count)
+			needed_thread_count = d->max_thread_count;
 		if (needed_thread_count == 0)
 			needed_thread_count = 1;
 	}
 
-	if (m_d->thread_pool.size() < needed_thread_count) {
-		for (size_t i = m_d->thread_pool.size(); i < needed_thread_count; ++i) {
+	if (d->thread_pool.size() < needed_thread_count) {
+		for (size_t i = d->thread_pool.size(); i < needed_thread_count; ++i) {
 			_THREAD_ITEM thread_item;
-			thread_item.thread_sn = ++m_d->atomic_last_thread_sn;
+			thread_item.thread_sn = ++d->atomic_last_thread_sn;
 			thread_item.thread = std::make_shared<std::thread>(
-				[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
-			m_d->thread_pool.push_back(thread_item);
-			m_d->living_any_thread_total++;
+				[self, d, thread_sn = thread_item.thread_sn]() { _now_thread_proc(self, d, thread_sn); });
+			d->thread_pool.push_back(thread_item);
+			d->living_any_thread_total++;
 		}
 	}
 }
 
-void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
+void ks_thread_pool_apartment_imp::_now_thread_proc(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, uint64_t thread_sn) {
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
-	ks_apartment::__tls_set_current_thread_apartment(this);
+	ks_apartment::__tls_set_current_thread_apartment(self);
 	tls_current_now_thread_sn = thread_sn;
 
 	std::stringstream thread_name_ss;
-	thread_name_ss << "mta-thread of: " << m_d->name << " (work-" << thread_sn << "/" << m_d->max_thread_count << ")";
+	thread_name_ss << "mta-thread of: " << d->name << " (work-" << thread_sn << "/" << d->max_thread_count << ")";
 	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
@@ -301,20 +299,20 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 
 	while (true) {
 #if __KS_APARTMENT_ATFORK_ENABLED
-		std::shared_lock<ks_shared_mutex> busy_shared_lock(m_d->busy_shared_mutex);
+		std::shared_lock<ks_shared_mutex> busy_shared_lock(d->busy_shared_mutex);
 #endif
-		std::unique_lock<ks_mutex> lock(m_d->mutex);
+		std::unique_lock<ks_mutex> lock(d->mutex);
 
 		//try next now_fn
-		auto* now_fn_queue_sel = !m_d->now_fn_queue_prior.empty() ? &m_d->now_fn_queue_prior : &m_d->now_fn_queue_normal;
+		auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
 		if (now_fn_queue_sel->empty()) {
-			if (m_d->state_v != _STATE::RUNNING && m_d->now_fn_queue_prior.empty() && m_d->now_fn_queue_normal.empty())
+			if (d->state_v != _STATE::RUNNING && d->now_fn_queue_prior.empty() && d->now_fn_queue_normal.empty())
 				break; //check stop, end
 
 			//保留1个线程不去执行idle任务（除非是单线程套间）
-			if (!m_d->now_fn_queue_idle.empty()
-				&& (m_d->busy_thread_count_for_idle == 0 || m_d->busy_thread_count_for_idle + 1 < m_d->thread_pool.size()))
-				now_fn_queue_sel = &m_d->now_fn_queue_idle;
+			if (!d->now_fn_queue_idle.empty()
+				&& (d->busy_thread_count_for_idle == 0 || d->busy_thread_count_for_idle + 1 < d->thread_pool.size()))
+				now_fn_queue_sel = &d->now_fn_queue_idle;
 		}
 
 		if (!now_fn_queue_sel->empty()) {
@@ -322,9 +320,9 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			_FN_ITEM now_fn_item = std::move(now_fn_queue_sel->front());
 			now_fn_queue_sel->pop_front();
 
-			++m_d->busy_thread_count;
-			if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-				++m_d->busy_thread_count_for_idle;
+			++d->busy_thread_count;
+			if (now_fn_queue_sel == &d->now_fn_queue_idle)
+				++d->busy_thread_count_for_idle;
 			lock.unlock();
 
 			//try {
@@ -338,9 +336,9 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 			//}
 
 			lock.lock();
-			--m_d->busy_thread_count;
-			if (now_fn_queue_sel == &m_d->now_fn_queue_idle)
-				--m_d->busy_thread_count_for_idle;
+			--d->busy_thread_count;
+			if (now_fn_queue_sel == &d->now_fn_queue_idle)
+				--d->busy_thread_count_for_idle;
 
 			continue;
 		}
@@ -349,38 +347,39 @@ void ks_thread_pool_apartment_imp::_now_thread_proc(uint64_t thread_sn) {
 #if __KS_APARTMENT_ATFORK_ENABLED
 			busy_shared_lock.unlock();
 #endif
-			m_d->now_fn_queue_cv.wait(lock);
+			d->now_fn_queue_cv.wait(lock);
 			continue;
 		}
 	}
 
 	if (true) {
-		std::unique_lock<ks_mutex> lock(m_d->mutex);
-		ASSERT(m_d->living_any_thread_total > 0);
-		m_d->living_any_thread_total--;
-		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_total == 0) {
-			m_d->state_v = _STATE::STOPPED;
-			m_d->stopped_state_cv.notify_all();
+		std::unique_lock<ks_mutex> lock(d->mutex);
+		ASSERT(d->living_any_thread_total > 0);
+		d->living_any_thread_total--;
+		if (d->state_v == _STATE::STOPPING && d->living_any_thread_total == 0) {
+			d->state_v = _STATE::STOPPED;
+			d->stopped_state_cv.notify_all();
 		}
 	}
 
-	ASSERT(ks_apartment::current_thread_apartment() == this);
+	ASSERT(ks_apartment::current_thread_apartment() == self);
+	ASSERT(tls_current_now_thread_sn == thread_sn);
 }
 
-void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(std::unique_lock<ks_mutex>& lock) {
-	if (m_d->delaying_trigger_thread != nullptr)
+void ks_thread_pool_apartment_imp::_prepare_delaying_trigger_thread_locked(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, std::unique_lock<ks_mutex>& lock) {
+	if (d->delaying_trigger_thread != nullptr)
 		return;
 
-	if (m_d->state_v == _STATE::RUNNING) {
-		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
-			[this]() { this->_delaying_trigger_thread_proc(); });
-		m_d->living_any_thread_total++;
+	if (d->state_v == _STATE::RUNNING) {
+		d->delaying_trigger_thread = std::make_shared<std::thread>(
+			[self, d]() { _delaying_trigger_thread_proc(self, d); });
+		d->living_any_thread_total++;
 	}
 }
 
-void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
+void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d) {
 	std::stringstream thread_name_ss;
-	thread_name_ss << "mta-thread of: " << m_d->name << " (timer)";
+	thread_name_ss << "mta-thread of: " << d->name << " (timer)";
 	std::string thread_name = thread_name_ss.str();
 #if defined(_WIN32)
 	typedef HRESULT(WINAPI* PFN_SetThreadDescription)(HANDLE, PCWSTR);
@@ -395,99 +394,99 @@ void ks_thread_pool_apartment_imp::_delaying_trigger_thread_proc() {
 
 	while (true) {
 #if __KS_APARTMENT_ATFORK_ENABLED
-		std::shared_lock<ks_shared_mutex> busy_shared_lock(m_d->busy_shared_mutex);
+		std::shared_lock<ks_shared_mutex> busy_shared_lock(d->busy_shared_mutex);
 #endif
-		std::unique_lock<ks_mutex> lock(m_d->mutex);
+		std::unique_lock<ks_mutex> lock(d->mutex);
 
 		//try next tilled delayed_fn
-		if (m_d->state_v != _STATE::RUNNING)
+		if (d->state_v != _STATE::RUNNING)
 			break; //check stop, end
 
-		if (m_d->delaying_fn_queue.empty()) {
+		if (d->delaying_fn_queue.empty()) {
 			//wait
 #if __KS_APARTMENT_ATFORK_ENABLED
 			busy_shared_lock.unlock();
 #endif
-			m_d->delaying_fn_queue_cv.wait(lock);
+			d->delaying_fn_queue_cv.wait(lock);
 			continue;
 		}
-		else if (m_d->delaying_fn_queue.front().until_time > std::chrono::steady_clock::now()) {
+		else if (d->delaying_fn_queue.front().until_time > std::chrono::steady_clock::now()) {
 			//wait until
 #if __KS_APARTMENT_ATFORK_ENABLED
 			busy_shared_lock.unlock();
 #endif
-			m_d->delaying_fn_queue_cv.wait_until(lock, m_d->delaying_fn_queue.front().until_time);
+			d->delaying_fn_queue_cv.wait_until(lock, d->delaying_fn_queue.front().until_time);
 			continue;
 		}
 		else {
 			//直接将到期的delaying项移入idle队列（忽略priority）
-			_do_put_fn_item_into_now_list_locked(std::move(m_d->delaying_fn_queue.front()), lock);
-			m_d->delaying_fn_queue.pop_front();
-			_prepare_now_thread_pool_locked(lock);
+			_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
+			d->delaying_fn_queue.pop_front();
+			_prepare_now_thread_pool_locked(self, d, lock);
 			continue;
 		}
 	}
 
 	if (true) {
-		std::unique_lock<ks_mutex> lock(m_d->mutex);
-		ASSERT(m_d->living_any_thread_total > 0);
-		m_d->living_any_thread_total--;
-		if (m_d->state_v == _STATE::STOPPING && m_d->living_any_thread_total == 0) {
-			m_d->state_v = _STATE::STOPPED;
-			m_d->stopped_state_cv.notify_all();
+		std::unique_lock<ks_mutex> lock(d->mutex);
+		ASSERT(d->living_any_thread_total > 0);
+		d->living_any_thread_total--;
+		if (d->state_v == _STATE::STOPPING && d->living_any_thread_total == 0) {
+			d->state_v = _STATE::STOPPED;
+			d->stopped_state_cv.notify_all();
 		}
 	}
 }
 
-bool ks_thread_pool_apartment_imp::_debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const {
+bool ks_thread_pool_apartment_imp::_debug_check_fn_id_exists_locked(const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, uint64_t id, std::unique_lock<ks_mutex>& lock) {
 	auto do_check_fn_exists = [](std::deque<_FN_ITEM>* fn_queue, uint64_t fn_id) -> bool {
 		return std::find_if(fn_queue->cbegin(), fn_queue->cend(), 
 			[fn_id](const auto& item) {return item.fn_id == fn_id; }) != fn_queue->cend();
 	};
 
-	return do_check_fn_exists(&m_d->now_fn_queue_prior, id)
-		|| do_check_fn_exists(&m_d->now_fn_queue_normal, id)
-		|| do_check_fn_exists(&m_d->now_fn_queue_idle, id)
-		|| do_check_fn_exists(&m_d->delaying_fn_queue, id);
+	return do_check_fn_exists(&d->now_fn_queue_prior, id)
+		|| do_check_fn_exists(&d->now_fn_queue_normal, id)
+		|| do_check_fn_exists(&d->now_fn_queue_idle, id)
+		|| do_check_fn_exists(&d->delaying_fn_queue, id);
 }
 
-void ks_thread_pool_apartment_imp::_do_put_fn_item_into_now_list_locked(_FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock) {
+void ks_thread_pool_apartment_imp::_do_put_fn_item_into_now_list_locked(const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, _FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock) {
 	auto* now_fn_queue_sel = 
-		fn_item.is_delaying_fn ? &m_d->now_fn_queue_idle :
-		fn_item.priority == 0 ? &m_d->now_fn_queue_normal :  //priority=0为普通优先级
-		fn_item.priority > 0 ? &m_d->now_fn_queue_prior :    //priority>0为高优先级
-		&m_d->now_fn_queue_idle;                             //priority<0为低优先级，简单地加入到idle队列
+		fn_item.is_delaying_fn ? &d->now_fn_queue_idle :
+		fn_item.priority == 0 ? &d->now_fn_queue_normal :  //priority=0为普通优先级
+		fn_item.priority > 0 ? &d->now_fn_queue_prior :    //priority>0为高优先级
+		&d->now_fn_queue_idle;                             //priority<0为低优先级，简单地加入到idle队列
 	now_fn_queue_sel->push_back(std::move(fn_item));
-	m_d->now_fn_queue_cv.notify_one();
+	d->now_fn_queue_cv.notify_one();
 }
 
-void ks_thread_pool_apartment_imp::_do_put_fn_item_into_delaying_list_locked(_FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock) {
-	auto where_it = m_d->delaying_fn_queue.end();
-	if (!m_d->delaying_fn_queue.empty()) {
-		if (fn_item.until_time >= m_d->delaying_fn_queue.back().until_time) {
+void ks_thread_pool_apartment_imp::_do_put_fn_item_into_delaying_list_locked(const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, _FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock) {
+	auto where_it = d->delaying_fn_queue.end();
+	if (!d->delaying_fn_queue.empty()) {
+		if (fn_item.until_time >= d->delaying_fn_queue.back().until_time) {
 			//最大延时项：插在队尾
-			where_it = m_d->delaying_fn_queue.end();
+			where_it = d->delaying_fn_queue.end();
 		}
-		else if (fn_item.until_time < m_d->delaying_fn_queue.front().until_time) {
+		else if (fn_item.until_time < d->delaying_fn_queue.front().until_time) {
 			//最小延时项：插在队头
-			where_it = m_d->delaying_fn_queue.begin();
+			where_it = d->delaying_fn_queue.begin();
 		}
 		else {
 			//新项的目标时点落在当前队列的时段区间内。。。
 			//忽略priority
-			where_it = std::upper_bound(m_d->delaying_fn_queue.begin(), m_d->delaying_fn_queue.end(), fn_item,
+			where_it = std::upper_bound(d->delaying_fn_queue.begin(), d->delaying_fn_queue.end(), fn_item,
 				[](const auto& a, const auto& b) { return a.until_time < b.until_time; });
 		}
 	}
 
-	bool should_notify = m_d->delaying_fn_queue.empty() || fn_item.until_time < m_d->delaying_fn_queue.front().until_time;
-	m_d->delaying_fn_queue.insert(where_it, std::move(fn_item));
+	bool should_notify = d->delaying_fn_queue.empty() || fn_item.until_time < d->delaying_fn_queue.front().until_time;
+	d->delaying_fn_queue.insert(where_it, std::move(fn_item));
 
 	if (should_notify) {
 		//只需notify_one即可，即使有多项。
 		//这是因为调度时到期的delayed项会被先移至now队列，即使瞬间由一个线程处理多项也没什么负担。
 		//参见_thread_proc中对于delayed的调度算法。
-		m_d->delaying_fn_queue_cv.notify_one();
+		d->delaying_fn_queue_cv.notify_one();
 	}
 }
 
@@ -597,7 +596,7 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 			if (!atfork_calling_in_my_thread_flag || thread_item.thread_sn != current_now_thread_sn) {
 				thread_item.thread->detach();
 				thread_item.thread = std::make_shared<std::thread>(
-					[this, thread_sn = thread_item.thread_sn]() { this->_now_thread_proc(thread_sn); });
+					[self = this, d = m_d, thread_sn = thread_item.thread_sn]() { _now_thread_proc(self, d, thread_sn); });
 			}
 		}
 	}
@@ -605,7 +604,7 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 	if (m_d->delaying_trigger_thread) {
 		m_d->delaying_trigger_thread->detach();
 		m_d->delaying_trigger_thread = std::make_shared<std::thread>(
-			[this]() { this->_delaying_trigger_thread_proc(); });
+			[self = this, d = m_d]() { _delaying_trigger_thread_proc(self, d); });
 	}
 
 	m_d->atfork_prepared_flag_v = false;

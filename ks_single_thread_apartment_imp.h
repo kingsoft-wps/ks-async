@@ -60,13 +60,13 @@ protected:
 	virtual bool __try_pump_once() override;
 
 private:
+	struct _SINGLE_THREAD_APARTMENT_DATA;
+
 	void _try_start_locked(std::unique_lock<ks_mutex>& lock);
 	void _try_stop_locked(std::unique_lock<ks_mutex>& lock);
 
-	void _prepare_single_thread_locked(std::unique_lock<ks_mutex>& lock);
-	void _single_thread_proc();
-
-	bool _debug_check_fn_id_exists_locked(uint64_t id, std::unique_lock<ks_mutex>& lock) const;
+	static void _prepare_single_thread_locked(ks_single_thread_apartment_imp* self, const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, std::unique_lock<ks_mutex>& lock);
+	static void _single_thread_proc(ks_single_thread_apartment_imp* self, const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d);
 
 private:
 	struct _FN_ITEM {
@@ -78,8 +78,10 @@ private:
 		uint64_t fn_id;
 	};
 
-	void _do_put_fn_item_into_now_list_locked(_FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock);
-	void _do_put_fn_item_into_delaying_list_locked(_FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock);
+	static void _do_put_fn_item_into_now_list_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, _FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock);
+	static void _do_put_fn_item_into_delaying_list_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, _FN_ITEM&& fn_item, std::unique_lock<ks_mutex>& lock);
+
+	static bool _debug_check_fn_id_exists_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, uint64_t id, std::unique_lock<ks_mutex>& lock);
 
 private:
 	enum class _STATE { NOT_START, RUNNING, STOPPING, STOPPED };
@@ -113,5 +115,5 @@ private:
 #endif
 	};
 
-	_SINGLE_THREAD_APARTMENT_DATA* m_d;
+	std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA> m_d;
 };
