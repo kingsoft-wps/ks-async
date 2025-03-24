@@ -455,22 +455,14 @@ ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NA
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 
-ks_notification_center::ks_notification_center(__raw_ctor, const char* center_name) {
-	m_d = new __ks_notification_center_data(center_name);
-}
-
-ks_notification_center::~ks_notification_center() {
-	delete m_d;
+ks_notification_center::ks_notification_center(const char* center_name)
+	: m_d(std::make_shared<__ks_notification_center_data>(center_name)) {
 }
 
 
 ks_notification_center* ks_notification_center::default_center() {
-	static ks_notification_center g_default_center(__raw_ctor::v, "default_center");
+	static ks_notification_center g_default_center("default_center");
 	return &g_default_center;
-}
-
-std::shared_ptr<ks_notification_center> ks_notification_center::__create_center(const char* center_name) {
-	return std::make_shared< ks_notification_center>(__raw_ctor::v, center_name);
 }
 
 

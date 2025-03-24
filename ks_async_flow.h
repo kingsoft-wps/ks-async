@@ -8,8 +8,7 @@
 
 class ks_async_flow {
 public:
-	explicit ks_async_flow(nullptr_t) : m_raw_flow(nullptr) {}
-	explicit ks_async_flow(const ks_async_context& context = {}) : m_raw_flow(ks_raw_async_flow::create()) {}
+	explicit ks_async_flow() : m_raw_flow(ks_raw_async_flow::create()) {}
 
 	ks_async_flow(ks_async_flow&&) noexcept = default;
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_flow);
