@@ -31,6 +31,7 @@ public:
 
 public:
 	static ks_error of(HRESULT code) {
+		ASSERT(code != 0);
 		return ks_error(code); 
 	}
 
