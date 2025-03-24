@@ -205,7 +205,7 @@ private:
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
-public: //repetitive
+public: //periodic, repetitive
 	static ks_future<void> periodic(
 		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
 		int64_t interval, int64_t first_delay = 0,
@@ -221,20 +221,21 @@ public: //repetitive
 		data->interval = interval;
 		data->first_delay = first_delay;
 		data->context = context;
-
+		data->create_time = std::chrono::steady_clock::now();
 		data->raw_final_promise_void = ks_raw_promise::create(apartment);
-		data->raw_final_promise_void->get_future()->on_failure(
-			//注：支持在返回的future上调用try_cancel
-			[data](const ks_error& error) {
-				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE && !data->cancel_ctrl)
-					data->cancel_ctrl = true;
-			},
-			context, apartment);
 
-		ks_future_util::post_delayed<void>(
-				data->apartment,
-				[data]() { __pump_periodic_once(data); },
-				first_delay);
+		data->raw_final_promise_void->get_future()->on_failure(
+			//注：支持在final_future上调用try_cancel
+			[data_weak = std::weak_ptr<__periodic_data_t>(data)](const ks_error& error) {
+				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
+					auto data = data_weak.lock();
+					if (data != nullptr)
+						data->cancel_ctrl = true;
+				}
+			},
+			make_async_context().set_priority(0x10000), apartment);
+
+		__schedule_periodic_once(data, first_delay);
 
 		return ks_future<void>::__from_raw(data->raw_final_promise_void->get_future());
 	}
@@ -258,15 +259,19 @@ public: //repetitive
 		data->produce_fn = std::move(produce_fn);
 		data->consume_fn = std::move(consume_fn);
 		data->context = context;
-
+		data->create_time = std::chrono::steady_clock::now();
 		data->raw_final_promise_void = ks_raw_promise::create(consume_apartment);
+
 		data->raw_final_promise_void->get_future()->on_failure(
-			//注：支持在返回的future上调用try_cancel
-			[data](const ks_error& error) {
-				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE && !data->cancel_ctrl)
-					data->cancel_ctrl = true;
+			//注：支持在final_future上调用try_cancel
+			[data_weak = std::weak_ptr<__repetitive_data_t<V>>(data)](const ks_error& error) {
+				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
+					auto data = data_weak.lock();
+					if (data != nullptr)
+						data->cancel_ctrl = true;
+				}
 			}, 
-			context, consume_apartment);
+			make_async_context().set_priority(0x10000), produce_apartment);
 
 		__pump_repetitive_once<V>(data);
 
@@ -280,42 +285,61 @@ private:
 		int64_t interval;
 		int64_t first_delay;
 		ks_async_context context;
+
+		std::chrono::steady_clock::time_point create_time{};
+		uint64_t rounds = 0;
 		volatile bool cancel_ctrl = false;
-		uint64_t counter = 0;
 		ks_raw_promise_ptr raw_final_promise_void = nullptr;
 	};
 
-	static void __pump_periodic_once(const std::shared_ptr<__periodic_data_t>& data) {
+	static void __schedule_periodic_once(const std::shared_ptr<__periodic_data_t>& data, int64_t delay) {
 		ks_future_util
-			::post<void>(data->apartment, []() {})
-			.flat_then<void>(
+			::post_delayed<void>(
 				data->apartment,
-				[data]() {
+				[data]() -> ks_result<void> {
 					if (data->cancel_ctrl)
-						return ks_future<void>::rejected(ks_error::cancelled_error());
-					return data->fn();
+						return ks_error::cancelled_error();
+					else
+						return nothing;
 				},
-				data->context)
+				delay, data->context)
 			.on_completion(
 				data->apartment,
-				[data](const ks_result<void>& result) {
-					if (result.is_value()) {
-						data->counter++;
-						ks_future_util::post_delayed<void>(
-							data->apartment,
-							[data]() { __pump_periodic_once(data); },
-							data->interval);
-					}
-					else {
-						ks_error error = result.to_error();
-						if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
-							data->raw_final_promise_void->resolve(ks_raw_value::of(nothing));
-						else
-							data->raw_final_promise_void->reject(error);
-					}
-				});
+				[data](const ks_result<void>& schedule_result) {
+					__on_trigger_periodic_once(data, schedule_result);
+				},
+				make_async_context().set_priority(0x10000));
 	}
 
+	static void __on_trigger_periodic_once(const std::shared_ptr<__periodic_data_t>& data, const ks_result<void>& schedule_result) {
+		if (!schedule_result.is_value()) {
+			data->raw_final_promise_void->try_complete(__last_error_to_raw_result_void(schedule_result.to_error()));
+			return;
+		}
+		ks_future_util
+			::post<void>(data->apartment, data->fn);
+
+		ks_future_util
+			::post<void>(data->apartment, data->fn)
+			.on_success(
+				data->apartment, 
+				[data]() {
+					data->rounds++;
+					const std::chrono::steady_clock::time_point now_time = std::chrono::steady_clock::now();
+					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds(data->first_delay + data->interval * data->rounds);
+					const int64_t next_delay = std::chrono::duration_cast<std::chrono::milliseconds>(next_time - now_time).count();
+					__schedule_periodic_once(data, next_delay);
+				},
+				make_async_context().set_priority(0x10000))
+			.on_failure(
+				data->apartment,
+				[data](const ks_error& error) {
+					data->raw_final_promise_void->try_complete(__last_error_to_raw_result_void(error));
+				},
+				make_async_context().set_priority(0x10000));
+	}
+
+private:
 	template <class V>
 	struct __repetitive_data_t {
 		ks_apartment* produce_apartment;
@@ -323,8 +347,10 @@ private:
 		std::function<ks_future<V>()> produce_fn;
 		std::function<ks_future<void>(const V&)> consume_fn;
 		ks_async_context context;
+
+		std::chrono::steady_clock::time_point create_time{};
+		uint64_t rounds = 0;
 		volatile bool cancel_ctrl = false;
-		uint64_t counter = 0;
 		ks_raw_promise_ptr raw_final_promise_void = nullptr;
 	};
 
@@ -359,7 +385,7 @@ private:
 				data->consume_apartment,
 				[data](const ks_result<void>& result) {
 					if (result.is_value()) {
-						data->counter++;
+						data->rounds++;
 						__pump_repetitive_once<V>(data);
 					}
 					else {
@@ -369,6 +395,14 @@ private:
 						else
 							data->raw_final_promise_void->reject(error);
 					}
-				});
+				},
+				make_async_context().set_priority(0x10000));
+	}
+
+	static ks_raw_result __last_error_to_raw_result_void(const ks_error& error) {
+		if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
+			return ks_raw_value::of(nothing);
+		else
+			return error;
 	}
 };

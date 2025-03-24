@@ -71,39 +71,39 @@ private: //__wrap_task_fn
 
 	template <class FN>
 	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
-		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
 			task_fn();
 			return ks_result<nothing_t>(nothing);
 		};
 	}
 	template <class FN>
 	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
 			return task_fn().template cast<nothing_t>();
 		};
 	}
 	template <class FN>
 	static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return[task_fn = std::move(task_fn)]()->ks_future<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_future<nothing_t> {
 			return task_fn().template cast<nothing_t>();
 		};
 	}
 	template <class FN>
 	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
-		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
 			task_fn(ks_cancel_inspector::__for_future());
 			return ks_result<nothing_t>(nothing);
 		};
 	}
 	template <class FN>
 	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
 			return task_fn(ks_cancel_inspector::__for_future()).template cast<nothing_t>();
 		};
 	}
 	template <class FN>
 	static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return[task_fn = std::move(task_fn)]()->ks_future<nothing_t> {
+		return[task_fn = std::forward<FN>(task_fn)]()->ks_future<nothing_t> {
 			return task_fn(ks_cancel_inspector::__for_future()).template cast<nothing_t>();
 		};
 	}
