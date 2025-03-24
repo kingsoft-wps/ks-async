@@ -59,24 +59,6 @@ public: //resolved, rejected
 	}
 
 public: //post, post_delayed, post_pending
-	static ks_future<T> post(ks_apartment* apartment, std::function<T()>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
-	static ks_future<T> post(ks_apartment* apartment, std::function<ks_result<T>()>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
-	static ks_future<T> post(ks_apartment* apartment, std::function<ks_future<T>()>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
-	static ks_future<T> post(ks_apartment* apartment, std::function<T(ks_cancel_inspector*)>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
-	static ks_future<T> post(ks_apartment* apartment, std::function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
-	static ks_future<T> post(ks_apartment* apartment, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post(apartment, context, std::move(task_fn));
-	}
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T()>> ||
 		std::is_convertible_v<FN, std::function<ks_result<T>()>> ||
@@ -98,24 +80,6 @@ public: //post, post_delayed, post_pending
 		return ks_future<T>::__choose_post(apartment, context, std::forward<FN>(task_fn));
 	}
 
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<T()>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<ks_result<T>()>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<ks_future<T>()>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<T(ks_cancel_inspector*)>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
-	static ks_future<T> post_delayed(ks_apartment* apartment, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn, int64_t delay, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_delayed(apartment, context, std::move(task_fn), delay);
-	}
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T()>> ||
 		std::is_convertible_v<FN, std::function<ks_result<T>()>> ||
@@ -137,24 +101,6 @@ public: //post, post_delayed, post_pending
 		return ks_future<T>::__choose_post_delayed(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<T()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<ks_result<T>()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<ks_future<T>()>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<T(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<ks_result<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
-	static ks_future<T> post_pending(ks_apartment* apartment, std::function<ks_future<T>(ks_cancel_inspector*)>&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
-		return ks_future<T>::__choose_post_pending(apartment, context, std::move(task_fn), trigger);
-	}
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<T()>> ||
 		std::is_convertible_v<FN, std::function<ks_result<T>()>> ||
@@ -177,30 +123,6 @@ public: //post, post_delayed, post_pending
 	}
 
 public: //then, transform
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<R(const T&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<ks_result<R>(const T&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<ks_future<R>(const T&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<R(const T&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> then(ks_apartment* apartment, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_then<R>(apartment, context, std::move(fn));
-	}
 	template <class R, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<R(const T&)>> ||
 		std::is_convertible_v<FN, std::function<ks_result<R>(const T&)>> ||
@@ -222,30 +144,6 @@ public: //then, transform
 		return this->__choose_then<R>(apartment, context, std::forward<FN>(fn));
 	}
 
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<R(const ks_result<T>&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<ks_result<R>(const ks_result<T>&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<ks_future<R>(const ks_result<T>&)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<R(const ks_result<T>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
-	template <class R>
-	ks_future<R> transform(ks_apartment* apartment, std::function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>&& fn, const ks_async_context& context = {}) const {
-		return this->__choose_transform<R>(apartment, context, std::move(fn));
-	}
 	template <class R, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<R(const ks_result<T>&)>> || 
 		std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&)>> || 
@@ -356,13 +254,11 @@ public: //cast, map, deliver_to_promise, set_timeout
 		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
-	template <class R, class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<R(const T&)>> &&
-		std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>>>
-		ks_future<R> map(FN&& fn) const {
+	template <class R>
+	ks_future<R> map(std::function<R(const T&)>&& fn) const {
 		ASSERT(this->is_valid());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
-			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(fn(value.get<T>())); },
+			[fn = std::move(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(fn(value.get<T>())); },
 			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
 	}

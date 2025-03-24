@@ -47,12 +47,10 @@ public:
 		return m_nothing_result.template cast<R>();
 	}
 
-	template <class R, class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<R()>> && 
-		std::is_convertible_v<std::invoke_result_t<FN>, R>>>
-	ks_result<R> map(FN&& fn) const {
+	template <class R>
+	ks_result<R> map(std::function<R()>&& fn) const {
 		return m_nothing_result.template map<R>(
-			[fn = std::forward<FN>(fn)](const nothing_t&) -> R { return fn(); }
+			[fn = std::move(fn)](const nothing_t&) -> R { return fn(); }
 		);
 	}
 
