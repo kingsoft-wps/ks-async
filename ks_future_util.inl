@@ -29,7 +29,7 @@ private:
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
-public:
+public: //resolved, rejected
 	template <class T, class X = T, class _ = std::enable_if_t<std::is_void_v<T> ? std::is_nothing_v<X> : std::is_convertible_v<X, T>>>
 	static ks_future<T> resolved(X&& value) {
 		return ks_future<T>::resolved(std::forward<X>(value));
@@ -44,27 +44,38 @@ public:
 		return ks_future<T>::rejected(error);
 	}
 
-	template <class T, class FN>
+public: //post, post_delayed, post_pending
+	template <class T, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<T()>> || 
+		std::is_convertible_v<FN, std::function<ks_result<T>()>> || 
+		std::is_convertible_v<FN, std::function<ks_future<T>()>> ||
+		std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>> || 
+		std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>> || 
+		std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> post(ks_apartment* apartment, FN&& task_fn, const ks_async_context& context = {}) {
 		return ks_future<T>::post(apartment, context, std::forward<FN>(task_fn));
 	}
-	template <class T, class FN>
+
+	template <class T, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<T()>> ||
+		std::is_convertible_v<FN, std::function<ks_result<T>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<T>()>> ||
+		std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>> ||
+		std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>> ||
+		std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> post_delayed(ks_apartment* apartment, FN&& task_fn, int64_t delay, const ks_async_context& context = {}) {
 		return ks_future<T>::post_delayed(apartment, std::forward<FN>(task_fn), delay, context);
 	}
-	template <class T, class FN>
+
+	template <class T, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<T()>> ||
+		std::is_convertible_v<FN, std::function<ks_result<T>()>> ||
+		std::is_convertible_v<FN, std::function<ks_future<T>()>> ||
+		std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>> ||
+		std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>> ||
+		std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> post_pending(ks_apartment* apartment, FN&& task_fn, ks_pending_trigger* trigger, const ks_async_context& context = {}) {
 		return ks_future<T>::post_pending(apartment, std::forward<FN>(task_fn), trigger, context);
-	}
-
-private:
-	template <class T, class X>
-	static ks_future<T> __choose_resolved(std::bool_constant<false> is_void_mode, X&& value) {
-		return ks_future<T>::resolved(std::forward<X>(value));
-	}
-	template <class T, class X>
-	static ks_future<void> __choose_resolved(std::bool_constant<true> is_void_mode, X&& value) {
-		return ks_future<void>::resolved(std::forward<X>(value));
 	}
 
 public: //tuple aggr
