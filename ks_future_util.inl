@@ -26,6 +26,8 @@ private:
 
 	using ks_raw_future = __ks_async_raw::ks_raw_future;
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
+	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
+	using ks_raw_promise_ptr = __ks_async_raw::ks_raw_promise_ptr;
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
@@ -203,8 +205,40 @@ private:
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
-
 public: //repetitive
+	static ks_future<void> periodic(
+		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		int64_t interval, int64_t first_delay = 0,
+		const ks_async_context& context = {}) {
+
+		ASSERT(apartment != nullptr);
+		if (apartment == nullptr)
+			apartment = ks_apartment::default_mta();
+
+		std::shared_ptr<__periodic_data_t> data = std::make_shared<__periodic_data_t>();
+		data->apartment = apartment;
+		data->fn = std::move(fn);
+		data->interval = interval;
+		data->first_delay = first_delay;
+		data->context = context;
+
+		data->raw_final_promise_void = ks_raw_promise::create(apartment);
+		data->raw_final_promise_void->get_future()->on_failure(
+			//注：支持在返回的future上调用try_cancel
+			[data](const ks_error& error) {
+				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE && !data->cancel_ctrl)
+					data->cancel_ctrl = true;
+			},
+			context, apartment);
+
+		ks_future_util::post_delayed<void>(
+				data->apartment,
+				[data]() { __pump_periodic_once(data); },
+				first_delay);
+
+		return ks_future<void>::__from_raw(data->raw_final_promise_void->get_future());
+	}
+
 	template <class V>
 	static ks_future<void> repetitive(
 		ks_apartment* produce_apartment, std::function<ks_future<V>()>&& produce_fn,
@@ -218,60 +252,126 @@ public: //repetitive
 		if (consume_apartment == nullptr)
 			consume_apartment = ks_apartment::default_mta();
 
-		ks_promise<void> final_promise = ks_promise<void>::create();
-		__do_pump_repetitive_once<V>(
-			produce_apartment, produce_fn,
-			consume_apartment, consume_fn,
-			context, final_promise);
+		std::shared_ptr<__repetitive_data_t<V>> data = std::make_shared<__repetitive_data_t<V>>();
+		data->produce_apartment = produce_apartment;
+		data->consume_apartment = consume_apartment;
+		data->produce_fn = std::move(produce_fn);
+		data->consume_fn = std::move(consume_fn);
+		data->context = context;
 
-		return final_promise.get_future();
+		data->raw_final_promise_void = ks_raw_promise::create(consume_apartment);
+		data->raw_final_promise_void->get_future()->on_failure(
+			//注：支持在返回的future上调用try_cancel
+			[data](const ks_error& error) {
+				if (error.get_code() == ks_error::CANCELLED_ERROR_CODE && !data->cancel_ctrl)
+					data->cancel_ctrl = true;
+			}, 
+			context, consume_apartment);
+
+		__pump_repetitive_once<V>(data);
+
+		return ks_future<void>::__from_raw(data->raw_final_promise_void->get_future());
 	}
 
 private:
-	template <class V>
-	static void __do_pump_repetitive_once(
-		ks_apartment* produce_apartment, const std::function<ks_future<V>()>& produce_fn,
-		ks_apartment* consume_apartment, const std::function<ks_future<void>(const V&)>& consume_fn,
-		const ks_async_context& context, const ks_promise<void>& final_promise) {
+	struct __periodic_data_t {
+		ks_apartment* apartment;
+		std::function<ks_future<void>()> fn;
+		int64_t interval;
+		int64_t first_delay;
+		ks_async_context context;
+		volatile bool cancel_ctrl = false;
+		uint64_t counter = 0;
+		ks_raw_promise_ptr raw_final_promise_void = nullptr;
+	};
 
+	static void __pump_periodic_once(const std::shared_ptr<__periodic_data_t>& data) {
+		ks_future_util
+			::post<void>(data->apartment, []() {})
+			.flat_then<void>(
+				data->apartment,
+				[data]() {
+					if (data->cancel_ctrl)
+						return ks_future<void>::rejected(ks_error::cancelled_error());
+					return data->fn();
+				},
+				data->context)
+			.on_completion(
+				data->apartment,
+				[data](const ks_result<void>& result) {
+					if (result.is_value()) {
+						data->counter++;
+						ks_future_util::post_delayed<void>(
+							data->apartment,
+							[data]() { __pump_periodic_once(data); },
+							data->interval,
+							data->context);
+					}
+					else {
+						ks_error error = result.to_error();
+						if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
+							data->raw_final_promise_void->resolve(ks_raw_value::of(nothing));
+						else
+							data->raw_final_promise_void->reject(error);
+					}
+				},
+				data->context);
+	}
+
+	template <class V>
+	struct __repetitive_data_t {
+		ks_apartment* produce_apartment;
+		ks_apartment* consume_apartment;
+		std::function<ks_future<V>()> produce_fn;
+		std::function<ks_future<void>(const V&)> consume_fn;
+		ks_async_context context;
+		volatile bool cancel_ctrl = false;
+		uint64_t counter = 0;
+		ks_raw_promise_ptr raw_final_promise_void = nullptr;
+	};
+
+	template <class V>
+	static void __pump_repetitive_once(const std::shared_ptr< __repetitive_data_t<V>>& data) {
 		ks_future_util
 			::post<V>(
-				produce_apartment,
-				[produce_fn]() -> ks_future<V> {
-					ks_future<V> fut = produce_fn();
+				data->produce_apartment,
+				[data]() -> ks_future<V> {
+					if (data->cancel_ctrl)
+						return ks_future<V>::rejected(ks_error::cancelled_error());
+					ks_future<V> fut = data->produce_fn();
 					ASSERT(fut.is_valid());
 					if (!fut.is_valid()) 
 						fut = ks_future<V>::rejected(ks_error::unexpected_error());
 					return fut;
 				},
-				context)
+				data->context)
 			.template flat_then<void>(
-				consume_apartment,
-				[consume_fn](const V& value) -> ks_future<void> {
-					ks_future<void> fut = consume_fn(value);
+				data->consume_apartment,
+				[data](const V& value) -> ks_future<void> {
+					if (data->cancel_ctrl)
+						return ks_future<void>::rejected(ks_error::cancelled_error());
+					ks_future<void> fut = data->consume_fn(value);
 					ASSERT(fut.is_valid());
 					if (!fut.is_valid())
 						fut = ks_future<void>::rejected(ks_error::unexpected_error());
 					return fut;
 				},
-				context)
+				data->context)
 			.on_completion(
-				consume_apartment,
-				[produce_apartment, produce_fn, consume_apartment, consume_fn, context, final_promise](const ks_result<void>& result) -> void {
+				data->consume_apartment,
+				[data](const ks_result<void>& result) {
 					if (result.is_value()) {
-						__do_pump_repetitive_once<V>(
-							produce_apartment, produce_fn,
-							consume_apartment, consume_fn,
-							context, final_promise);
+						data->counter++;
+						__pump_repetitive_once<V>(data);
 					}
 					else {
 						ks_error error = result.to_error();
 						if (error.get_code() == 0 || error.get_code() == ks_error::EOF_ERROR_CODE)
-							final_promise.resolve();
+							data->raw_final_promise_void->resolve(ks_raw_value::of(nothing));
 						else
-							final_promise.reject(error);
+							data->raw_final_promise_void->reject(error);
 					}
 				},
-				context);
+				data->context);
 	}
 };

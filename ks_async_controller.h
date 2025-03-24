@@ -34,6 +34,11 @@ public:
 		m_controller_data_ptr->cancel_all_ctrl_v = true;
 	}
 
+	bool check_cancel_all_ctrl() {
+		return m_controller_data_ptr->cancel_all_ctrl_v;
+	}
+
+public:
 	bool has_pending_futures() const {
 		return m_controller_data_ptr->pending_latch.try_wait() == false;
 	}

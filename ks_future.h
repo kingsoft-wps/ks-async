@@ -993,7 +993,6 @@ private:
 private:
 	using ks_raw_future = __ks_async_raw::ks_raw_future;
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
-
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 

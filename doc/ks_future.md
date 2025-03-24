@@ -361,14 +361,31 @@ ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>
 <br>
 <br>
 
+
+```C++
+ks_future<void> periodic(
+		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		int64_t first_delay, int64_t interval, 
+		const ks_async_context& context = {});
+```
+#### 描述：定时执行一个异步过程，直至EOF或错误。
+#### 参数：
+  - apartment: 异步执行套间。
+  - fn: 异步函数。
+  - first_delay: 首次执行时延。
+  - interval: 每次执行间隔时间。
+  - context: 异步任务执行时所需上下文。
+#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
+<br>
+
 ```C++
 template <class V>
 ks_future<void> ks_future_util::repetitive<V>(
-  ks_apartment* produce_apartment, function<ks_future<V>()>&& produce_fn,
-  ks_apartment* consume_apartment, function<ks_future<void>(const U&)>&& consume_fn,
-  const ks_async_context& context = {});
+    ks_apartment* produce_apartment, function<ks_future<V>()>&& produce_fn,
+    ks_apartment* consume_apartment, function<ks_future<void>(const U&)>&& consume_fn,
+    const ks_async_context& context = {});
 ```
-#### 描述：反复迭代一个异步的produce-consume过程，直至出现 “错误”。
+#### 描述：反复迭代一个异步的produce-consume过程，直至EOF或错误。
 #### 模板参数：
   -- V: produce_fn每次产生的、以及consume_fn消费的数据类型。
 #### 参数：
@@ -377,7 +394,7 @@ ks_future<void> ks_future_util::repetitive<V>(
   - consume_apartment: 消费者执行套间。
   - consume_fn: 消费者异步函数。
   - context: 异步任务执行时所需上下文。
-#### 返回值：代表迭代结束的一个future，因迭代过程是出现 “错误” 时结束，故返回的future的最终状态必为 “错误”。
+#### 返回值：代表迭代结束的一个future，若至EOF结束则返回成功。
 <br>
 <br>
 <br>
