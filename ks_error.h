@@ -22,28 +22,30 @@ limitations under the License.
 class ks_error final {
 public:
 	ks_error() : m_code(0) {}
-	explicit ks_error(HRESULT code) : m_code(code) {}
 
 	ks_error(const ks_error&) = default;
 	ks_error& operator=(const ks_error&) = default;
+
 	ks_error(ks_error&&) noexcept = default;
 	ks_error& operator=(ks_error&&) noexcept = default;
 
 public:
 	static ks_error of(HRESULT code) {
-		return ks_error(code); 
-	}
-
-	template <class T>
-	ks_error with_payload(const T& payload) const {
-		ks_error ret = *this;
-		ret.m_payload_any = ks_any::of(payload);
+		ks_error ret;
+		ret.m_code = code;
 		return ret;
 	}
-	template <class T>
+
+	template <class T, class X = T>
+	ks_error with_payload(X&& payload) const {
+		ks_error ret = *this;
+		ret.m_payload_any = ks_any::of<T>(payload);
+		return ret;
+	}
+	template <class T, class X = T>
 	ks_error with_payload(T&& payload) const {
 		ks_error ret = *this;
-		ret.m_payload_any = ks_any::of(std::forward<T>(payload));
+		ret.m_payload_any = ks_any::of<T>(std::forward<X>(payload));
 		return ret;
 	}
 
