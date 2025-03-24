@@ -368,7 +368,7 @@ public: //cast, map, deliver_to_promise, set_timeout
 	}
 
 	template <class R, class X = R>
-	ks_result<R> map_value(X&& x) const {
+	ks_future<R> map_value(X&& x) const {
 		ASSERT(this->is_valid());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[x = std::forward<X>(x)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(x); },

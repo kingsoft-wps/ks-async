@@ -560,7 +560,7 @@ public: //cast, map, deliver_to_promise, set_timeout
 	}
 
 	template <class R, class X = R>
-	ks_result<R> map_value(X&& x) const {
+	ks_future<R> map_value(X&& x) const {
 		return m_nothing_future.template map_value<R>(std::forward<X>(x));
 	}
 
