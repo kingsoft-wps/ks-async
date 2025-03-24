@@ -53,17 +53,15 @@ ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 		if (m_d->delaying_trigger_thread != nullptr) {
-			m_d->delaying_trigger_thread->detach();  //这里也不要join了，只detach
-			m_d->delaying_trigger_thread = nullptr;
+			m_d->delaying_trigger_thread->detach();   //这里也不要join了，只detach
+			//m_d->delaying_trigger_thread = nullptr; //也不必置null了
 		}
 
 		if (!m_d->thread_pool.empty()) {
 			for (auto& thread_item : m_d->thread_pool) {
-				thread_item.thread->detach();  //这里也不要join了，只detach
-				thread_item.thread = nullptr;
+				thread_item.thread->detach();   //这里也不要join了，只detach
+				//thread_item.thread = nullptr; //也不必置null了
 			}
-
-			m_d->thread_pool.clear();
 		}
 	}
 

@@ -61,8 +61,8 @@ ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 		if (m_d->isolated_thread_opt != nullptr) {
-			m_d->isolated_thread_opt->detach();  //这里也不要join了，只detach
-			m_d->isolated_thread_opt = nullptr;
+			m_d->isolated_thread_opt->detach();   //这里也不要join了，只detach
+			//m_d->isolated_thread_opt = nullptr; //也不必置null了
 		}
 	}
 
