@@ -152,13 +152,26 @@ public: //vector aggr
 public: //repetitive
 	template <class T>
 	static ks_future<void> repetitive(
-		ks_apartment* apartment,
-		const std::function<ks_future<T>()>& producer,
-		const std::function<ks_future<void>(const T&)>& consumer,
+		std::function<ks_future<T>()>&& producer,
+		std::function<ks_future<void>(const T&)>&& consumer,
+		ks_apartment* producer_apartment = ks_apartment::default_mta(),
+		ks_apartment* consumer_apartment = ks_apartment::default_mta(),
 		const ks_async_context& context = {}) {
 
+		ASSERT(producer_apartment != nullptr);
+		ASSERT(consumer_apartment != nullptr);
+		if (producer_apartment == nullptr)
+			producer_apartment = ks_apartment::default_mta();
+		if (consumer_apartment == nullptr)
+			consumer_apartment = ks_apartment::default_mta();
+
 		ks_promise<void> final_promise = ks_promise<void>::create();
-		__do_pump_repetitive_once(apartment, producer, consumer, context, final_promise);
+		__do_pump_repetitive_once(
+			producer, consumer, 
+			producer_apartment, consumer_apartment,
+			context, 
+			final_promise);
+
 		return final_promise.get_future();
 	}
 
@@ -171,15 +184,16 @@ private:
 private:
 	template <class T>
 	static void __do_pump_repetitive_once(
-		ks_apartment* apartment,
 		const std::function<ks_future<T>()>& producer,
 		const std::function<ks_future<void>(const T&)>& consumer,
+		ks_apartment* producer_apartment,
+		ks_apartment* consumer_apartment,
 		const ks_async_context& context,
 		const ks_promise<void>& final_promise) {
 
 		ks_future<T>
 			::post(
-				apartment, 
+				producer_apartment,
 				[producer]() -> ks_future<T> {
 					ks_future<T> fut = producer();
 					ASSERT(fut.is_valid());
@@ -189,7 +203,7 @@ private:
 				},
 				context)
 			.template flat_then<void>(
-				apartment, 
+				consumer_apartment,
 				[consumer](const T& value) -> ks_future<void> {
 					ks_future<void> fut = consumer(value);
 					ASSERT(fut.is_valid());
@@ -199,10 +213,14 @@ private:
 				},
 				context)
 			.on_completion(
-				apartment,
-				[apartment, producer, consumer, context, final_promise](const ks_result<void>& consume_res) -> void {
+				producer_apartment,
+				[producer, consumer, producer_apartment, consumer_apartment, context, final_promise](const ks_result<void>& consume_res) -> void {
 					if (consume_res.is_value()) {
-						__do_pump_repetitive_once(apartment, producer, consumer, context, final_promise);
+						__do_pump_repetitive_once(
+							producer, consumer, 
+							producer_apartment, consumer_apartment, 
+							context, 
+							final_promise);
 					}
 					else {
 						final_promise.reject(consume_res.to_error());

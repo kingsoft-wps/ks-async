@@ -220,8 +220,18 @@ ks_future<R> cast<R>();
 #### 返回值：新ks_future\<R>对象。
 #### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return R(val); })`
 <br>
-<br>
 
+```C++
+template <class R>
+ks_future<R> map<R>(function<R(const T&)>&& fn);
+```
+#### 描述：将this的T类型的结果值经转换函数fn变换为R类型，得到一个新的ks_future<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_future\<R>。
+#### 返回值：新ks_future\<R>对象。
+#### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return fn(val); })`
+<br>
+<br>
 
 
 # 状态和结果查询/控制
@@ -307,18 +317,20 @@ static ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_fu
 ```C++
 	template <class T>
 	static ks_future<void> repetitive(
-		ks_apartment* apartment,
-		const std::function<ks_future<T>()>& producer,
-		const std::function<ks_future<void>(const T&)>& consumer,
+		function<ks_future<T>()>&& producer,
+		function<ks_future<void>(const T&)>&& consumer,
+		ks_apartment* producer_apartment = ks_apartment::default_mta(),
+		ks_apartment* consumer_apartment = ks_apartment::default_mta(),
 		const ks_async_context& context = {});
 ```
 #### 描述：反复迭代一个异步的produce-consume过程，直至出现 “错误”。
 #### 模板参数：
   -- T: producer产生的、以及consumer消费的数据类型。
 #### 参数：
-  - apartment: 指定异步任务执行时所在套间。
   - producer: 生产者异步函数。
   - consumer: 消费者异步函数。
+  - producer_apartment: 指定生产者执行套间。
+  - consumer_apartment: 指定消费者执行套间。
   - context: 异步任务执行时所需上下文。
 #### 返回值：代表迭代结束的一个future，因迭代过程是出现 “错误” 时结束，故返回的future的最终状态必为 “错误”。
 <br>

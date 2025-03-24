@@ -232,7 +232,7 @@ bool ks_raw_async_flow::add_flat_task(
 			this_ptr->do_make_task_completed_locked(task_item, task_result, lock);
 			return task_result;
 		},
-		ks_async_context().set_priority(0x10000), task_item->task_apartment
+		make_async_context().set_priority(0x10000), task_item->task_apartment
 	);
 
 	m_task_map[task_item->task_name] = task_item;

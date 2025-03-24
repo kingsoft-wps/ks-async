@@ -544,10 +544,19 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::move(fn), context);
 	}
 
-public: //cast, deliver_to_promise, set_timeout
+public: //cast, map, deliver_to_promise, set_timeout
 	template <class R>
 	ks_future<R> cast() const {
-		return m_nothing_future.cast<R>();
+		return m_nothing_future.template cast<R>();
+	}
+
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R()>> && 
+		std::is_convertible_v<std::invoke_result_t<FN>, R>>>
+	ks_future<R> map(FN&& fn) const {
+		return m_nothing_future.template map<R>(
+			[fn = std::forward<FN>(fn)](const nothing_t&) { return fn(); }
+		);
 	}
 
 	template <class X /*= void*/, class _ = std::enable_if_t<std::is_void_v<X>>>
@@ -585,11 +594,11 @@ public: //is_valid, is_completed, peek_result, wait(deprecated), try_cancel
 	}
 
 private:
-	using __cast_mode_t = typename ks_result<void>::__cast_mode_t;
+	using __raw_cast_mode_t = typename ks_result<void>::__raw_cast_mode_t;
 
 	template <class R>
-	static constexpr __cast_mode_t __determine_cast_mode() {
-		return ks_result<void>::template __determine_cast_mode<R>();
+	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
+		return ks_result<void>::template __determine_raw_cast_mode<R>();
 	}
 
 private:

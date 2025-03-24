@@ -48,81 +48,77 @@ public:
 
 	template <class R>
 	ks_result<R> cast() const {
-		constexpr __cast_mode_t cast_mode = __determine_cast_mode<R>();
-		static_assert(cast_mode != __cast_mode_t::invalid, "invalid cast type");
-		return __do_cast<R>(std::integral_constant<__cast_mode_t, cast_mode>());
+		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
+		static_assert(cast_mode != __raw_cast_mode_t::invalid, "invalid cast type");
+		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
-	template <class R, class FN = std::function<R(const T&)>>
-	ks_result<R> map(const FN& fn) const {
-		constexpr bool is_void_fn = std::is_void_v<std::invoke_result_t<FN, const T&>>;
-		static_assert(is_void_fn ? std::is_void_v<R> : std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>, "inalid map fn");
-		return __do_map<R, FN>(std::bool_constant<is_void_fn>(), fn);
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R(const T&)>> && 
+		std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>>>
+	ks_result<R> map(FN&& fn) const {
+		if (this->is_value())
+			return ks_result<R>(fn(this->to_value()));
+		else if (this->is_error())
+			return ks_result<R>(this->to_error());
+		else
+			return ks_result<R>::__bare();
 	}
 
 	template <class R, class X = R>
 	ks_result<R> map_value(const X& x) const {
-		static_assert(std::is_convertible_v<X, R>, "invalid map_value type");
 		if (this->is_value())
 			return ks_result<R>(x);
-		else
+		else if (this->is_error())
 			return ks_result<R>(this->to_error());
+		else
+			return ks_result<R>::__bare();
+	}
+	template <class R, class X = R>
+	ks_result<R> map_value(X&& x) const {
+		if (this->is_value())
+			return ks_result<R>(std::forward<X>(x));
+		else if (this->is_error())
+			return ks_result<R>(this->to_error());
+		else
+			return ks_result<R>::__bare();
 	}
 
 private:
-	enum class __cast_mode_t { invalid, to_same, to_nothing, to_other };
+	enum class __raw_cast_mode_t { invalid, to_same, to_nothing, to_other };
 
 	template <class R>
-	static constexpr __cast_mode_t __determine_cast_mode() {
+	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
 		using XT = std::remove_cvref_t<T>;
 		using XR = std::remove_cvref_t<R>;
 		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
 		using PROXR = std::conditional_t<std::is_void_v<XR>, nothing_t, XR>;
 
 		if (std::is_same_v<PROXT, PROXR>)
-			return __cast_mode_t::to_same;
+			return __raw_cast_mode_t::to_same;
 		else if (std::is_nothing_v<PROXR>)
-			return __cast_mode_t::to_nothing;
+			return __raw_cast_mode_t::to_nothing;
 		else if (std::is_convertible_v<PROXT, PROXR>)
-			return __cast_mode_t::to_other;
+			return __raw_cast_mode_t::to_other;
 		else
-			return __cast_mode_t::invalid;
+			return __raw_cast_mode_t::invalid;
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_same> __cast_mode) const {
+	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_same> __cast_mode) const {
 		return ks_result<R>::__from_raw(m_raw_result);
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_nothing> __cast_mode) const {
+	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_nothing> __cast_mode) const {
 		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of(nothing) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_other> __cast_mode) const {
+	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_other> __cast_mode) const {
 		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of<R>(m_raw_result.to_value().template get<T>()) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
-	}
-
-private:
-	template <class R, class FN>
-	ks_result<R> __do_map(std::bool_constant<true> __is_void_fn, const FN& fn) const {
-		static_assert(std::is_void_v<R>, "invalid map type");
-		if (this->is_value()) 
-			return ks_result<R>((fn(this->to_value()), nothing));
-		else
-			return ks_result<R>(this->to_error());
-	}
-
-	template <class R, class FN>
-	ks_result<R> __do_map(std::bool_constant<false> __is_void_fn, const FN& fn) const {
-		static_assert(std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>, "invalid map type");
-		if (this->is_value())
-			return ks_result<R>(fn(this->to_value()));
-		else
-			return ks_result<R>(this->to_error());
 	}
 
 private:

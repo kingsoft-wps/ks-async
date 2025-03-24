@@ -88,6 +88,26 @@ ks_result<R> cast<R>();
   - R: 约定函数返回值类型为ks_result\<R>。（但要求R必须与T类型兼容或一致）
 #### 返回值：新ks_result\<R>对象。
 <br>
+
+```C++
+template <class R>
+ks_result<R> map<R>(function<R(const T&)>&& fn);
+```
+#### 描述：将this的T类型的结果值经转换函数fn变换为R类型，得到一个新的ks_result<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_result\<R>。
+#### 返回值：新ks_result\<R>对象。
+<br>
+
+```C++
+template <class R>
+ks_result<R> map_value<R>(const R& x);
+```
+#### 描述：将this的T类型的结果值变换为R类型新值，得到一个新的ks_result<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_result\<R>。
+#### 返回值：新ks_result\<R>对象。
+<br>
 <br>
 <br>
 <br>

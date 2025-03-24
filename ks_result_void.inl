@@ -47,22 +47,26 @@ public:
 		return m_nothing_result.template cast<R>();
 	}
 
-	template <class R, class FN = std::function<R()>>
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R()>> && 
+		std::is_convertible_v<std::invoke_result_t<FN>, R>>>
 	ks_result<R> map(FN&& fn) const {
-		return m_nothing_result.template map<R>([fn = std::forward<FN>(fn)](nothing_t) { return fn(); });
+		return m_nothing_result.template map<R>(
+			[fn = std::forward<FN>(fn)](const nothing_t&) { return fn(); }
+		);
 	}
 
-	template <class R, class X = R>
-	ks_result<R> map_value(X&& x) const {
-		return m_nothing_result.template map_value<R>(std::forward<X>(x));
+	template <class R>
+	ks_result<R> map_value(R&& x) const {
+		return m_nothing_result.template map_value<R>(std::forward<R>(x));
 	}
 
 private:
-	using __cast_mode_t = ks_result<nothing_t>::__cast_mode_t;
+	using __raw_cast_mode_t = ks_result<nothing_t>::__raw_cast_mode_t;
 
 	template <class R>
-	static constexpr __cast_mode_t __determine_cast_mode() {
-		return  ks_result<nothing_t>::__determine_cast_mode();
+	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
+		return  ks_result<nothing_t>::__determine_raw_cast_mode();
 	}
 
 private:

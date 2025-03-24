@@ -348,12 +348,23 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::move(fn), context);
 	}
 
-public: //cast, deliver_to_promise, set_timeout
+public: //cast, map, deliver_to_promise, set_timeout
 	template <class R>
 	ks_future<R> cast() const {
 		ASSERT(this->is_valid());
-		constexpr __cast_mode_t cast_mode = __determine_cast_mode<R>();
-		return __do_cast<R>(std::integral_constant<__cast_mode_t, cast_mode>());
+		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
+		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
+	}
+
+	template <class R, class FN, class _ = std::enable_if_t<
+		std::is_convertible_v<FN, std::function<R(const T&)>> &&
+		std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>>>
+		ks_future<R> map(FN&& fn) const {
+		ASSERT(this->is_valid());
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(
+			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of(fn(value.get<T>())); },
+			make_async_context().set_priority(0x10000), nullptr);
+		return ks_future<R>::__from_raw(raw_future2);
 	}
 
 	const this_future_type& deliver_to_promise(const ks_promise<T>& promise) const {
@@ -430,27 +441,27 @@ private:
 
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T()>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_of_arglist_1_ret_1(apartment, context, std::function<T()>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_1_ret_1(apartment, context, std::forward<FN>(task_fn));
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>()>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_of_arglist_1_ret_2(apartment, context, std::function<ks_result<T>()>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_1_ret_2(apartment, context, std::forward<FN>(task_fn));
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>()>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_of_arglist_1_ret_3(apartment, context, std::function<ks_future<T>()>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_1_ret_3(apartment, context, std::forward<FN>(task_fn));
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_of_arglist_2_ret_1(apartment, context, std::function<T(ks_cancel_inspector*)>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_2_ret_1(apartment, context, std::forward<FN>(task_fn));
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_of_arglist_2_ret_2(apartment, context, std::function<ks_result<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_2_ret_2(apartment, context, std::forward<FN>(task_fn));
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_of_arglist_2_ret_3(apartment, context, std::function<ks_future<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)));
+		return ks_future<T>::__post_of_arglist_2_ret_3(apartment, context, std::forward<FN>(task_fn));
 	}
 
 	template <class FN, class _ = std::enable_if_t<
@@ -485,27 +496,27 @@ private:
 
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T()>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_delayed_of_arglist_1_ret_1(apartment, context, std::function<T()>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_1_ret_1(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>()>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_delayed_of_arglist_1_ret_2(apartment, context, std::function<ks_result<T>()>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_1_ret_2(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>()>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_delayed_of_arglist_1_ret_3(apartment, context, std::function<ks_future<T>()>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_1_ret_3(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_delayed_of_arglist_2_ret_1(apartment, context, std::function<T(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_2_ret_1(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_delayed_of_arglist_2_ret_2(apartment, context, std::function<ks_result<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_2_ret_2(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_delayed_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, int64_t delay, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_delayed_of_arglist_2_ret_3(apartment, context, std::function<ks_future<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), delay);
+		return ks_future<T>::__post_delayed_of_arglist_2_ret_3(apartment, context, std::forward<FN>(task_fn), delay);
 	}
 
 	template <class FN, class _ = std::enable_if_t<
@@ -540,27 +551,27 @@ private:
 
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T()>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_pending_of_arglist_1_ret_1(apartment, context, std::function<T()>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_1_ret_1(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>()>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_pending_of_arglist_1_ret_2(apartment, context, std::function<ks_result<T>()>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_1_ret_2(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>()>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_pending_of_arglist_1_ret_3(apartment, context, std::function<ks_future<T>()>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_1_ret_3(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<T(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
-		return ks_future<T>::__post_pending_of_arglist_2_ret_1(apartment, context, std::function<T(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_2_ret_1(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return ks_future<T>::__post_pending_of_arglist_2_ret_2(apartment, context, std::function<ks_result<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_2_ret_2(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<T>(ks_cancel_inspector*)>>>>
 	static ks_future<T> __choose_post_pending_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& task_fn, ks_pending_trigger* trigger, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return ks_future<T>::__post_pending_of_arglist_2_ret_3(apartment, context, std::function<ks_future<T>(ks_cancel_inspector*)>(std::forward<FN>(task_fn)), trigger);
+		return ks_future<T>::__post_pending_of_arglist_2_ret_3(apartment, context, std::forward<FN>(task_fn), trigger);
 	}
 
 private:
@@ -770,35 +781,35 @@ private:
 
 	template <class R, class FN, class _ = std::enable_if_t<std::is_void_v<R> && std::is_convertible_v<FN, std::function<void(const T&)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) const {
-		return this->__then_of_arglist_1_ret_x<R>(apartment, context, std::function<void(const T&)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_1_ret_x<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<!std::is_void_v<R> && std::is_convertible_v<FN, std::function<R(const T&)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) const {
-		return this->__then_of_arglist_1_ret_1<R>(apartment, context, std::function<R(const T&)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_1_ret_1<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<R>(const T&)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) const {
-		return this->__then_of_arglist_1_ret_2<R>(apartment, context, std::function<ks_result<R>(const T&)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_1_ret_2<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<R>(const T&)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) const {
-		return this->__then_of_arglist_1_ret_3<R>(apartment, context, std::function<ks_future<R>(const T&)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_1_ret_3<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_void_v<R>&& std::is_convertible_v<FN, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) const {
-		return this->__then_of_arglist_2_ret_x<R>(apartment, context, std::function<void(const T&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_2_ret_x<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<!std::is_void_v<R> && std::is_convertible_v<FN, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) const {
-		return this->__then_of_arglist_2_ret_1<R>(apartment, context, std::function<R(const T&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_2_ret_1<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) const {
-		return this->__then_of_arglist_2_ret_2<R>(apartment, context, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_2_ret_2<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_then_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) const {
-		return this->__then_of_arglist_2_ret_3<R>(apartment, context, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__then_of_arglist_2_ret_3<R>(apartment, context, std::forward<FN>(fn));
 	}
 
 	template <class R, class FN, class _ = std::enable_if_t<
@@ -835,35 +846,35 @@ private:
 
 	template <class R, class FN, class _ = std::enable_if_t<std::is_void_v<R> && std::is_convertible_v<FN, std::function<void(const ks_result<T>&)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) const {
-		return this->__transform_of_arglist_1_ret_x<R>(apartment, context, std::function<void(const ks_result<T>&)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_1_ret_x<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<!std::is_void_v<R> && std::is_convertible_v<FN, std::function<R(const ks_result<T>&)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) const {
-		return this->__transform_of_arglist_1_ret_1<R>(apartment, context, std::function<R(const ks_result<T>&)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_1_ret_1<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) const {
-		return this->__transform_of_arglist_1_ret_2<R>(apartment, context, std::function<ks_result<R>(const ks_result<T>&)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_1_ret_2<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<T>&)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) const {
-		return this->__transform_of_arglist_1_ret_3<R>(apartment, context, std::function<ks_future<R>(const ks_result<T>&)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_1_ret_3<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_void_v<R> && std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) const {
-		return this->__transform_of_arglist_2_ret_x<R>(apartment, context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_2_ret_x<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<!std::is_void_v<R> && std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) const {
-		return this->__transform_of_arglist_2_ret_1<R>(apartment, context, std::function<R(const ks_result<T>&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_2_ret_1<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) const {
-		return this->__transform_of_arglist_2_ret_2<R>(apartment, context, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_2_ret_2<R>(apartment, context, std::forward<FN>(fn));
 	}
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>>>>
 	ks_future<R> __choose_transform_by_arglist_ret(ks_apartment* apartment, const ks_async_context& context, FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) const {
-		return this->__transform_of_arglist_2_ret_3<R>(apartment, context, std::function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>(std::forward<FN>(fn)));
+		return this->__transform_of_arglist_2_ret_3<R>(apartment, context, std::forward<FN>(fn));
 	}
 
 private:
@@ -948,7 +959,7 @@ private:
 	}
 
 	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
-	ks_future<void> __then_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const {
+	ks_future<R> __then_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&)>&& fn) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
@@ -958,10 +969,10 @@ private:
 			return ks_raw_value::of(nothing);
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-		return ks_future<void>::__from_raw(raw_future2);
+		return ks_future<R>::__from_raw(raw_future2);
 	}
 	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
-	ks_future<void> __then_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&, ks_cancel_inspector*)>&& fn) const {
+	ks_future<R> __then_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const T&, ks_cancel_inspector*)>&& fn) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
@@ -971,7 +982,7 @@ private:
 			return ks_raw_value::of(nothing);
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-		return ks_future<void>::__from_raw(raw_future2);
+		return ks_future<R>::__from_raw(raw_future2);
 	}
 
 
@@ -1055,7 +1066,7 @@ private:
 	}
 
 	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
-	ks_future<void> __transform_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const {
+	ks_future<R> __transform_of_arglist_1_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&)>&& fn) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
@@ -1065,10 +1076,10 @@ private:
 			return ks_raw_value::of(nothing);
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-		return ks_future<void>::__from_raw(raw_future2);
+		return ks_future<R>::__from_raw(raw_future2);
 	}
 	template <class R, class _ = std::enable_if_t<std::is_void_v<R>>>
-	ks_future<void> __transform_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const {
+	ks_future<R> __transform_of_arglist_2_ret_x(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<T>&, ks_cancel_inspector*)>&& fn) const {
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
@@ -1078,24 +1089,24 @@ private:
 			return ks_raw_value::of(nothing);
 		};
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
-		return ks_future<void>::__from_raw(raw_future2);
+		return ks_future<R>::__from_raw(raw_future2);
 	}
 
 private:
-	using __cast_mode_t = typename ks_result<T>::__cast_mode_t;
+	using __raw_cast_mode_t = typename ks_result<T>::__raw_cast_mode_t;
 
 	template <class R>
-	static constexpr __cast_mode_t __determine_cast_mode() {
-		return ks_result<T>::template __determine_cast_mode<R>();
+	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
+		return ks_result<T>::template __determine_raw_cast_mode<R>();
 	}
 
 	template <class R>
-	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_same> __cast_mode) const {
+	ks_future<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_same> __cast_mode) const {
 		return ks_future<R>::__from_raw(m_raw_future);
 	}
 
 	template <class R>
-	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_nothing> __cast_mode) const {
+	ks_future<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_nothing> __cast_mode) const {
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[](const ks_raw_value& value) -> ks_raw_result { return ks_raw_value::of(nothing); },
 			make_async_context().set_priority(0x10000), nullptr);
@@ -1103,7 +1114,7 @@ private:
 	}
 
 	template <class R>
-	ks_future<R> __do_cast(std::integral_constant<__cast_mode_t, __cast_mode_t::to_other> __cast_mode) const {
+	ks_future<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_other> __cast_mode) const {
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[](const ks_raw_value& value) -> ks_raw_result {
 				return ks_raw_value::of(static_cast<R>(value.get<T>()));
