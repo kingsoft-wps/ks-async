@@ -485,7 +485,18 @@ public: //parallel, sequential
 					return ks_future<void>::rejected(ks_error::eof_error());
 			};
 
-			return ks_future_util::repeat(apartment, fn, context);
+			return ks_future_util
+				::repeat(apartment, fn, context)
+				.then<void>(
+					apartment, 
+					[index]() -> ks_result<void> {
+						//若repeat返回成功，但index未达到count，则意味着中间遇到了eof，那么我们还原这个eof错误
+						if ((*index) < count)
+							return ks_error::eof_error();
+						else
+							return nothing;
+					},
+					make_async_context().set_priority(0x10000));
 		}
 	}
 

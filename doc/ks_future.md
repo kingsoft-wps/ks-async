@@ -364,7 +364,7 @@ ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>
 
 ```C++
 ks_future<void> repeat(
-		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
 		const ks_async_context& context = {});
 ```
 #### 描述：重复执行一个异步过程，直至EOF或错误。
@@ -377,7 +377,7 @@ ks_future<void> repeat(
 
 ```C++
 ks_future<void> repeat_periodic(
-		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
 		int64_t first_delay, int64_t interval, 
 		const ks_async_context& context = {});
 ```
@@ -394,8 +394,8 @@ ks_future<void> repeat_periodic(
 ```C++
 template <class V>
 ks_future<void> ks_future_util::repeat_repetitive<V>(
-    ks_apartment* produce_apartment, function<ks_future<V>()>&& produce_fn,
-    ks_apartment* consume_apartment, function<ks_future<void>(const U&)>&& consume_fn,
+    ks_apartment* produce_apartment, function<ks_result<V>()>&& produce_fn,
+    ks_apartment* consume_apartment, function<ks_result<void>(const U&)>&& consume_fn,
     const ks_async_context& context = {});
 ```
 #### 描述：反复迭代一个异步的produce-consume过程，直至EOF或错误。
@@ -412,7 +412,7 @@ ks_future<void> ks_future_util::repeat_repetitive<V>(
 
 ```C++
 ks_future<void> parallel(
-		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
     size_t count,
 		const ks_async_context& context = {});
 ```
@@ -427,7 +427,7 @@ ks_future<void> parallel(
 
 ```C++
 ks_future<void> sequential(
-		ks_apartment* apartment, std::function<ks_future<void>()>&& fn, 
+		ks_apartment* apartment, std::function<ks_result<void>()>&& fn, 
     size_t count,
 		const ks_async_context& context = {});
 ```
