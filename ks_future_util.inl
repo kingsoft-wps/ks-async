@@ -210,7 +210,7 @@ private:
 		return std::tuple<Ts...>(value_vec.at(IDXs).get<Ts>()...);
 	}
 
-public: //repeat, repeat_periodic, repeat_repetitive
+public: //repeat, repeat_periodic, repeat_productive
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
 		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
@@ -218,8 +218,8 @@ public: //repeat, repeat_periodic, repeat_repetitive
 		ks_apartment* apartment, FN&& fn,
 		const ks_async_context& context = {}) {
 
-		//repeat可以简单地变换为repeat_repetitive，一个空的produce，后接fn
-		return ks_future_util::repeat_repetitive<nothing_t>(
+		//repeat可以简单地变换为repeat_productive，一个空的produce，后接fn
+		return ks_future_util::repeat_productive<nothing_t>(
 			apartment, []() -> nothing_t { return nothing; },
 			apartment, [fn = std::forward<FN>(fn)](const nothing_t&) -> auto { return fn(); },
 			context);
@@ -275,7 +275,7 @@ public: //repeat, repeat_periodic, repeat_repetitive
 			std::is_convertible_v<CONSUME_FN, std::function<void(const V&)>> ||
 			std::is_convertible_v<CONSUME_FN, std::function<ks_result<void>(const V&)>> ||
 			std::is_convertible_v<CONSUME_FN, std::function<ks_future<void>(const V&)>>>>
-	static ks_future<void> repeat_repetitive(
+	static ks_future<void> repeat_productive(
 		ks_apartment* produce_apartment, PRODUCE_FN&& produce_fn,
 		ks_apartment* consume_apartment, CONSUME_FN&& consume_fn,
 		const ks_async_context& context = {}) {

@@ -185,22 +185,25 @@ void test_any() {
     g_exit_latch.wait();
 }
 
-void test_periodic() {
+void test_repeat() {
     g_exit_latch.add(1);
-    std::cout << "test periodic ... ";
+    std::cout << "test repeat ... ";
 
     std::atomic<int> sn = { 0 };
 
     auto fn = [p_sn = &sn]() -> ks_result<void> {
         int sn = ++(*p_sn);
-        if (sn <= 5)
+        if (sn <= 5) {
+            std::cout << sn << " ";
             return nothing;
-        else
+        }
+        else {
             return ks_error::eof_error();
+        }
     };
 
-    ks_future_util::repeat_periodic(
-        ks_apartment::default_mta(), fn, 0, 100)
+    ks_future_util::repeat(
+        ks_apartment::default_mta(), fn)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
         _output_result("completion: ", result);
         g_exit_latch.count_down();
@@ -209,23 +212,58 @@ void test_periodic() {
     g_exit_latch.wait();
 }
 
-void test_repetitive() {
+void test_repeat_periodic() {
     g_exit_latch.add(1);
-    std::cout << "test repetitive ... ";
+    std::cout << "test repeat_periodic ... ";
 
     std::atomic<int> sn = { 0 };
 
     auto fn = [p_sn = &sn]() -> ks_result<void> {
         int sn = ++(*p_sn);
-        std::cout << sn << " ";
-        if (sn <= 5)
+        if (sn <= 5) {
+            std::cout << sn << " ";
             return nothing;
-        else
+        }
+        else {
             return ks_error::eof_error();
+        }
     };
 
-    ks_future_util::repeat(
-        ks_apartment::default_mta(), fn)
+    ks_future_util::repeat_periodic(
+        ks_apartment::default_mta(), fn, 0, 100)
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
+            _output_result("completion: ", result);
+            g_exit_latch.count_down();
+        });
+
+    g_exit_latch.wait();
+}
+
+void test_repeat_productive() {
+    g_exit_latch.add(1);
+    std::cout << "test repeat_productive ... ";
+
+    std::atomic<int> sn = { 0 };
+
+    auto produce_fn = [p_sn = &sn]() -> ks_result<int> {
+        int sn = ++(*p_sn);
+        if (sn <= 5) {
+            std::cout << sn << " ";
+            return sn;
+        }
+        else {
+            return ks_error::eof_error();
+        }
+    };
+
+    auto consume_fn = [](const int& sn) -> void {
+        std::cout << "# ";
+    };
+
+    ks_future_util
+        ::repeat_productive<int>(
+            ks_apartment::default_mta(), produce_fn, 
+            ks_apartment::default_mta(), consume_fn)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
@@ -413,8 +451,9 @@ int main() {
     test_all();
     test_any();
 
-    test_periodic();
-    test_repetitive();
+    test_repeat();
+    test_repeat_periodic();
+    test_repeat_productive();
 
     test_future_methods();
     test_post_delayed();

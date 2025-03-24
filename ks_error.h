@@ -83,9 +83,9 @@ public:
 	static constexpr HRESULT CANCELLED_ERROR_CODE     = 0xFF338003;
 	static constexpr HRESULT TERMINATED_ERROR_CODE    = 0xFF338004;
 
-	static constexpr HRESULT GENERAL_ERROR_CODE       = 0xFF33A001;
-	static constexpr HRESULT EOF_ERROR_CODE           = 0xFF33A002;
-	static constexpr HRESULT ARG_ERROR_CODE           = 0xFF33A003;
-	static constexpr HRESULT DATA_ERROR_CODE          = 0xFF33A004;
-	static constexpr HRESULT STATUS_ERROR_CODE        = 0xFF33A005;
+	static constexpr HRESULT GENERAL_ERROR_CODE       = 0xFF339001;
+	static constexpr HRESULT EOF_ERROR_CODE           = 0xFF339002;
+	static constexpr HRESULT ARG_ERROR_CODE           = 0xFF339003;
+	static constexpr HRESULT DATA_ERROR_CODE          = 0xFF339004;
+	static constexpr HRESULT STATUS_ERROR_CODE        = 0xFF339005;
 };
