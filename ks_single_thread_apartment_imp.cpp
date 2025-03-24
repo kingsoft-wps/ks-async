@@ -81,7 +81,7 @@ const char* ks_single_thread_apartment_imp::name() {
 }
 
 uint ks_single_thread_apartment_imp::features() {
-	return sequential_feature | nested_pump_loop_future;
+	return sequential_feature | atfork_enabled_future | nested_pump_enabled_future;
 }
 
 

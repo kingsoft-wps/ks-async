@@ -141,7 +141,7 @@ protected:
 			return true;
 
 		ks_apartment* cur_apartment = ks_apartment::current_thread_apartment();
-		if (cur_apartment != nullptr && (cur_apartment->features() & ks_apartment::nested_pump_loop_future) != 0) {
+		if (cur_apartment != nullptr && (cur_apartment->features() & ks_apartment::nested_pump_enabled_future) != 0) {
 			if (true) {
 				std::unique_lock<ks_mutex> lock(m_mutex);
 				m_waiting_for_me_apartment_set.insert(cur_apartment); //若嵌套loop会遭遇相同项，但不必重复记录，因为至多仅顶层可能会卡在真cv.wait调用处

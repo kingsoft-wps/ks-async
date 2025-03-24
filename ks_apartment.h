@@ -43,8 +43,9 @@ public:
 
 public:
 	enum { //feature consts
-		sequential_feature      = 0x0001,
-		nested_pump_loop_future = 0x0002,
+		sequential_feature         = 0x0001,
+		atfork_enabled_future      = 0x0002,
+		nested_pump_enabled_future = 0x0004,
 	};
 
 public:

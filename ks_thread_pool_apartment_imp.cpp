@@ -62,7 +62,7 @@ const char* ks_thread_pool_apartment_imp::name() {
 }
 
 uint ks_thread_pool_apartment_imp::features() {
-	uint my_features = nested_pump_loop_future;
+	uint my_features = atfork_enabled_future | nested_pump_enabled_future;
 	if (m_d->max_thread_count == 1)
 		my_features |= sequential_feature;
 	return my_features;
