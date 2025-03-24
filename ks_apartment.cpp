@@ -64,6 +64,23 @@ ks_apartment* ks_apartment::default_mta() {
 	return &g_default_mta;
 }
 
+ks_apartment* ks_apartment::current_thread_apartment() {
+	return tls_current_thread_apartment;
+}
+
+ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	if (cur_apartment == nullptr)
+		cur_apartment = ks_apartment::default_mta();
+	return cur_apartment;
+}
+
+ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartment) {
+	ks_apartment* cur_apartment = tls_current_thread_apartment;
+	if (cur_apartment == nullptr)
+		cur_apartment = or_apartment;
+	return cur_apartment;
+}
 
 ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
@@ -90,42 +107,52 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 }
 
 
-ks_apartment* ks_apartment::current_thread_apartment() {
-	return tls_current_thread_apartment;
-}
-
-ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	if (cur_apartment == nullptr)
-		cur_apartment = ks_apartment::default_mta();
-	return cur_apartment;
-}
-
-ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartment) {
-	ks_apartment* cur_apartment = tls_current_thread_apartment;
-	if (cur_apartment == nullptr)
-		cur_apartment = or_apartment;
-	return cur_apartment;
-}
-
 void ks_apartment::__set_ui_sta(ks_apartment* ui_sta) {
-	ASSERT(g_ui_sta == nullptr || ui_sta == nullptr);
-	ASSERT(g_ui_sta != nullptr || ui_sta != nullptr);
-	ASSERT(ui_sta == nullptr || strcmp(ui_sta->name(), "ui_sta") == 0);
+	ASSERT(ui_sta != nullptr);
+	ASSERT(g_ui_sta == nullptr || g_ui_sta == ui_sta);
 	g_ui_sta = ui_sta;
 }
 
 void ks_apartment::__set_master_sta(ks_apartment* master_sta) {
-	ASSERT(g_master_sta == nullptr || master_sta == nullptr);
-	ASSERT(g_master_sta != nullptr || master_sta != nullptr);
-	ASSERT(master_sta == nullptr || strcmp(master_sta->name(), "master_sta") == 0);
+	ASSERT(master_sta != nullptr);
+	ASSERT(g_master_sta == nullptr || g_master_sta == master_sta);
 	g_master_sta = master_sta;
 }
+
+void ks_apartment::__tls_set_current_thread_apartment(ks_apartment* current_thread_apartment) {
+	ASSERT(current_thread_apartment != nullptr);
+	ASSERT(tls_current_thread_apartment == nullptr || tls_current_thread_apartment == current_thread_apartment);
+	tls_current_thread_apartment = current_thread_apartment;
+}
+
+
+void ks_apartment::__unset_ui_sta(ks_apartment* ui_sta) {
+	ASSERT(ui_sta != nullptr);
+	ASSERT(g_ui_sta == nullptr || g_ui_sta == ui_sta);
+	if (g_ui_sta == ui_sta)
+		g_ui_sta = nullptr;
+}
+
+void ks_apartment::__unset_master_sta(ks_apartment* master_sta) {
+	ASSERT(master_sta != nullptr);
+	ASSERT(g_master_sta == nullptr || g_master_sta == master_sta);
+	if (g_master_sta == master_sta)
+		g_master_sta = nullptr;
+}
+
+void ks_apartment::__tls_unset_current_thread_apartment(ks_apartment* current_thread_apartment) {
+	ASSERT(current_thread_apartment != nullptr);
+	ASSERT(tls_current_thread_apartment == nullptr || tls_current_thread_apartment == current_thread_apartment);
+	if (tls_current_thread_apartment == current_thread_apartment)
+		tls_current_thread_apartment = nullptr;
+}
+
 
 void ks_apartment::__register_public_apartment(const char* name, ks_apartment* apartment) {
 	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr && apartment != nullptr);
-	ASSERT(g_public_apartment_map.find(name) == g_public_apartment_map.cend());
+	ASSERT(g_public_apartment_map.find(name) == g_public_apartment_map.cend()
+		|| g_public_apartment_map.find(name)->second == apartment);
 	g_public_apartment_map[name] = apartment;
 }
 
@@ -133,18 +160,18 @@ void ks_apartment::__unregister_public_apartment(const char* name, ks_apartment*
 	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr && apartment != nullptr);
 	auto it = g_public_apartment_map.find(name);
-	if (it != g_public_apartment_map.cend() && it->second == apartment)
-		g_public_apartment_map.erase(it);
-}
-
-void ks_apartment::__tls_set_current_thread_apartment(ks_apartment* current_thread_apartment) {
-	ASSERT(tls_current_thread_apartment == nullptr || current_thread_apartment == nullptr);
-	ASSERT(tls_current_thread_apartment != nullptr || current_thread_apartment != nullptr);
-	tls_current_thread_apartment = current_thread_apartment;
+	ASSERT(it != g_public_apartment_map.cend());
+	if (it != g_public_apartment_map.cend()) {
+		ASSERT(it->second == apartment);
+		if (it->second == apartment) {
+			g_public_apartment_map.erase(it);
+		}
+	}
 }
 
 
 void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
+	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
 	g_default_mta_max_thread_count = max_thread_count;
 }
 

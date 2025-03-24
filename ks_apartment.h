@@ -31,11 +31,11 @@ public:
 	KS_ASYNC_API static ks_apartment* background_sta(); //后台[单线程]套间
 	KS_ASYNC_API static ks_apartment* default_mta();    //默认[多线程]套间
 
-	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name);
-
 	KS_ASYNC_API static ks_apartment* current_thread_apartment();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta();
 	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
+
+	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name);
 
 public:
 	enum { //feature consts
@@ -75,11 +75,14 @@ public:
 	//注意：current_thread_apartment是TLS变量，各色套间线程实现者务必对其进行正确初始化。
 	KS_ASYNC_API static void __set_ui_sta(ks_apartment* ui_sta);
 	KS_ASYNC_API static void __set_master_sta(ks_apartment* master_sta);
+	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
+
+	KS_ASYNC_API static void __unset_ui_sta(ks_apartment* ui_sta);
+	KS_ASYNC_API static void __unset_master_sta(ks_apartment* master_sta);
+	KS_ASYNC_API static void __tls_unset_current_thread_apartment(ks_apartment* current_thread_apartment);
 
 	KS_ASYNC_API static void __register_public_apartment(const char* name, ks_apartment* apartment);
 	KS_ASYNC_API static void __unregister_public_apartment(const char* name, ks_apartment* apartment);
-
-	KS_ASYNC_API static void __tls_set_current_thread_apartment(ks_apartment* current_thread_apartment);
 
 public:
 	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用

@@ -71,12 +71,12 @@ ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 		ks_apartment::__unregister_public_apartment(m_d->name.c_str(), this);
 	}
 	if (m_d->flags & be_ui_sta_flag) {
-		ks_apartment::__set_ui_sta(nullptr);
+		ks_apartment::__unset_ui_sta(this);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "ui_sta") != 0)
 			ks_apartment::__unregister_public_apartment("ui_sta", this);
 	}
 	if (m_d->flags & be_master_sta_flag) {
-		ks_apartment::__set_master_sta(nullptr);
+		ks_apartment::__unset_master_sta(this);
 		if ((m_d->flags & auto_register_flag) && strcmp(m_d->name.c_str(), "master_sta") != 0)
 			ks_apartment::__unregister_public_apartment("master_sta", this);
 	}
