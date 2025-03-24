@@ -56,9 +56,9 @@ public:
 		);
 	}
 
-	template <class R>
-	ks_result<R> map_value(R&& x) const {
-		return m_nothing_result.template map_value<R>(std::forward<R>(x));
+	template <class R, class X = R>
+	ks_result<R> map_value(X&& x) const {
+		return m_nothing_result.template map_value<R>(std::forward<X>(x));
 	}
 
 private:

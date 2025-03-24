@@ -66,15 +66,6 @@ public:
 	}
 
 	template <class R, class X = R>
-	ks_result<R> map_value(const X& x) const {
-		if (this->is_value())
-			return ks_result<R>(x);
-		else if (this->is_error())
-			return ks_result<R>(this->to_error());
-		else
-			return ks_result<R>::__bare();
-	}
-	template <class R, class X = R>
 	ks_result<R> map_value(X&& x) const {
 		if (this->is_value())
 			return ks_result<R>(std::forward<X>(x));

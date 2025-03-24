@@ -362,7 +362,16 @@ public: //cast, map, deliver_to_promise, set_timeout
 		ks_future<R> map(FN&& fn) const {
 		ASSERT(this->is_valid());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
-			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of(fn(value.get<T>())); },
+			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(fn(value.get<T>())); },
+			make_async_context().set_priority(0x10000), nullptr);
+		return ks_future<R>::__from_raw(raw_future2);
+	}
+
+	template <class R, class X = R>
+	ks_result<R> map_value(X&& x) const {
+		ASSERT(this->is_valid());
+		ks_raw_future_ptr raw_future2 = m_raw_future->then(
+			[x = std::forward<X>(x)](const ks_raw_value& value)->ks_raw_result { return ks_raw_value::of<R>(x); },
 			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
 	}

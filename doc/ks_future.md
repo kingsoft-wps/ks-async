@@ -231,6 +231,17 @@ ks_future<R> map<R>(function<R(const T&)>&& fn);
 #### 返回值：新ks_future\<R>对象。
 #### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return fn(val); })`
 <br>
+
+```C++
+template <class R>
+ks_future<R> map_value<R>(const R& x);
+```
+#### 描述：将this的T类型的结果值变换为R类型新值，得到一个新的ks_future<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_future\<R>。
+#### 返回值：新ks_future\<R>对象。
+#### 特别说明：`f.cast_to<R>()` 相当于 `f.then<R>(..., [](const T& val) { return x; })`
+<br>
 <br>
 
 

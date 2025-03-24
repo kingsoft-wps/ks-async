@@ -218,7 +218,7 @@ private:
 		auto raw_fn = ;
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
-			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of((fn(ks_async_flow::__from_raw(flow)), nothing)); },
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of<T>((fn(ks_async_flow::__from_raw(flow)), nothing)); },
 			context, value_typeinfo);
 	}
 
@@ -230,7 +230,7 @@ private:
 		const std::type_info* value_typeinfo) const {
 		return m_raw_flow->add_task(
 			name_and_dependencies, apartment,
-			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of(fn(ks_async_flow::__from_raw(flow))); },
+			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow)->ks_raw_result { return ks_raw_value::of<T>(fn(ks_async_flow::__from_raw(flow))); },
 			context, value_typeinfo);
 	}
 

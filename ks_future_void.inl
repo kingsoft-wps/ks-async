@@ -559,6 +559,11 @@ public: //cast, map, deliver_to_promise, set_timeout
 		);
 	}
 
+	template <class R, class X = R>
+	ks_result<R> map_value(X&& x) const {
+		return m_nothing_future.template map_value<R>(std::forward<X>(x));
+	}
+
 	template <class X /*= void*/, class _ = std::enable_if_t<std::is_void_v<X>>>
 	const this_future_type& deliver_to_promise(const ks_promise<X>& promise) const {
 		m_nothing_future.deliver_to_promise(promise.m_nothing_promise);
