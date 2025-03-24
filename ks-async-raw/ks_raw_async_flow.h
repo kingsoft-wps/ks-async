@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <regex>
 
-//for flow_future_ext
+//for flow_future_wrapped
 #include "../ks_future.h"
 class ks_async_flow;
 

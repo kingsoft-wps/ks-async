@@ -100,10 +100,10 @@ static void __do_pattern_to_regex(const char* pattern, std::regex* re) {
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 
-inline ks_raw_async_flow::ks_raw_async_flow(__raw_ctor) {
+ks_raw_async_flow::ks_raw_async_flow(__raw_ctor) {
 }
 
-inline ks_raw_async_flow::~ks_raw_async_flow() {
+ks_raw_async_flow::~ks_raw_async_flow() {
 	ASSERT(m_flow_status != status_t::running);
 }
 
