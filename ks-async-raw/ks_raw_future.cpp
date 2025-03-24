@@ -149,8 +149,9 @@ protected:
 				std::unique_lock<ks_mutex> lock(m_mutex);
 				m_waiting_for_me_apartment_set.erase(cur_apartment); //若退嵌套loop则会遭遇缺失项，这是正常的
 
-				if (!was_satisfied) {
-					this->do_complete_locked<false>(ks_raw_result(ks_error::interupted_error()), cur_apartment, false, lock);
+				if (!m_completed_result.is_completed()) {
+					ASSERT(!was_satisfied);
+					this->do_complete_locked<false>(ks_error::interupted_error(), cur_apartment, false, lock);
 					return false;
 				}
 			}
