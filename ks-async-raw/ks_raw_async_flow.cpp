@@ -492,7 +492,7 @@ __ks_async_raw::ks_raw_result ks_raw_async_flow::peek_task_result(const char* ta
 	}
 
 	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
-	ASSERT(value_typeinfo == nullptr || *task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
+	ASSERT(*task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
 
 	return task_item->task_result;
 }
@@ -507,7 +507,7 @@ __ks_async_raw::ks_raw_future_ptr ks_raw_async_flow::get_task_future(const char*
 	}
 
 	const std::shared_ptr<_TASK_ITEM>& task_item = it->second;
-	ASSERT(value_typeinfo == nullptr || *task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
+	ASSERT(*task_item->task_value_typeinfo == *value_typeinfo || strcmp(task_item->task_value_typeinfo->name(), value_typeinfo->name()) == 0);
 
 	if (task_item->task_promise_opt == nullptr) {
 		task_item->task_promise_opt = ks_raw_promise::create(task_item->task_apartment);
@@ -704,6 +704,7 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	task_item->task_result = task_result;
 
 	if (task_item->need_apply_value && task_result.is_value()) {
+		ASSERT(m_raw_value_map.find(task_item->task_name) == m_raw_value_map.end());
 		m_raw_value_map[task_item->task_name] = task_result.to_value();
 	}
 

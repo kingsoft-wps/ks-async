@@ -24,6 +24,7 @@ public:
 
 public:
 	KS_ASYNC_API void set_default_apartment(ks_apartment* apartment);
+
 	KS_ASYNC_API void set_j(size_t j);
 
 public:
@@ -34,6 +35,7 @@ public:
 		const ks_async_context& context,
 		bool need_apply_value = true,
 		const std::type_info* value_typeinfo = nullptr);
+
 	KS_ASYNC_API bool add_flat_task(
 		const char* name_and_dependencies,
 		ks_apartment* apartment,
