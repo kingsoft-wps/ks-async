@@ -184,8 +184,9 @@ protected:
 			}
 			else {
 				lock.unlock();
-				while (!m_completed_result.is_completed())
+				while (!m_completed_result.is_completed()) {
 					std::this_thread::yield();
+				}
 			}
 
 			return true;
