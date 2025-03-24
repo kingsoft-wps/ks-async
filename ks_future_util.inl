@@ -439,9 +439,9 @@ public: //parallel, sequential
 		std::is_convertible_v<FN, std::function<void()>> ||
 		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
 		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
-		static ks_future<void> parallel(
-			ks_apartment* apartment, FN&& fn, size_t count,
-			const ks_async_context& context = {}) {
+	static ks_future<void> parallel(
+		ks_apartment* apartment, FN&& fn, size_t count,
+		const ks_async_context& context = {}) {
 
 		if (count == 0) {
 			return ks_future<void>::resolved(nothing);
@@ -466,9 +466,9 @@ public: //parallel, sequential
 		std::is_convertible_v<FN, std::function<void()>> ||
 		std::is_convertible_v<FN, std::function<ks_result<void>()>> ||
 		std::is_convertible_v<FN, std::function<ks_future<void>()>>>>
-		static ks_future<void> sequential(
-			ks_apartment* apartment, FN&& fn, size_t count,
-			const ks_async_context& context = {}) {
+	static ks_future<void> sequential(
+		ks_apartment* apartment, FN&& fn, size_t count,
+		const ks_async_context& context = {}) {
 
 		if (count == 0) {
 			return ks_future<void>::resolved(nothing);
@@ -490,7 +490,7 @@ public: //parallel, sequential
 				.template then<void>(
 					apartment, 
 					[index_p, count]() -> ks_result<void> {
-						//若repeat返回成功，但index未达到count，则意味着中间遇到了eof，那么我们还原这个eof错误
+						//若repeat返回成功，但index未达到count，则意味着中间遇到了eof，那么我们恢复为返回为eof错误
 						if ((*index_p) < count)
 							return ks_error::eof_error();
 						else
