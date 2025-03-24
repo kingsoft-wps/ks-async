@@ -202,12 +202,12 @@ void test_repeat() {
         }
     };
 
-    ks_future_util::repeat(
-        ks_apartment::default_mta(), fn)
+    ks_future_util
+        ::repeat(ks_apartment::default_mta(), fn)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
-        _output_result("completion: ", result);
-        g_exit_latch.count_down();
-            });
+            _output_result("completion: ", result);
+            g_exit_latch.count_down();
+        });
 
     g_exit_latch.wait();
 }
@@ -229,8 +229,8 @@ void test_repeat_periodic() {
         }
     };
 
-    ks_future_util::repeat_periodic(
-        ks_apartment::default_mta(), fn, 0, 100)
+    ks_future_util
+        ::repeat_periodic(ks_apartment::default_mta(), fn, 0, 100)
         .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
             _output_result("completion: ", result);
             g_exit_latch.count_down();
@@ -270,6 +270,44 @@ void test_repeat_productive() {
         });
 
     g_exit_latch.wait();
+}
+
+void test_parallel() {
+    g_exit_latch.add(1);
+    std::cout << "test parallel ... ";
+
+    auto c = std::make_shared<std::atomic<int>>(0);
+    ks_future_util
+        ::parallel(
+            ks_apartment::default_mta(), 
+            [c]() { ++(*c); },
+            5)
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
+            _output_result("completion: ", result);
+            g_exit_latch.count_down();
+        });
+
+    g_exit_latch.wait();
+    ASSERT(*c == 5);
+}
+
+void test_sequential() {
+    g_exit_latch.add(1);
+    std::cout << "test sequential ... ";
+
+    auto c = std::make_shared<std::atomic<int>>(0);
+    ks_future_util
+        ::parallel(
+            ks_apartment::default_mta(),
+            [c]() { ++(*c); },
+            5)
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [](const auto& result) {
+            _output_result("completion: ", result);
+            g_exit_latch.count_down();
+        });
+
+    g_exit_latch.wait();
+    ASSERT(*c == 5);
 }
 
 void test_future_methods() {
@@ -330,7 +368,7 @@ void test_future_methods() {
 
 void test_async_flow() {
     g_exit_latch.add(1);
-    std::cout << "test async-flow ... \n";
+    std::cout << "test flow ... \n";
 
     ks_async_flow flow;
     bool b;
@@ -352,24 +390,24 @@ void test_async_flow() {
     ASSERT(b);
 
     id = flow.add_task_running_observer("*", ks_apartment::background_sta(), [](const ks_async_flow& flow, const char* task_name) {
-        std::cout << (std::stringstream() << "async-flow: notify: task/" << task_name << ": running" << "\n").str();
+        std::cout << (std::stringstream() << "flow: notify: task/" << task_name << ": running" << "\n").str();
     }, ks_async_context());
     ASSERT(id != 0);
 
     id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [](const ks_async_flow& flow, const char* task_name, const ks_error& error) {
-        std::cout << (std::stringstream() << "async-flow: notify: task/" << task_name << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
+        std::cout << (std::stringstream() << "flow: notify: task/" << task_name << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
         }, ks_async_context());
     ASSERT(id != 0);
 
     id = flow.add_flow_running_observer(ks_apartment::background_sta(), [](const ks_async_flow& flow) {
-        std::cout << (std::stringstream() << "async-flow: notify: flow" << ": running" << "\n").str();
+        std::cout << (std::stringstream() << "flow: notify: flow" << ": running" << "\n").str();
     }, ks_async_context());
     ASSERT(id != 0);
 
     id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [](const ks_async_flow& flow, const ks_error& error) {
-        std::cout << (std::stringstream() << "async-flow: notify: flow" << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
+        std::cout << (std::stringstream() << "flow: notify: flow" << (error.get_code() == 0 ? ": succeeded" : ": failed") << "\n").str();
 
-        std::cout << "async-flow ";
+        std::cout << "flow ";
         _output_result("complete(void): ", error.get_code() == 0 ? ks_result<void>(nothing) : ks_result<void>(error));
         g_exit_latch.count_down();
     }, ks_async_context());
@@ -454,6 +492,8 @@ int main() {
     test_repeat();
     test_repeat_periodic();
     test_repeat_productive();
+    test_parallel();
+    test_sequential();
 
     test_future_methods();
     test_post_delayed();
