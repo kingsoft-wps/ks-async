@@ -184,7 +184,7 @@ protected:
 			if (m_completed_result.is_completed())
 				return true;
 
-			if (m_belong_pid == __native_get_current_pid()) {
+			if (!__KS_APARTMENT_ATFORK_ENABLED || m_belong_pid == __native_get_current_pid()) {
 				++m_completed_result_cv_waiting_rc;
 				while (!m_completed_result.is_completed()) {
 					m_completed_result_cv.wait(lock);
@@ -290,7 +290,7 @@ protected:
 		m_completed_result = result.require_completed_or_error();
 		m_completed_prefer_apartment = prefer_apartment;
 
-		if (m_completed_result_cv_waiting_rc != 0 && m_belong_pid == __native_get_current_pid()) {
+		if (m_completed_result_cv_waiting_rc != 0 && (!__KS_APARTMENT_ATFORK_ENABLED || m_belong_pid == __native_get_current_pid())) {
 			m_completed_result_cv.notify_all();
 		}
 
