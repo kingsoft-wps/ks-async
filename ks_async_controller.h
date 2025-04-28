@@ -22,28 +22,31 @@ limitations under the License.
 class ks_async_controller final {
 public:
 	ks_async_controller() : m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {}
-	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
 
-	~ks_async_controller() {
-		ASSERT(!this->has_pending_futures());
-		this->try_cancel_all(); //自动cancel-all
-	}
+	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
+	ks_async_controller(ks_async_controller&&) noexcept = default;
 
 public:
 	void try_cancel_all() {
 		m_controller_data_ptr->cancel_all_ctrl_v = true;
 	}
 
-	bool has_pending_futures() const {
+	bool check_cancel_all() {
+		return m_controller_data_ptr->cancel_all_ctrl_v;
+	}
+
+private: //注：下面方法暂不对外提供！
+	bool __has_pending_futures() const {
 		return m_controller_data_ptr->pending_latch.try_wait() == false;
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	template <class _ = void>
-	_DECL_DEPRECATED void wait_pending_futures_done() const {
+	_DECL_DEPRECATED bool __wait_pending_futures_done() const {
 		//特别说明：
 		//与ks_raw_future::wait情况类似，甚至更危险，因为这里连基本的跨apartment检查都没有，极易死锁。
 		m_controller_data_ptr->pending_latch.wait();
+		return true;
 	}
 
 private:

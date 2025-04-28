@@ -34,9 +34,11 @@ public:
 	}
 
 	ks_raw_result(const ks_error& error) : m_state(_STATE::JUST_ERROR) {
+		ASSERT(error.get_code() != 0);
 		::new (this->__error_data_ptr()) ks_error(error);
 	}
 	ks_raw_result(ks_error&& error) noexcept : m_state(_STATE::JUST_ERROR) {
+		ASSERT(error.get_code() != 0);
 		::new (this->__error_data_ptr()) ks_error(std::move(error));
 	}
 
@@ -77,11 +79,9 @@ public:
 	}
 
 public:
-	bool is_completed() const { return m_state != _STATE::NOT_COMPLETED; }
-	ks_raw_result require_completed_or_error() const { return m_state != _STATE::NOT_COMPLETED ? *this : ks_error::unexpected_error(); }
-
-	bool is_value() const { return m_state == _STATE::JUST_VALUE; }
-	bool is_error() const { return m_state == _STATE::JUST_ERROR; }
+	bool is_completed() const { return (volatile _STATE&)m_state != _STATE::NOT_COMPLETED; }
+	bool is_value() const { return (volatile _STATE&)m_state == _STATE::JUST_VALUE; }
+	bool is_error() const { return (volatile _STATE&)m_state == _STATE::JUST_ERROR; }
 
 	const ks_raw_value& to_value() const noexcept(false) {
 		if (m_state == _STATE::JUST_VALUE)
@@ -90,11 +90,22 @@ public:
 			throw m_state == _STATE::JUST_ERROR ? *this->__error_data_ptr() : ks_error::unexpected_error();
 	}
 
-	const ks_error& to_error() const noexcept(false) {
+	ks_error to_error() const noexcept(false) {
 		if (m_state == _STATE::JUST_ERROR)
 			return *this->__error_data_ptr();
-		else
-			throw ks_error::unexpected_error();
+		else {
+			ASSERT(false);
+			return ks_error();
+		}
+	}
+
+	ks_raw_result require_completed_or_error() const { 
+		if (this->is_value())
+			return *this;
+		else if (this->is_error() && this->to_error().get_code() != 0)
+			return *this;
+		else 
+			return ks_error::unexpected_error();
 	}
 
 private:
@@ -108,8 +119,6 @@ private:
 	enum class _STATE { NOT_COMPLETED, JUST_VALUE, JUST_ERROR };
 	_STATE m_state;
 	std::aligned_union_t<0, ks_raw_value, ks_error> m_data_memory;
-	//alignas(alignof(ks_raw_value) >= alignof(ks_error) ? alignof(ks_raw_value) : alignof(ks_error))
-	//	byte m_data_memory[sizeof(ks_raw_value) >= sizeof(ks_error) ? sizeof(ks_raw_value) : sizeof(ks_error)];
 };
 
 

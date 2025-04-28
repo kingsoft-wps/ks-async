@@ -18,18 +18,17 @@ limitations under the License.
 #include "ks_async_base.h"
 #include "ks_error.h"
 
-class ks_cancel_inspector {
-protected:
-	ks_cancel_inspector() = default;
-	virtual ~ks_cancel_inspector() = default;  //protected
-	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector);
-
+_ABSTRACT class ks_cancel_inspector {
 public:
 	virtual bool check_cancel() = 0;
-	virtual ks_error get_cancel_error() = 0;
+
+protected:
+	ks_cancel_inspector() = default;
+	~ks_cancel_inspector() = default;
+	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector);
 
 private:
 	KS_ASYNC_API static ks_cancel_inspector* __for_future();
-
 	template <class T2> friend class ks_future;
+	friend class ks_future_util;
 };

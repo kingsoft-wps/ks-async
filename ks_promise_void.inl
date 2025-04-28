@@ -18,20 +18,19 @@ limitations under the License.
 template <>
 class ks_promise<void> final {
 public:
-	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
+	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
+	static ks_promise<void> create() { return ks_promise<void>(std::create_inst); }
+
 	ks_promise(const ks_promise&) = default;
-	ks_promise& operator=(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
-	ks_promise& operator=(ks_promise&&) noexcept = default;
+
+	//让ks_promise看起来像一个智能指针
+	ks_promise* operator->() { return this; }
+	const ks_promise* operator->() const { return this; }
 
 	using arg_type = void;
 	using value_type = void;
 	using this_promise_type = ks_promise<void>;
-
-public:
-	static ks_promise<void> create() {
-		return ks_promise<nothing_t>::create();
-	}
 
 public:
 	bool is_valid() const {
@@ -42,7 +41,7 @@ public:
 		return m_nothing_promise.get_future().cast<void>();
 	}
 
-	void resolve(nothing_t _ = nothing) const {
+	void resolve(nothing_t = nothing) const {
 		m_nothing_promise.resolve(nothing);
 	}
 
@@ -50,17 +49,11 @@ public:
 		m_nothing_promise.reject(error);
 	}
 
-	void try_complete(const ks_result<void>& result) const {
-		if (result.is_value())
-			this->resolve();
-		else if (result.is_error())
-			this->reject(result.to_error());
-		else
-			ASSERT(false);
+	void try_settle(const ks_result<void>& result) const {
+		m_nothing_promise.try_settle(result.cast<nothing_t>());
 	}
-
-	void try_complete(const ks_result<nothing_t>& result) const {
-		return this->try_complete(ks_result<void>::__from_other(result));
+	void try_settle(const ks_result<nothing_t>& result) const {
+		m_nothing_promise.try_settle(result);
 	}
 
 private:
@@ -68,7 +61,6 @@ private:
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
 	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
 	using ks_raw_promise_ptr = __ks_async_raw::ks_raw_promise_ptr;
-
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
@@ -81,6 +73,7 @@ private:
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;
 	friend class ks_future_util;
+	friend class ks_async_flow;
 
 private:
 	ks_promise<nothing_t> m_nothing_promise;

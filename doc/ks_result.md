@@ -21,7 +21,7 @@ ks_result还具有不可变性，其内包含的 “值” 是不可变的。（
 # 构造方法
 
 ```C++
-ks_result<T>(const T& value);
+ks_result<T>::ks_result(const T& value);
 ```
 #### 描述：构造一个有值ks_result对象，状态为已完成、且有值。
 #### 参数：
@@ -30,7 +30,7 @@ ks_result<T>(const T& value);
 <br>
 
 ```C++
-ks_result<T>(ks_error error);
+ks_result<T>::ks_result(ks_error error);
 ```
 #### 描述：构造一个错误ks_result对象，状态为已完成、且错误。
 #### 参数：
@@ -88,6 +88,30 @@ ks_result<R> cast<R>();
   - R: 约定函数返回值类型为ks_result\<R>。（但要求R必须与T类型兼容或一致）
 #### 返回值：新ks_result\<R>对象。
 <br>
+
+```C++
+template <class R>
+ks_result<R> map<R>(function<R(const T&)> fn);
+```
+#### 描述：将this的T类型的结果值经转换函数fn变换为R类型，得到一个新的ks_result<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_result\<R>。
+#### 参数：
+  - fn: 值转换函数（T类型 => R类型）。
+#### 返回值：新ks_result\<R>对象。
+<br>
+
+```C++
+template <class R>
+ks_result<R> map_value<R>(const R& other_value);
+```
+#### 描述：将this的T类型的结果值变换为R类型新值，得到一个新的ks_result<R>对象。
+#### 模板参数：
+  - R: 约定函数返回值类型为ks_result\<R>。
+#### 参数：
+  - other_value: 新值（R类型）。
+#### 返回值：新ks_result\<R>对象。
+<br>
 <br>
 <br>
 <br>
@@ -96,5 +120,4 @@ ks_result<R> cast<R>();
 # 另请参阅
   - [HOME](HOME.md)
   - [ks_error](ks_error.md)
-  - [ks_future\<T>](ks_future.md)
   - [ks_future\<T>](ks_future.md)

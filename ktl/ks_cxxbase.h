@@ -24,33 +24,63 @@ limitations under the License.
 
 using byte = uint8_t;
 using uint = unsigned int;
-
 using nullptr_t = decltype(nullptr);
+using HRESULT = std::conditional<sizeof(long) == 4, long, int>::type;
 
 #ifndef __NOTHING_DEF
 #define __NOTHING_DEF
-struct nothing_t {};
-constexpr nothing_t nothing = {};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
+struct nothing_t { explicit nothing_t() = default; };
+constexpr nothing_t nothing = nothing_t{};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
 #endif //__NOTHING_DEF
 
-#ifndef __INIT_INSTANCE_DEF
-#define __INIT_INSTANCE_DEF
-struct init_instance_t {};
-constexpr init_instance_t init_instance = {};
-#endif //__INIT_INSTANCE_DEF
+#ifndef __CREATE_INST_DEF
+#define __CREATE_INST_DEF
+namespace std {
+	struct create_inst_t { explicit create_inst_t() = default; };
+	constexpr create_inst_t create_inst = create_inst_t{};  //这类似于KComObjectPtr构造函数的create_instance参数，是通用版本，用于明确指示实例化
+}
+#endif //__CREATE_INST_DEF
 
-using HRESULT = std::conditional<sizeof(long) == 4, long, int32_t>::type;
 
-
-//宏_NOOP定义
-#ifndef _NOOP
-#	define _NOOP(...)  ((void)(0))
-#endif
-//宏_UNUSED定义
-#ifndef _UNUSED
-#	define _UNUSED(x)  ((void)(x))
+//宏_ABSTRACT定义
+#ifndef _ABSTRACT
+#	define _ABSTRACT
 #endif
 
+//宏_NAMESPACE_LIKE定义
+#ifndef _NAMESPACE_LIKE
+#	define _NAMESPACE_LIKE
+#endif
+
+//宏_DISABLE_COPY_CONSTRUCTOR定义
+#ifndef _DISABLE_COPY_CONSTRUCTOR
+#	define _DISABLE_COPY_CONSTRUCTOR(ThisClass)            \
+			ThisClass(const ThisClass&) = delete;          \
+			ThisClass& operator=(const ThisClass&) = delete;
+#endif
+
+
+//宏_DECL_EXPORT定义
+#ifndef _DECL_EXPORT
+#	if defined(_MSC_VER)
+#		define _DECL_EXPORT __declspec(dllexport)
+#	elif defined(__GNUC__)
+#		define _DECL_EXPORT __attribute__((visibility("default")))
+#	else
+#		error how to decl-export?
+#	endif
+#endif
+
+//宏_DECL_IMPORT定义
+#ifndef _DECL_IMPORT
+#	if defined(_MSC_VER)
+#		define _DECL_IMPORT __declspec(dllimport)
+#	elif defined(__GNUC__)
+#		define _DECL_IMPORT __attribute__((visibility("default")))
+#	else
+#		error how to decl-import?
+#	endif
+#endif
 
 //宏_DECL_DEPRECATED定义
 #ifndef _DECL_DEPRECATED
@@ -63,38 +93,7 @@ using HRESULT = std::conditional<sizeof(long) == 4, long, int32_t>::type;
 #	endif
 #endif
 
-
-//宏_DISABLE_COPY_CONSTRUCTOR定义
-#ifndef _DISABLE_COPY_CONSTRUCTOR
-#	define _DISABLE_COPY_CONSTRUCTOR(ThisClass)            \
-			ThisClass(const ThisClass&) = delete;          \
-			ThisClass& operator=(const ThisClass&) = delete;
-#endif
-
-
-//宏_DECL_EXPORT和_DECL_IMPORT定义
-#ifndef _DECL_EXPORT
-#	if defined(_MSC_VER)
-#		define _DECL_EXPORT __declspec(dllexport)
-#	elif defined(__GNUC__)
-#		define _DECL_EXPORT __attribute__((visibility("default")))
-#	else
-#		error how to decl-export?
-#	endif
-#endif
-
-#ifndef _DECL_IMPORT
-#	if defined(_MSC_VER)
-#		define _DECL_IMPORT __declspec(dllimport)
-#	elif defined(__GNUC__)
-#		define _DECL_IMPORT __attribute__((visibility("default")))
-#	else
-#		error how to decl-import?
-#	endif
-#endif
-
-
-//宏_NODISCARD
+//宏_NODISCARD定义
 #ifndef _NODISCARD
 #	if defined(_MSC_VER)
 #		define _NODISCARD _Check_return_
@@ -104,25 +103,39 @@ using HRESULT = std::conditional<sizeof(long) == 4, long, int32_t>::type;
 #endif
 
 
-//宏_DEBUG
+//宏_NOOP定义
+#ifndef _NOOP
+#	define _NOOP(...)  ((void)(0))
+#endif
+
+//宏_UNUSED定义
+#ifndef _UNUSED
+#	define _UNUSED(x)  ((void)(x))
+#endif
+
+
+//宏_DEBUG定义
 #ifndef _DEBUG
 #	if !defined(NDEBUG)
 #		define _DEBUG
 #	endif
 #endif
 
-
-//ASSERT宏定义
-#ifndef ASSERT
+//宏_ASSERT定义
+#ifndef _ASSERT
 #	ifdef _DEBUG
 #		if defined(_MSC_VER)
 #			include <crtdbg.h>
-#			define ASSERT _ASSERT
 #		else
 #			include <assert.h>
-#			define ASSERT assert
+#			define _ASSERT(x)  assert(x)
 #		endif
 #	else
-#		define ASSERT(x)  ((void)(0))
+#			define _ASSERT(x)  ((void)(0))
 #	endif
+#endif
+
+//宏ASSERT定义
+#ifndef ASSERT
+#	define ASSERT(x)  _ASSERT(x)
 #endif

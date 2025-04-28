@@ -4,6 +4,7 @@
 
 #### 关于Future：
 - [ks_future\<T>](ks_future.md)：ks_future对象
+- [ks_future_util](ks_future_util.md)：ks_future_util工具集
 - [ks_promise\<T>](ks_promise.md)：ks_promise对象
 <br><br>
 
@@ -16,7 +17,11 @@
 <br><br>
 
 #### 高级异步任务抽象（进化）：
-- [ks_async_task\<T, ARG...>](ks_async_task.md)：可延迟编排的异步任务高级封装
+- [ks_async_flow](ks_async_flow.md)：高级异步任务编排器
+<br><br>
+
+#### 通知中心（额外）：
+- ks_notification_center：通知中心
 <br><br>
 
 <br>

@@ -26,15 +26,16 @@ __KS_ASYNC_RAW_BEGIN
 class ks_raw_future;
 using ks_raw_future_ptr = std::shared_ptr<ks_raw_future>;
 
-class ks_raw_future {
+_ABSTRACT class ks_raw_future {
 protected:
-	KS_ASYNC_API ks_raw_future() = default;
-	KS_ASYNC_API virtual ~ks_raw_future() = default;  //protected
+	ks_raw_future() = default;
+	~ks_raw_future() = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future);
 
 public:
 	KS_ASYNC_API static ks_raw_future_ptr resolved(const ks_raw_value& value, ks_apartment* apartment);
 	KS_ASYNC_API static ks_raw_future_ptr rejected(const ks_error& error, ks_apartment* apartment);
+	KS_ASYNC_API static ks_raw_future_ptr __from_result(const ks_raw_result& result, ks_apartment* apartment);
 
 	KS_ASYNC_API static ks_raw_future_ptr post(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment);
 	KS_ASYNC_API static ks_raw_future_ptr post_delayed(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment, int64_t delay);
@@ -63,25 +64,23 @@ public:
 	virtual ks_raw_result peek_result() = 0;
 
 	virtual void try_cancel(bool backtrack);
-	KS_ASYNC_API static bool check_current_future_cancel(bool with_extra);
-	KS_ASYNC_API static ks_error get_current_future_cancel_error(bool with_extra);
+	KS_ASYNC_API static bool __check_current_future_cancel(bool with_extra);
+	KS_ASYNC_API static ks_error __acquire_current_future_cancel_error(const ks_error& def_error, bool with_extra);
 
 	virtual void set_timeout(int64_t timeout, bool backtrack);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	//由于声明为_DECL_DEPRECATED，为避免编译警告，直接在此实现、而非override。
-	template <class _ = void>
-	_DECL_DEPRECATED KS_ASYNC_INLINE_API bool wait() { return this->do_wait(); }
+	virtual void __wait();
 
 protected:
 	virtual void do_add_next(const ks_raw_future_ptr& next_future) = 0;
 	virtual void do_add_next_multi(const std::vector<ks_raw_future_ptr>& next_futures) = 0;
 
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) = 0;
-
 	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal) = 0;
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) = 0;
+	virtual bool is_cancelable_self() = 0;
 	virtual bool do_check_cancel() = 0;
 	virtual ks_error do_acquire_cancel_error(const ks_error& def_error) = 0;
 
@@ -89,11 +88,9 @@ protected:
 
 	virtual bool do_wait() = 0;
 
-	virtual ks_apartment* get_spec_apartment() = 0;
-	virtual bool is_with_upstream_future() = 0;
-
 protected:
 	friend class ks_raw_future_baseimp;
+	friend class ks_raw_dx_future;
 	friend class ks_raw_promise_future;
 	friend class ks_raw_task_future;
 	friend class ks_raw_pipe_future;

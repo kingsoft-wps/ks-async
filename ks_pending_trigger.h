@@ -20,33 +20,43 @@ limitations under the License.
 
 class ks_pending_trigger final {
 public:
-	ks_pending_trigger() : m_pending_promise(ks_raw_promise::create(ks_apartment::current_thread_apartment_or_default_mta())) {}
-	_DISABLE_COPY_CONSTRUCTOR(ks_pending_trigger);
+	ks_pending_trigger() : m_trigger_promise(__do_create_raw_trigger_promise()) {}
 
-	~ks_pending_trigger() {
-		if (!m_pending_promise->get_future()->peek_result().is_completed()) {
-			ASSERT(false);
-			m_pending_promise->resolve(ks_raw_value::of(nothing)); //auto start
-		}
-	}
+	_DISABLE_COPY_CONSTRUCTOR(ks_pending_trigger);
+	ks_pending_trigger(ks_pending_trigger&&) noexcept = default;
 
 public:
 	void start() {
-		m_pending_promise->resolve(ks_raw_value::of(nothing));
+		return m_trigger_promise->resolve(ks_raw_value::of_nothing());
 	}
+
 	void cancel() {
-		m_pending_promise->reject(ks_error::was_cancelled_error());
+		return m_trigger_promise->reject(ks_error::cancelled_error());
 	}
 
 private:
 	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
 	using ks_raw_promise_ptr = __ks_async_raw::ks_raw_promise_ptr;
-
+	using ks_raw_future = __ks_async_raw::ks_raw_future;
+	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
+
+	static ks_raw_promise_ptr __do_create_raw_trigger_promise() {
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
+		return ks_raw_promise::create(apartment_hint);
+	}
+
+	ks_raw_future_ptr __get_raw_trigger_future() const {
+		return m_trigger_promise->get_future();
+	}
+
+	bool __was_triggered() const {
+		return m_trigger_promise->get_future()->peek_result().is_completed();
+	}
 
 	template <class T> friend class ks_future;
 
 private:
-	ks_raw_promise_ptr m_pending_promise;
+	ks_raw_promise_ptr m_trigger_promise;
 };

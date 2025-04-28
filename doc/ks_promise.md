@@ -4,8 +4,6 @@
 
 一个ks_promise\<T>对象表示一个未完成（未决）的结果。可以用一个值来reslove，也可以用一个错误来reject。
 
-调用 `ks_promise<T>::create()` 方法可以创建一个新ks_promise对象，新的ks_promise\<T>对象的初始状态是未完成（未决）的。
-
 ks_promise提供了一个与其关联的ks_future对象，通过此ks_future对象即可对ks_promise的结果进行各种处置。
 
 通常，每个被创建的ks_promise对象都应该最终被完成（reslove或reject），以避免相关ks_future永不能完成，从而产生意料外的资源泄漏。
@@ -15,7 +13,7 @@ ks_promise提供了一个与其关联的ks_future对象，通过此ks_future对�
 可以看出，ks_promise可用于一个外部的异步调用，例如：
 ```C++
 ks_future<ks_stdptr<IDataBuffer>> async_download(const std::string& url) {
-    auto promise = ks_promise<ks_stdptr<IDataBuffer>>::create();
+    ks_promise<ks_stdptr<IDataBuffer>> promise;
     netlib::do_async_download(url, [promise](IDataBuffer* pDataBuffer) {
         if (hr == 0) 
             promise.resolve(ks_stdptr<IDataBuffer>(pDataBuffer));
@@ -33,16 +31,18 @@ ks_future<ks_stdptr<IDataBuffer>> async_download(const std::string& url) {
 
 <br>
 <br>
+<br>
 
 
-# 静态成员方法
+# 构造方法
 
 ```C++
-static ks_promise<T> create();
+explicit ks_promise<T>::ks_promise(std::create_inst);
 ```
 #### 描述：创建一个ks_promise对象。
+#### 参数：
+  - std::create_inst: 传入固定值std::create_inst，用以明确意图。
 #### 特别说明：新ks_promise对象应该最终完成（reslove或reject），以避免相关ks_future永不能完成，从而产生意料外的资源泄漏。
-<br>
 <br>
 <br>
 
@@ -85,4 +85,5 @@ void reject(ks_error error) const;
 # 另请参阅
   - [HOME](HOME.md)
   - [ks_future\<T>](ks_future.md)
+  - [ks_future_util](ks_future_util.md)
   - [ks_result\<T>](ks_result.md)

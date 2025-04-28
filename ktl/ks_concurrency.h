@@ -17,13 +17,22 @@ limitations under the License.
 
 #include "ks_cxxbase.h"
 #include <mutex>
+#include <shared_mutex>
 #include <condition_variable>
 #include <atomic>
 #include <thread>
 
 
+#ifndef __KS_MUTEX_DEF
+#define __KS_MUTEX_DEF
 using ks_mutex = std::mutex;
+#endif
+
+
+#ifndef __KS_CONDITION_VARIABLE_DEF
+#define __KS_CONDITION_VARIABLE_DEF
 using ks_condition_variable = std::condition_variable;
+#endif
 
 
 #ifndef __KS_SEMAPHORE_DEF
@@ -108,72 +117,3 @@ private:
 };
 
 #endif //__KS_LATCH_DEF
-
-
-//自旋锁，请谨慎使用
-//注：在Linux下应该使用futex技术实现。此外还有一个好玩的rseq技术可以去了解一下。
-#ifndef __KS_SPINLOCK_DEF
-#define __KS_SPINLOCK_DEF
-
-class ks_spinlock {
-public:
-	ks_spinlock() : m_spin_value(0) {}
-	_DISABLE_COPY_CONSTRUCTOR(ks_spinlock);
-
-	void lock() {
-		//立即尝试
-		if (true) {
-			int expected = 0;
-			if (m_spin_value.compare_exchange_weak(expected, 1))
-				return;
-		}
-
-		static const bool _HAS_MULTI_CPU = std::thread::hardware_concurrency() >= 2;
-		if (_HAS_MULTI_CPU) {
-			//立即循环尝试
-			for (int i = 0; i < 200; ++i) { //具体值可再斟酌
-				int expected = 0;
-				if (m_spin_value.compare_exchange_weak(expected, 1))
-					return;
-			}
-		}
-
-		//间断循环尝试
-		for (;;) {
-			int expected = 0;
-			if (m_spin_value.compare_exchange_weak(expected, 1))
-				return;
-
-			//注：对于spin来说，理论上用yield就够了，虽然用sleep更能确保线程调度。
-			//此外，还可以用非原子化方式直接地快速判定值为非0，当非0时再次立即yield；
-			//不过，因atomic并未提供标准的非原子化取值方法，这里我们先按MSVC实现。
-			//std::this_thread::sleep_for(std::chrono::seconds(0));
-			static_assert(sizeof(m_spin_value) == sizeof(int), "error");
-			do {
-				std::this_thread::yield();
-			} while (*(volatile int*)(&m_spin_value) != 0);
-		}
-	}
-
-	_NODISCARD bool try_lock() {
-		int expected = 0;
-		return m_spin_value.compare_exchange_strong(expected, 1);
-	}
-
-	void unlock() {
-		ASSERT(m_spin_value.load() == 1);
-		m_spin_value.store(0);
-	}
-
-private:
-	//注：使用atomic_flag实现与使用atomic_int实现性能相近。
-	//使用CS实现比std::mutex要高效些，但比atomic要差一些。
-	//使用真正的内核对象Mutex自然是最低效的。
-	//atomic/CS/std::mutex/Mutex耗时比（1000000次）：
-	//	Release:94/140/187/2829
-	//	Debug:1719/140/1172/2969
-	//	要注意，Debug与Release性能表现是不同的，我们以Release为准。
-	std::atomic<int> m_spin_value; //0或1
-};
-
-#endif //__KS_SPINLOCK_DEF

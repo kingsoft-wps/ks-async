@@ -15,7 +15,7 @@ limitations under the License.
 
 #include "ks_notification_center.h"
 #include "ks_thread_pool_apartment_imp.h"
-#include "ks-async-raw/ks_raw_internal_helper.h"
+#include "ks-async-raw/ks_raw_internal_helper.hpp"
 #include "ktl/ks_concurrency.h"
 #include <string>
 #include <deque>
@@ -26,18 +26,21 @@ limitations under the License.
 void __forcelink_to_ks_notification_center_cpp() {}
 
 
-class ks_notification_center::__ks_notification_center_data {
+class ks_notification_center::__ks_notification_center_data final {
 public:
-	__ks_notification_center_data(const char* center_name) : m_center_name(center_name != nullptr ? center_name : "") {}
+	__ks_notification_center_data(const char* center_name) { ASSERT(center_name != nullptr); m_center_name = center_name; }
 	~__ks_notification_center_data() {}
 	_DISABLE_COPY_CONSTRUCTOR(__ks_notification_center_data);
 
 public:
+	const char* name();
+
+public:
 	void add_observer(
-		const void* observer, const char* notification_name, 
+		const void* observer, const char* notification_name_pattern,
 		std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment);
 
-	void remove_observer(const void* observer, const char* notification_name);
+	void remove_observer(const void* observer, const char* notification_name_pattern);
 
 public:
 	void do_post_notification(const ks_notification& notification);
@@ -112,22 +115,26 @@ private:
 };
 
 
-void ks_notification_center::__ks_notification_center_data::add_observer(const void* observer, const char* notification_name, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
+const char* ks_notification_center::__ks_notification_center_data::name() {
+	return m_center_name.c_str();
+}
+
+void ks_notification_center::__ks_notification_center_data::add_observer(const void* observer, const char* notification_name_pattern, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	ASSERT(observer != nullptr);
 	ASSERT(apartment != nullptr);
 	if (apartment == nullptr)
-		apartment = ks_apartment::default_mta();
-	if (notification_name == nullptr)
-		notification_name = "*";
+		apartment = ks_apartment::current_thread_apartment_or_default_mta();
+	if (notification_name_pattern == nullptr || notification_name_pattern[0] == 0)
+		notification_name_pattern = "*";
 
 	_ENTRY_PTR entry_ptr = std::make_shared<_ENTRY_DATA>();
 	entry_ptr->observer = observer;
 	entry_ptr->fn = std::move(fn);
 	entry_ptr->context = context;
 	entry_ptr->apartment = apartment;
-	static_cast<_PARSED_NOTIFICATION_NAME&>(*entry_ptr) = do_parse_notification_name(notification_name);
+	static_cast<_PARSED_NOTIFICATION_NAME&>(*entry_ptr) = do_parse_notification_name(notification_name_pattern);
 
 	m_observer_map[observer]
 		.his_group_map[entry_ptr->base_name]
@@ -138,19 +145,19 @@ void ks_notification_center::__ks_notification_center_data::add_observer(const v
 		.entry_list.push_back(entry_ptr);
 }
 
-void ks_notification_center::__ks_notification_center_data::remove_observer(const void* observer, const char* notification_name) {
+void ks_notification_center::__ks_notification_center_data::remove_observer(const void* observer, const char* notification_name_pattern) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	ASSERT(observer != 0);
-	if (notification_name == nullptr || notification_name[0] == 0)
-		notification_name = "*";
+	if (notification_name_pattern == nullptr || notification_name_pattern[0] == 0)
+		notification_name_pattern = "*";
 
 	auto observer_it = m_observer_map.find(observer);
 	if (observer_it == m_observer_map.end())
 		return;
 
 	_OBSERVER_DATA& observer_data = observer_it->second;
-	const _PARSED_NOTIFICATION_NAME parsed_notification_name = do_parse_notification_name(notification_name);
+	const _PARSED_NOTIFICATION_NAME parsed_notification_name = do_parse_notification_name(notification_name_pattern);
 
 	//匹配所有(*)，observer的全部entry将被移除
 	if (parsed_notification_name.base_name == "*") {
@@ -248,7 +255,7 @@ void ks_notification_center::__ks_notification_center_data::remove_observer(cons
 }
 
 void ks_notification_center::__ks_notification_center_data::do_post_notification(const ks_notification& notification) {
-	const _EXPANDED_NOTIFICATION_NAME_SEQ expanded_notification_name_seq = do_expand_notification_name(notification.get_notification_name());
+	const _EXPANDED_NOTIFICATION_NAME_SEQ expanded_notification_name_seq = do_expand_notification_name(notification.get_name());
 	ASSERT(!expanded_notification_name_seq.empty());
 
 	std::unique_lock<ks_mutex> lock(m_mutex);
@@ -306,7 +313,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 
 	//异步触发匹配到的entries各项
 	if (!matched_entries.empty()) {
-		const ks_async_context& notification_context = notification.get_notification_context();
+		const ks_async_context& notification_context = notification.get_context();
 
 		__ks_async_raw::ks_raw_living_context_rtstt notification_context_rtstt;
 		notification_context_rtstt.apply(notification_context);
@@ -320,15 +327,16 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 					__ks_async_raw::ks_raw_living_context_rtstt entry_context_rtstt;
 					entry_context_rtstt.apply(entry_context);
 
-					try {
+					//try {
 						if (!entry_ptr->context.__check_cancel_all_ctrl() && !entry_context.__check_owner_expired())
 							entry_ptr->fn(notification);
-					}
-					catch (...) {
-						//TODO dump exception ...
-						ASSERT(false);
-						abort();
-					}
+					//}
+					//catch (...) {
+					//	//TODO dump exception ...
+					//	ASSERT(false);
+					//	//abort();
+					//	throw;
+					//}
 
 					entry_context_rtstt.try_unapply();
 				}, 0);
@@ -447,40 +455,40 @@ ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NA
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 
-ks_notification_center::ks_notification_center(__raw_ctor, const char* center_name)
-	: m_d(new __ks_notification_center_data(center_name)) {
-}
-
-ks_notification_center::~ks_notification_center() {
-	delete m_d;
+ks_notification_center::ks_notification_center(const char* center_name)
+	: m_d(std::make_shared<__ks_notification_center_data>(center_name)) {
 }
 
 
 ks_notification_center* ks_notification_center::default_center() {
-	static ks_notification_center g_default_center(__raw_ctor::v, "default");
+	static ks_notification_center g_default_center("default_center");
 	return &g_default_center;
 }
 
-std::shared_ptr<ks_notification_center> ks_notification_center::_create_center(const char* center_name) {
-	return std::make_shared< ks_notification_center>(__raw_ctor::v, center_name);
+
+const char* ks_notification_center::name() {
+	return m_d->name();
 }
 
-
-void ks_notification_center::add_observer(const void* observer, const char* notification_name, ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn) {
-	m_d->add_observer(observer, notification_name, std::move(fn), context, apartment);
+void ks_notification_center::add_observer(const void* observer, const char* notification_name_pattern, ks_apartment* apartment, std::function<void(const ks_notification&)> fn, const ks_async_context& context) {
+	m_d->add_observer(observer, notification_name_pattern, std::move(fn), context, apartment);
 }
 
-void ks_notification_center::remove_observer(const void* observer, const char* notification_name) {
-	m_d->remove_observer(observer, notification_name);
+void ks_notification_center::remove_observer(const void* observer, const char* notification_name_pattern) {
+	m_d->remove_observer(observer, notification_name_pattern);
 }
 
 void ks_notification_center::remove_observer(const void* observer) {
 	m_d->remove_observer(observer, "*");
 }
 
-void ks_notification_center::do_post_notification(const ks_notification& notification) {
-	//将异步在background-sta中执行，避免阻塞业务，但又可保持notification时序
-	ks_apartment* inter_apartment = ks_apartment::background_sta();
+void ks_notification_center::post_notification_indirect(const ks_notification& notification) {
+	//将异步在master-sta（或background-sta）中执行，避免阻塞业务，但又可保持notification时序
+	ks_apartment* inter_apartment = ks_apartment::master_sta();
+	if (inter_apartment == nullptr)
+		inter_apartment = ks_apartment::background_sta();
+
+	ASSERT(inter_apartment != nullptr);
 	inter_apartment->schedule([d = m_d, notification]() {
 		d->do_post_notification(notification);
 	}, 0);

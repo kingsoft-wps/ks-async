@@ -8,7 +8,12 @@
 <br>
 
 
-# 静态成员方法
+# 构造方法
+
+```C++
+ks_error::ks_error();
+```
+<br>
 
 ```C++
 static ks_error of(HRESULT code);
@@ -20,15 +25,13 @@ static ks_error of(HRESULT code);
 # 一般成员方法
 
 ```C++
-template <class T>
-ks_error with_payload(T&& payload) const;
+ks_error with_payload<T>(const T& payload) const;
 ```
 
 ```C++
 HRESULT get_code() const;
 
-template <class T>
-const T& get_payload() const;
+const T& get_payload<T>() const;
 ```
 <br>
 <br>
@@ -39,27 +42,56 @@ const T& get_payload() const;
 ```C++
 static ks_error unexpected_error();
 ```
-#### 描述：意外错误，错误码为0xFF3C0001。
+#### 描述：意外错误，错误码为0xFF338001。
 <br>
 
 ```C++
-static ks_error was_timeout_error();
+static ks_error timeout_error();
 ```
-#### 描述：异步过程超时，错误码为0xFF3C0002。
+#### 描述：异步过程超时，错误码为0xFF338002。
 <br>
 
 ```C++
-static ks_error was_cancelled_error();
+static ks_error cancelled_error();
 ```
-#### 描述：异步过程被取消，错误码为0xFF3C0003。
+#### 描述：异步过程被取消，错误码为0xFF338003。
 <br>
 
 ```C++
-static ks_error was_terminated_error();
+static ks_error terminated_error();
 ```
-#### 描述：异步环境（套间）已终止，错误码为0xFF3C0004。
+#### 描述：异步环境（套间）已终止，错误码为0xFF338004。
 <br>
 <br>
+
+```C++
+static ks_error general_error();
+```
+#### 描述：一般错误，错误码为0xFF339001。
+<br>
+
+```C++
+static ks_error eof_error();
+```
+#### 描述：EOF错误，错误码为0xFF339002。
+<br>
+
+```C++
+static ks_error arg_error();
+```
+#### 描述：参数错误，错误码为0xFF339003。
+<br>
+
+```C++
+static ks_error data_error();
+```
+#### 描述：数据错误，错误码为0xFF339004。
+<br>
+
+```C++
+static ks_error status_error();
+```
+#### 描述：状态错误，错误码为0xFF339005。
 <br>
 <br>
 

@@ -23,58 +23,46 @@ limitations under the License.
 #ifndef __STD_TYPE_TRAITS_FIX14
 #define __STD_TYPE_TRAITS_FIX14
 
-#if defined(_MSVC_LANG) ? false : __cplusplus < 201703L
+#if __cplusplus < 201703L && !defined(_MSVC_LANG)
 namespace std {
 	template<bool __v>
 	using bool_constant = integral_constant<bool, __v>;
 
 	template <typename _Tp>
 	constexpr bool is_void_v = is_void<_Tp>::value;
-
 	template <typename _Tp>
 	constexpr bool is_null_pointer_v = is_null_pointer<_Tp>::value;
 
 	template <typename _Tp, typename _Up>
 	constexpr bool is_same_v = is_same<_Tp, _Up>::value;
-
-	template <typename _From, typename _To>
-	constexpr bool is_convertible_v = is_convertible<_From, _To>::value;
-
 	template <typename _Tp>
 	constexpr bool is_copy_assignable_v = is_copy_assignable<_Tp>::value;
+	template <typename _From, typename _To>
+	constexpr bool is_convertible_v = is_convertible<_From, _To>::value;
+	template <typename _Base, typename _Derived>
+	constexpr bool is_base_of_v = is_base_of<_Base, _Derived>::value;
 
 	template <typename _Tp>
-	constexpr bool is_trivially_copy_assignable_v = is_trivially_copy_assignable<_Tp>::value;
-
+	constexpr bool is_reference_v = is_reference<_Tp>::value;
 	template <typename _Tp>
-	constexpr bool is_trivially_destructible_v = is_trivially_destructible<_Tp>::value;
-
-	template <typename _Tp>
-	constexpr bool is_lvalue_reference_v = false;
-	template <typename _Tp>
-	constexpr bool is_lvalue_reference_v<_Tp&> = true;
-
+	constexpr bool is_lvalue_reference_v = is_lvalue_reference<_Tp>::value;
 	template <typename _Tp>
 	constexpr bool is_rvalue_reference_v = is_rvalue_reference<_Tp>::value;
 
 	template <typename _Tp>
 	constexpr bool is_trivial_v = is_trivial<_Tp>::value;
-
 	template <typename _Tp>
 	constexpr bool is_standard_layout_v = is_standard_layout<_Tp>::value;
 
-	template <typename _Base, typename _Derived>
-	constexpr bool is_base_of_v = is_base_of<_Base, _Derived>::value;
-
 	template <typename _Tp>
 	constexpr bool is_const_v = is_const<_Tp>::value;
+	template <typename _Tp>
+	constexpr bool is_volatile_v = is_volatile<_Tp>::value;
 
 	template <typename _Tp>
 	constexpr bool is_signed_v = is_signed<_Tp>::value;
-
 	template <typename _Tp>
 	constexpr bool is_integral_v = is_integral<_Tp>::value;
-
 	template <typename _Tp>
 	constexpr bool is_floating_point_v = is_floating_point<_Tp>::value;
 
@@ -98,13 +86,19 @@ namespace std {
 }
 #endif
 
+#if __cplusplus < 202002L
 namespace std {
-	//remove_cvref (like c++17)
 	template <class T>
-	struct remove_cvref : std::remove_cv<std::remove_reference_t<T>> {};
+	struct remove_cvref { using type = remove_cv_t<remove_reference_t<T>>; };
 	template <class T>
 	using remove_cvref_t = typename remove_cvref<T>::type;
+
+	template <class T>
+	struct type_identity { using type = T; };
+	template <class T>
+	using type_identity_t = typename type_identity<T>::type;
 }
+#endif
 
 #endif //__STD_TYPE_TRAITS_FIX14
 
@@ -121,6 +115,30 @@ namespace std {
 	struct is_nothing : std::is_same<std::remove_cvref_t<T>, nothing_t> {};
 	template <class T>
 	constexpr bool is_nothing_v = is_nothing<T>::value;
+
+	//is_mutable
+	template <class T>
+	struct is_mutable : std::bool_constant<!std::is_reference_v<T> && !std::is_const_v<T>> {};
+	template <class T>
+	constexpr bool is_mutable_v = is_mutable<T>::value;
+
+	//is_const_lvalue_reference
+	template <class T>
+	struct is_const_lvalue_reference : std::bool_constant<std::is_lvalue_reference_v<T> && std::is_const_v<std::remove_reference_t<T>>> {};
+	template <class T>
+	constexpr bool is_const_lvalue_reference_v = is_const_lvalue_reference<T>::value;
+
+	//is_mutable_lvalue_reference
+	template <class T>
+	struct is_mutable_lvalue_reference : std::bool_constant<std::is_lvalue_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>> {};
+	template <class T>
+	constexpr bool is_mutable_lvalue_reference_v = is_mutable_lvalue_reference<T>::value;
+
+	//is_mutable_rvalue_reference
+	template <class T>
+	struct is_mutable_rvalue_reference : std::bool_constant<std::is_rvalue_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>> {};
+	template <class T>
+	constexpr bool is_mutable_rvalue_reference_v = is_mutable_rvalue_reference<T>::value;
 
 	//variadic_size
 	template <class... Ts>
@@ -166,50 +184,6 @@ namespace std {
 	template <class... Ts>
 	constexpr bool is_all_same_v = is_all_same<Ts...>::value;
 
-	//shareable_pointer_traits
-	template <class T> 
-	struct shareable_pointer_traits {
-		static constexpr bool is_shareable_pointer = false;
-		static constexpr bool is_strong_shareable_pointer = false;
-		static constexpr bool is_weak_shareable_pointer = false;
-	};
-	template <class X>
-	struct shareable_pointer_traits<std::shared_ptr<X>> { //特化shared_ptr
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(const std::shared_ptr<X>& pointer) { return pointer == nullptr; }
-		static bool check_pointer_expired(const std::shared_ptr<X>& pointer) { return false; }
-		static const void* try_lock_pointer(const std::shared_ptr<X>& pointer) { return (const void*)(-1); }
-		static void  unlock_pointer(const std::shared_ptr<X>& pointer, const void*& locker) { locker = nullptr; }
-		using pointer_type = std::shared_ptr<X>;
-		using pointer_locker_type = const void*;
-	};
-	template <>
-	struct shareable_pointer_traits<nullptr_t> { //特化nullptr_t（按shared_ptr等同看待）
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(nullptr_t) { return true; }
-		static bool check_pointer_expired(nullptr_t) { return false; }
-		static const void* try_lock_pointer(nullptr_t) { return (const void*)(-1); }
-		static void  unlock_pointer(nullptr_t, const void*& locker) { locker = nullptr; }
-		using pointer_type = nullptr_t;
-		using pointer_locker_type = const void*;
-	};
-	template <class X>
-	struct shareable_pointer_traits<std::weak_ptr<X>> { //特化weak_ptr
-		static constexpr bool is_shareable_pointer = true;
-		static constexpr bool is_strong_shareable_pointer = true;
-		static constexpr bool is_weak_shareable_pointer = false;
-		static bool check_pointer_null(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
-		static bool check_pointer_expired(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
-		static std::shared_ptr<X> try_lock_pointer(const std::weak_ptr<X>& pointer) { return pointer.lock(); }
-		static void  unlock_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) { locker.reset(); }
-		using pointer_type = std::weak_ptr<X>;
-		using pointer_locker_type = std::shared_ptr<X>;
-	};
-
 	//shared_pointer_traits
 	template <class T>
 	struct shared_pointer_traits {
@@ -228,6 +202,7 @@ namespace std {
 	template <class X>
 	struct weak_pointer_traits<std::weak_ptr<X>> {
 		static constexpr bool is_weak_pointer_v = true;
+		using locker_type = std::shared_ptr<X>;
 		static std::shared_ptr<X> try_lock_weak_pointer(const std::weak_ptr<X>& pointer) { return pointer.lock(); }
 		static void unlock_weak_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) { locker.reset(); }
 		static bool check_weak_pointer_expired(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
@@ -246,5 +221,27 @@ namespace std {
 	constexpr bool is_weak_pointer_v = is_weak_pointer<T>::value;
 
 }
+
+
+namespace std { //helper funcs
+	template <class T, class _ = std::enable_if_t<!std::is_const_v<std::remove_reference_t<T>>>>
+	constexpr inline std::remove_reference_t<T>&& __move_mutable(T&& arg) noexcept {
+		static_assert(!std::is_const_v<std::remove_reference_t<T>>, "T must be mutable");
+		return std::move(arg);
+	}
+
+	template <class T, class _ = std::enable_if_t<!std::is_const_v<std::remove_reference_t<T>>>>
+	constexpr inline T __forward_mutable(std::remove_reference_t<T>& arg) noexcept {
+		static_assert(!std::is_const_v<std::remove_reference_t<T>>, "T must be mutable");
+		return std::forward<T>(arg);
+	}
+
+	template <class T>
+	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>& arg) noexcept {
+		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
+			(void)std::remove_cvref_t<T>(std::move(arg));
+	}
+}
+
 
 #endif //__KS_TYPE_TRAITS_DEF

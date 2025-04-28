@@ -21,74 +21,7 @@ limitations under the License.
 __KS_ASYNC_RAW_BEGIN
 
 
-template <class T>
-class ks_raw_smart_ptr {
-public:
-	ks_raw_smart_ptr() : m_p(nullptr) {}
-	explicit ks_raw_smart_ptr(T* p) : m_p(p) { ASSERT(m_p == nullptr || m_p->ref_count == 1); }
-
-	ks_raw_smart_ptr(const ks_raw_smart_ptr& r) {
-		m_p = r.m_p;
-		if (m_p != nullptr) 
-			++m_p->ref_count;
-	}
-	ks_raw_smart_ptr& operator=(const ks_raw_smart_ptr& r) {
-		if (this != &r && m_p != r.m_p) {
-			this->reset();
-			m_p = r.m_p;
-			if (m_p != nullptr)
-				++m_p->ref_count;
-		}
-		return *this;
-	}
-
-	ks_raw_smart_ptr(ks_raw_smart_ptr&& r) noexcept {
-		m_p = r.m_p;
-		r.m_p = nullptr;
-	}
-	ks_raw_smart_ptr& operator=(ks_raw_smart_ptr&& r) noexcept {
-		ASSERT(this != &r);
-		this->reset();
-		m_p = r.m_p;
-		r.m_p = nullptr;
-		return *this;
-	}
-
-	~ks_raw_smart_ptr() {
-		this->reset(); 
-	}
-
-	template <class... ARGS>
-	void create_instance(ARGS&&... args) {
-		ASSERT(m_p == nullptr);
-		if (m_p == nullptr) {
-			m_p = new T(std::forward<ARGS>(args)...);
-			ASSERT(m_p->ref_count == 1);
-		}
-	}
-
-	void reset() { 
-		if (m_p != nullptr) {
-			if (--m_p->ref_count == 0) 
-				delete m_p;
-			m_p = nullptr;
-		}
-	}
-
-	T* get() const { return m_p; }
-	T* operator->() const { ASSERT(m_p != nullptr); return m_p; }
-
-	bool operator==(const ks_raw_smart_ptr<T>& r) const { return m_p == r.m_p; }
-	bool operator!=(const ks_raw_smart_ptr<T>& r) const { return m_p != r.m_p; }
-	bool operator==(T* p) const { return m_p == p; }
-	bool operator!=(T* p) const { return m_p != p; }
-
-private:
-	T* m_p;
-};
-
-
-class ks_raw_running_future_rtstt {
+class ks_raw_running_future_rtstt final {
 public:
 	ks_raw_running_future_rtstt() {}
 	~ks_raw_running_future_rtstt() { this->try_unapply(); }
@@ -133,7 +66,7 @@ private:
 };
 
 
-class ks_raw_living_context_rtstt {
+class ks_raw_living_context_rtstt final {
 public:
 	ks_raw_living_context_rtstt() {}
 	~ks_raw_living_context_rtstt() { this->try_unapply(); }
@@ -162,7 +95,7 @@ public:
 		m_cur_context.__decrement_pending_count();
 
 		m_applied_flag = false;
-		m_cur_context = ks_async_context::__empty_inst();
+		m_cur_context = {};
 		m_cur_context_owner_locker = {};
 	}
 

@@ -24,10 +24,10 @@ __KS_ASYNC_RAW_BEGIN
 class ks_raw_promise;
 using ks_raw_promise_ptr = std::shared_ptr<ks_raw_promise>;
 
-class ks_raw_promise {
+_ABSTRACT class ks_raw_promise {
 protected:
-	KS_ASYNC_API ks_raw_promise() = default;
-	KS_ASYNC_API virtual ~ks_raw_promise() = default;  //protected
+	ks_raw_promise() = default;
+	~ks_raw_promise() = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise);
 
 public:
@@ -38,7 +38,7 @@ public:
 
 	virtual void resolve(const ks_raw_value& value) = 0;
 	virtual void reject(const ks_error& error) = 0;
-	virtual void try_complete(const ks_raw_result& result) = 0;
+	virtual void try_settle(const ks_raw_result& result) = 0;
 };
 
 

@@ -29,6 +29,12 @@ static ks_apartment* default_mta();
 <br>
 
 ```C++
+static ks_apartment* find_public_apartment(const char* name);
+```
+#### 描述：获取已注册的公开套间。
+<br>
+
+```C++
 static ks_apartment* current_thread_apartment();
 static ks_apartment* current_thread_apartment_or_default_mta();
 static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
@@ -40,6 +46,23 @@ static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
 
 
 # 一般成员方法
+
+```C++
+const char* name();
+```
+#### 描述：获取套间名称。
+#### 返回值：套间名称。
+<br>
+
+```C++
+const char* features();
+```
+#### 描述：获取套间特征。
+#### 返回值：套间特征。
+#### 特别说明：目前支持的特征只有：sequential_feature。
+<br>
+<br>
+
 
 ```C++
 bool start();
@@ -58,20 +81,19 @@ void async_stop();
 void wait();
 ```
 #### 描述：等待（要求先async_stop）。
-#### 特别说明：目前的wait实现暂不支持并发重入（即同一时刻至多只允许有一个线程调用wait）。
 <br>
 
 ```C++
-bool is_stopping_or_stopped();
 bool is_stopped();
+bool is_stopping_or_stopped();
 ```
-#### 描述：判定套间是否正在被停止、或已停止。
+#### 描述：判定套间是否已停止、或正在被停止。
 <br>
 <br>
 
 
 ```C++
-uint64_t schedule(const function<void()>& fn, int priority);
+uint64_t schedule(function<void()> fn, int priority);
 ```
 #### 描述：调度一个异步过程。
 #### 参数：
@@ -82,7 +104,7 @@ uint64_t schedule(const function<void()>& fn, int priority);
 <br>
 
 ```C++
-uint64_t schedule_delayed(const function<void()>& fn, int priority, int64_t delay);
+uint64_t schedule_delayed(function<void()> fn, int priority, int64_t delay);
 ```
 #### 描述：调度一个异步**延时**过程。
 #### 参数：
@@ -104,9 +126,19 @@ void try_unschedule(uint64_t id);
 #### 特别说明：如果异步过程已经执行完毕、或正在被执行，则不能成功撤销。
 <br>
 <br>
-<br>
-<br>
 
+
+```C++
+void atfork_prepare();
+void atfork_parent();
+void atfork_child();
+```
+#### 描述：fork辅助支持。
+#### 特别说明：仅UNIX类系统下有效。
+<br>
+<br>
+<br>
+<br>
 
 
 # 另请参阅

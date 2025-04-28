@@ -25,22 +25,19 @@ limitations under the License.
 template <class T>
 class ks_promise final {
 public:
-	ks_promise(nullptr_t) : m_raw_promise(nullptr) {}
+	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
+	static ks_promise<T> create() { return ks_promise<T>(std::create_inst); }
+
 	ks_promise(const ks_promise&) = default;
-	ks_promise& operator=(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
-	ks_promise& operator=(ks_promise&&) noexcept = default;
+
+	//让ks_promise看起来像一个智能指针
+	ks_promise* operator->() { return this; }
+	const ks_promise* operator->() const { return this; }
 
 	using arg_type = T;
 	using value_type = T;
 	using this_promise_type = ks_promise<T>;
-
-public:
-	static ks_promise<T> create() {
-		ks_apartment* apartment_hint = ks_apartment::default_mta();
-		ks_raw_promise_ptr raw_promise = ks_raw_promise::create(apartment_hint);
-		return ks_promise<T>::__from_raw(raw_promise);
-	}
 
 public:
 	bool is_valid() const {
@@ -54,12 +51,12 @@ public:
 
 	void resolve(const T& value) const {
 		ASSERT(this->is_valid());
-		m_raw_promise->resolve(ks_raw_value::of(value));
+		m_raw_promise->resolve(ks_raw_value::of<T>(value));
 	}
 
 	void resolve(T&& value) const {
 		ASSERT(this->is_valid());
-		m_raw_promise->resolve(ks_raw_value::of(std::move(value)));
+		m_raw_promise->resolve(ks_raw_value::of<T>(std::move(value)));
 	}
 
 	void reject(const ks_error& error) const {
@@ -67,13 +64,9 @@ public:
 		m_raw_promise->reject(error);
 	}
 
-	void try_complete(const ks_result<T>& result) const {
-		if (result.is_value())
-			this->resolve(result.to_value());
-		else if (result.is_error())
-			this->reject(result.to_error());
-		else
-			ASSERT(false);
+	void try_settle(const ks_result<T>& result) const {
+		ASSERT(this->is_valid());
+		m_raw_promise->try_settle(result.__get_raw());
 	}
 
 private:
@@ -81,7 +74,6 @@ private:
 	using ks_raw_future_ptr = __ks_async_raw::ks_raw_future_ptr;
 	using ks_raw_promise = __ks_async_raw::ks_raw_promise;
 	using ks_raw_promise_ptr = __ks_async_raw::ks_raw_promise_ptr;
-
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
@@ -92,9 +84,15 @@ private:
 	static ks_promise<T> __from_raw(ks_raw_promise_ptr&& raw_promise) { return ks_promise<T>(std::move(raw_promise), 0); }
 	const ks_raw_promise_ptr& __get_raw() const { return m_raw_promise; }
 
+	static ks_raw_promise_ptr __do_create_raw_promise() {
+		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
+		return ks_raw_promise::create(apartment_hint);
+	}
+
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;
 	friend class ks_future_util;
+	friend class ks_async_flow;
 
 private:
 	ks_raw_promise_ptr m_raw_promise;

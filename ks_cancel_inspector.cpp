@@ -29,11 +29,7 @@ public:
 
 public:
 	virtual bool check_cancel() override {
-		return ks_raw_future::check_current_future_cancel(true);
-	}
-
-	virtual ks_error get_cancel_error() override {
-		return ks_raw_future::get_current_future_cancel_error(true);
+		return ks_raw_future::__check_current_future_cancel(true);
 	}
 
 private:

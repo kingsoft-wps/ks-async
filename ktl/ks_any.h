@@ -17,9 +17,9 @@ limitations under the License.
 #include "ks_cxxbase.h"
 #include "ks_type_traits.h"
 #include <atomic>
-#include <cstring>
 #include <functional>
-#include <stdlib.h>
+#include <cstring>
+#include <string.h>
 
 #ifndef __KS_ANY_DEF
 #define __KS_ANY_DEF
@@ -89,23 +89,59 @@ public:
 return *this;
 	}
 
+	void swap(ks_any& r) noexcept {
+		if (this != &r) {
+			std::swap(m_data_p, r.m_data_p);
+			std::swap(m_embed_tiny_trivial_x_mem, r.m_embed_tiny_trivial_x_mem);
+		}
+	}
+
+	void reset() noexcept {
+		if (m_data_p != nullptr && m_data_p != (void*)(-1)) {
+			if (--m_data_p->ref_count == 0) {
+				m_data_p->x_dtor(m_data_p->x_addr());
+				m_data_p->~_DATA_HEADER();
+				delete[](unsigned char*)m_data_p;
+			}
+		}
+
+		m_data_p = nullptr;
+		m_embed_tiny_trivial_x_mem = {};
+
+#ifdef _DEBUG
+		m_x_typeinfo = nullptr;
+		m_x_sizeof = 0;
+#endif
+	}
+
+public:
+	template <class T, class X = T, class = std::enable_if_t<std::is_convertible_v<X, T>>>
+	static ks_any of(X&& x) {
+		constexpr bool can_embed = __can_embed_tiny_trivial_x<T>();
+		return ks_any((T*)nullptr, std::forward<X>(x), std::bool_constant<can_embed>());
+	}
+
+	template <class T>
+	static ks_any __direct_of(T&& x) {
+		return ks_any::of<std::remove_cvref_t<T>>(std::forward<T>(x));
+	}
+
 private:
 	template <class T>
-	explicit ks_any(T&& x, int) {
+	static constexpr bool __can_embed_tiny_trivial_x() {
 		using XT = std::remove_cvref_t<T>;
-		if (__can_embed_tiny_trivial_x<XT>()) {
-			*(XT*)(void*)(&m_embed_tiny_trivial_x_mem) = x;
-			m_data_p = (_DATA_HEADER*)(void*)(-1);
-		}
-		else {
-			constexpr size_t x_offset = (sizeof(_DATA_HEADER) + alignof(XT) - 1) / alignof(XT) * alignof(XT);
-			_DATA_HEADER* data_p = (_DATA_HEADER*)malloc(x_offset + sizeof(XT));
-			::new ((void*)data_p) _DATA_HEADER();
-			data_p->x_offset = int(x_offset);
-			data_p->x_dtor = [](void* px) { ((XT*)px)->~XT(); };
-			::new (data_p->x_addr()) XT(std::forward<T>(x));
-			m_data_p = data_p;
-		}
+		return std::is_trivial_v<XT> && std::is_standard_layout_v<XT>
+			&& sizeof(XT) <= sizeof(m_embed_tiny_trivial_x_mem) 
+			&& alignof(XT) <= alignof(decltype(m_embed_tiny_trivial_x_mem));
+	}
+
+	template <class T, class X>
+	explicit ks_any(T*, X&& x, std::bool_constant<true>) {
+		using XT = std::remove_cvref_t<T>;
+		ASSERT(!this->has_value());
+
+		m_data_p = (_DATA_HEADER*)(void*)(-1);
+		::new ((XT*)(void*)(&m_embed_tiny_trivial_x_mem)) XT(std::forward<X>(x));
 
 #ifdef _DEBUG
 		m_x_typeinfo = &typeid(XT);
@@ -113,31 +149,38 @@ private:
 #endif
 	}
 
-	template <class T>
-	static constexpr bool __can_embed_tiny_trivial_x() {
+	template <class T, class X>
+	explicit ks_any(T*, X&& x, std::bool_constant<false>) {
 		using XT = std::remove_cvref_t<T>;
-		return std::is_trivially_copy_assignable_v<XT>
-			&& std::is_trivially_destructible_v<XT>
-			&& sizeof(XT) <= sizeof(m_embed_tiny_trivial_x_mem);
+		ASSERT(!this->has_value());
+
+		constexpr size_t x_offset = (sizeof(_DATA_HEADER) + alignof(XT) - 1) / alignof(XT) * alignof(XT);
+		_DATA_HEADER* data_p = (_DATA_HEADER*)(new unsigned char[x_offset + sizeof(XT)]);
+		::new ((void*)data_p) _DATA_HEADER();
+		data_p->x_offset = int(x_offset);
+		data_p->x_dtor = [](void* px) { ((XT*)px)->~XT(); };
+		::new (data_p->x_addr()) XT(std::forward<X>(x));
+		m_data_p = data_p;
+
+#ifdef _DEBUG
+		m_x_typeinfo = &typeid(XT);
+		m_x_sizeof = sizeof(XT);
+#endif
 	}
 
 public:
-	template <class T>
-	static ks_any of(T&& x) {
-		return ks_any(std::forward<T>(x), 0);
-	}
-
 	bool has_value() const {
 		return m_data_p != nullptr;
 	}
 
 	template <class T>
 	const T& get() const {
-		return this->cast<T>();
+		return this->do_get<T>();
 	}
 
+private:
 	template <class T>
-	T& cast() {
+	const T& do_get() const {
 		using XT = std::remove_cvref_t<T>;
 
 		ASSERT(this->has_value());
@@ -160,29 +203,6 @@ public:
 		}
 	}
 
-	template <class T>
-	const T& cast() const {
-		return const_cast<ks_any*>(this)->cast<T>();
-	}
-
-	void reset() {
-		if (m_data_p != nullptr && m_data_p != (void*)(-1)) {
-			if (--m_data_p->ref_count == 0) {
-				m_data_p->x_dtor(m_data_p->x_addr());
-				m_data_p->~_DATA_HEADER();
-				free((void*)m_data_p);
-			}
-		}
-
-		m_data_p = nullptr;
-		m_embed_tiny_trivial_x_mem = {};
-
-#ifdef _DEBUG
-		m_x_typeinfo = nullptr;
-		m_x_sizeof = 0;
-#endif
-	}
-
 private:
 	struct _DATA_HEADER {
 		int x_offset;  //const-like
@@ -200,5 +220,13 @@ private:
 	size_t m_x_sizeof = 0;
 #endif
 };
+
+
+namespace std {
+	inline void swap(ks_any& l, ks_any& r) noexcept {
+		l.swap(r);
+	}
+}
+
 
 #endif //__KS_ANY_DEF

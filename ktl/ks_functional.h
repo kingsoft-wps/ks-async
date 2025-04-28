@@ -47,7 +47,7 @@ namespace std {
 	template <bool IsInvocable, class FN, class... ARGs>
 	struct __invoke_result_imp {};
 	template <class FN, class... ARGs>
-	struct __invoke_result_imp<true, FN, ARGs...> { using type = decltype((*(std::remove_reference_t<FN>*)(nullptr))(std::forward<ARGs>(*(std::remove_reference_t<ARGs>*)(nullptr))...)); };
+	struct __invoke_result_imp<true, FN, ARGs...> { using type = decltype(((std::declval<FN>)())(std::declval<ARGs>()...)); };
 	template <class FN, class... ARGs>
 	struct invoke_result : __invoke_result_imp<std::is_invocable_v<FN, ARGs...>, FN, ARGs...> {};
 	template <class FN, class... ARGs>

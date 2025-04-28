@@ -16,84 +16,62 @@ limitations under the License.
 #pragma once
 
 #include "ks_async_base.h"
+#include "ks_notification.h"
 #include "ks_apartment.h"
-#include "ks_async_context.h"
-#include "ktl/ks_any.h"
-#include <string>
 #include <memory>
 
-class ks_notification;
-class ks_notification_center;
 
-
-class ks_notification {
+class ks_notification_center final {
 public:
-	template <class DATA_TYPE>
-	explicit ks_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data)
-		: m_props(std::make_shared<_NOTIFICATION_PROPS>()) {
-		m_props->sender = sender;
-		m_props->notification_name = notification_name != nullptr ? notification_name : "";
-		m_props->notification_context = notification_context;
-		m_props->notification_data_any = ks_any::of(std::forward<DATA_TYPE>(notification_data));
-	}
-
-	ks_notification(const ks_notification&) = default;
-	ks_notification& operator=(const ks_notification&) = default;
-	ks_notification(ks_notification&&) noexcept = default;
-	ks_notification& operator=(ks_notification&&) noexcept = default;
-
-public:
-	const void* get_sender() const { ASSERT(m_props != nullptr); return m_props->sender; }
-	const char* get_notification_name() const { ASSERT(m_props != nullptr); return m_props->notification_name.c_str(); }
-	const ks_async_context& get_notification_context() const { ASSERT(m_props != nullptr); return m_props->notification_context; }
-	template <class DATA_TYPE>
-	const DATA_TYPE& get_notification_data() const { ASSERT(m_props != nullptr); return m_props->notification_data_any.get<DATA_TYPE>(); }
-
-private:
-	struct _NOTIFICATION_PROPS {
-		const void* sender;
-		std::string notification_name;
-		ks_async_context notification_context;
-		ks_any notification_data_any;
-	};
-
-	std::shared_ptr<_NOTIFICATION_PROPS> m_props;
-};
-
-
-class ks_notification_center {
-private:
-	enum class __raw_ctor { v };
-
-public:
-	ks_notification_center() = delete;
+	KS_ASYNC_API explicit ks_notification_center(const char* center_name);
 	_DISABLE_COPY_CONSTRUCTOR(ks_notification_center);
 
-	explicit ks_notification_center(__raw_ctor, const char* center_name);
-	~ks_notification_center();
+	KS_ASYNC_API static ks_notification_center* default_center(); //default-center singleton
 
 public:
-	KS_ASYNC_API static ks_notification_center* default_center();
-	KS_ASYNC_API static std::shared_ptr<ks_notification_center> _create_center(const char* center_name);
+	KS_ASYNC_API const char* name();
 
 public:
 	KS_ASYNC_API void add_observer(
-		const void* observer, const char* notification_name, 
-		ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_notification&)>&& fn);
+		const void* observer, const char* notification_name_pattern, 
+		ks_apartment* apartment, std::function<void(const ks_notification&)> fn, const ks_async_context& context = {});
 
-	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name);
+	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name_pattern);
+
 	KS_ASYNC_API void remove_observer(const void* observer);
 
 public:
-	template <class DATA_TYPE>
-	KS_ASYNC_INLINE_API void post_notification(const void* sender, const char* notification_name, const ks_async_context& notification_context, DATA_TYPE&& notification_data) {
-		return this->do_post_notification(ks_notification(sender, notification_name, notification_context, std::forward<DATA_TYPE>(notification_data)));
+	KS_ASYNC_INLINE_API void post_notification(
+		const void* sender, 
+		const char* notification_name, 
+		const ks_async_context& notification_context = {}) {
+
+		return this->post_notification_indirect(
+			ks_notification_builder()
+				.set_sender(sender)
+				.set_name(notification_name)
+				.set_context(notification_context)
+				.build());
 	}
 
-private:
-	KS_ASYNC_API void do_post_notification(const ks_notification& notification);
+	template <class T, class X = T, class _ = std::enable_if_t<std::is_convertible_v<X, T>>>
+	KS_ASYNC_INLINE_API void post_notification_with_payload(
+		const void* sender, 
+		const char* notification_name, X&& notification_payload,
+		const ks_async_context& notification_context = {}) {
+
+		return this->post_notification_indirect(
+			ks_notification_builder()
+				.set_sender(sender)
+				.set_name(notification_name)
+				.set_payload<T>(std::forward<X>(notification_payload))
+				.set_context(notification_context)
+				.build());
+	}
+
+	KS_ASYNC_API void post_notification_indirect(const ks_notification& notification);
 
 private:
 	class __ks_notification_center_data;
-	__ks_notification_center_data* m_d;
+	std::shared_ptr<__ks_notification_center_data> m_d;
 };

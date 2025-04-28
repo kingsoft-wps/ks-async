@@ -3,8 +3,11 @@
 ks-async异步框架，按照完善的Future模型（而非std::future）进行抽象，基于C++14标准。
 
 异步组件：
- - ks_future
- - ks_promise
+ - ks_future\<T>
+ - ks_promise\<T>
+
+高级异步任务编排器：
+ - ks_async_flow
 
 异步套间（异步执行环境）抽象：
  - ks_apartment
