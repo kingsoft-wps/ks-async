@@ -62,7 +62,7 @@ public:
 			context);
 	}
 
-	bool remove_observer(uint64_t id) const {
+	void remove_observer(uint64_t id) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->remove_observer(id);
 	}

@@ -506,7 +506,7 @@ void test_alive() {
 }
 
 void test_notification_center() {
-    g_exit_latch.add(1);
+    g_exit_latch.add(2);
     std::cout << "test notification-center ... ";
 
     struct {} sender, observer;
@@ -518,14 +518,16 @@ void test_notification_center() {
         std::cout << "a.b.* notification: name=" << notification.get_name() << "; ";
         g_exit_latch.count_down();
         });
+    ks_notification_center::default_center()->add_observer(&observer, "*", ks_apartment::default_mta(), [](const ks_notification& notification) {
+        std::cout << "* notification: name=" << notification.get_name() << "; ";
+        g_exit_latch.count_down();
+        });
 
     ks_notification_center::default_center()->post_notification(&sender, "a.x.y.z");
     ks_notification_center::default_center()->post_notification_with_payload<int>(&sender, "a.x.y.z", 1);
-    ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.b.c", "xxx");
+    ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.b.c.d.e", "xxx");
 
     g_exit_latch.wait();
-    ks_notification_center::default_center()->remove_observer(&observer, "a.b.c.d");
-    ks_notification_center::default_center()->remove_observer(&observer, "a.*");
     ks_notification_center::default_center()->remove_observer(&sender);
 
     std::cout << "completion (succ)\n";

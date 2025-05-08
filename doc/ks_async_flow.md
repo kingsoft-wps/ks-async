@@ -42,7 +42,7 @@ uint64_t add_flow_completed_observer(ks_apartment* apartment, std::function<void
 uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name)> fn, const ks_async_context& context);
 uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name, const ks_error& error)> fn, const ks_async_context& context);
 
-bool remove_observer(uint64_t id);
+void remove_observer(uint64_t id);
 ```
 #### 描述：添加/移除观察者。
 <br>

@@ -327,13 +327,12 @@ uint64_t ks_raw_async_flow::add_task_completed_observer(const char* task_name_pa
 	return observer_id;
 }
 
-bool ks_raw_async_flow::remove_observer(uint64_t observer_id) {
+void ks_raw_async_flow::remove_observer(uint64_t observer_id) {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 	if (m_flow_observer_map.erase(observer_id) != 0)
-		return true;
+		return;
 	if (m_task_observer_map.erase(observer_id) != 0)
-		return true;
-	return false;
+		return;
 }
 
 
@@ -936,7 +935,7 @@ void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, c
 					}
 				}, observer_item->observer_context.__get_priority());
 
-			it = m_task_observer_map.erase(it);
+			++it;
 		}
 	}
 }

@@ -32,11 +32,11 @@ public:
 	KS_ASYNC_API const char* name();
 
 public:
-	KS_ASYNC_API void add_observer(
+	KS_ASYNC_API uint64_t add_observer(
 		const void* observer, const char* notification_name_pattern, 
 		ks_apartment* apartment, std::function<void(const ks_notification&)> fn, const ks_async_context& context = {});
 
-	KS_ASYNC_API void remove_observer(const void* observer, const char* notification_name_pattern);
+	KS_ASYNC_API void remove_observer(const void* observer, uint64_t id);
 
 	KS_ASYNC_API void remove_observer(const void* observer);
 

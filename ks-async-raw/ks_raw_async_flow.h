@@ -49,7 +49,7 @@ public:
 	KS_ASYNC_API uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context);
 	KS_ASYNC_API uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
 
-	KS_ASYNC_API bool remove_observer(uint64_t id);
+	KS_ASYNC_API void remove_observer(uint64_t id);
 
 public:
 	KS_ASYNC_API ks_raw_value get_value(const char* key);

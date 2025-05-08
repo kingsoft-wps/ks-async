@@ -115,7 +115,7 @@ return *this;
 	}
 
 public:
-	template <class T, class X = T, class = std::enable_if_t<std::is_convertible_v<X, T>>>
+	template <class T, class X = T, class _ = std::enable_if_t<std::is_convertible_v<X, T>>>
 	static ks_any of(X&& x) {
 		constexpr bool can_embed = __can_embed_tiny_trivial_x<T>();
 		return ks_any((T*)nullptr, std::forward<X>(x), std::bool_constant<can_embed>());
