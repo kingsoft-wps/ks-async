@@ -34,7 +34,10 @@ public:
 	using this_future_type = ks_future<void>;
 
 public: //resolved, rejected
-	static ks_future<void> resolved(nothing_t = nothing) {
+	static ks_future<void> resolved() {
+		return ks_future<nothing_t>::resolved(nothing).template cast<void>();
+	}
+	static ks_future<void> resolved(nothing_t) {
 		return ks_future<nothing_t>::resolved(nothing).template cast<void>();
 	}
 
@@ -429,12 +432,7 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
-public: //cast, map, map_value
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R> || std::is_nothing_v<R>>>
-	ks_future<R> cast() const {
-		return m_nothing_future.template cast<R>();
-	}
-
+public: //map, map_value, cast
 	template <class R, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<R()>>>>
 	ks_future<R> map(FN&& fn) const {
@@ -446,6 +444,11 @@ public: //cast, map, map_value
 	template <class R, class X = R, class _ = std::enable_if_t<std::is_convertible_v<X, R>>>
 	ks_future<R> map_value(X&& other_value) const {
 		return m_nothing_future.template map_value<R>(std::forward<X>(other_value));
+	}
+
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R> || std::is_nothing_v<R>>>
+	ks_future<R> cast() const {
+		return m_nothing_future.template cast<R>();
 	}
 
 public: //try_cancel, set_timeout

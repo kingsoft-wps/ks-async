@@ -59,7 +59,13 @@ const char* features();
 ```
 #### 描述：获取套间特征。
 #### 返回值：套间特征。
-#### 特别说明：目前支持的特征只有：sequential_feature。
+<br>
+
+```C++
+const char* concurrency();
+```
+#### 描述：获取套间理想并行度值。
+#### 返回值：套间理想并行度值。
 <br>
 <br>
 

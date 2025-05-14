@@ -43,11 +43,17 @@ public:
 		const std::type_info* value_typeinfo = nullptr);
 
 public:
-	KS_ASYNC_API uint64_t add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
-	KS_ASYNC_API uint64_t add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_flow_running_observer(
+		ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_flow_completed_observer(
+		ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context);
 
-	KS_ASYNC_API uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context);
-	KS_ASYNC_API uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_task_running_observer(
+		const char* task_name_pattern, 
+		ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context);
+	KS_ASYNC_API uint64_t add_task_completed_observer(
+		const char* task_name_pattern, 
+		ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context);
 
 	KS_ASYNC_API void remove_observer(uint64_t id);
 

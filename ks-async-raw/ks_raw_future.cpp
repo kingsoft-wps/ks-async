@@ -781,7 +781,8 @@ private:
 
 		virtual void try_settle(const ks_raw_result & result) override {
 			ASSERT(result.is_completed());
-			m_promise_future->do_complete(result.is_completed() ? result : ks_raw_result(ks_error::unexpected_error()), nullptr, false);
+			if (result.is_completed())
+				m_promise_future->do_complete(result, nullptr, false);
 		}
 
 	private:

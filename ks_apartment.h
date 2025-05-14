@@ -49,6 +49,7 @@ public:
 public:
 	virtual const char* name() = 0;
 	virtual uint features() = 0;
+	virtual size_t concurrency() = 0;
 
 public:
 	virtual bool start() = 0;
@@ -77,8 +78,9 @@ public:
 	//其存在的问题和隐患包括：
 	//1、若出现嵌套wait，则只能后入先出
 	//2、仍无法杜绝逻辑上的死锁，需要业务逻辑实现者自己保证
-	virtual bool __run_nested_pump_loop_for_extern_waiting(void* object, std::function<bool()>&& extern_pred_fn) { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
-	virtual void __awaken_nested_pump_loop_for_extern_waiting_once(void* object) { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
+	//另：在调用__run_nested_pump_loop_for_extern_waiting处，只可以对current_thread_apartment对象调用该方法
+	virtual bool __run_nested_pump_loop_for_extern_waiting(void* extern_obj, std::function<bool()>&& extern_pred_fn) { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
+	virtual void __awaken_nested_pump_loop_for_extern_waiting_once(void* extern_obj) { ASSERT(false); throw std::runtime_error("this apartment doesn't support nested pump-loop"); }
 
 public:
 	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用。

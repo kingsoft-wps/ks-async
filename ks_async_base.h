@@ -19,7 +19,7 @@ limitations under the License.
 #include "ktl/ks_type_traits.h"
 #include <string>
 #include <memory>
-
+#include <stdexcept>
 
 #if !defined(KS_ASYNC_API)
 #   ifdef KS_ASYNC_EXPORTS

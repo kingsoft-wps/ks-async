@@ -53,7 +53,6 @@ public:
 		ASSERT(this->is_valid());
 		m_raw_promise->resolve(ks_raw_value::of<T>(value));
 	}
-
 	void resolve(T&& value) const {
 		ASSERT(this->is_valid());
 		m_raw_promise->resolve(ks_raw_value::of<T>(std::move(value)));
