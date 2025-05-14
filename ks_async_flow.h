@@ -32,14 +32,16 @@ public:
 	}
 
 public:
-	uint64_t add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_async_flow& flow)> fn, const ks_async_context& context = {}) const {
+	uint64_t add_flow_running_observer(
+		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)> fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->add_flow_running_observer(
 			apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow) { fn(ks_async_flow::__from_raw(flow)); },
 			context);
 	}
-	uint64_t add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const ks_error& error)> fn, const ks_async_context& context = {}) const {
+	uint64_t add_flow_completed_observer(
+		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const ks_error& error)> fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->add_flow_completed_observer(
 			apartment,
@@ -47,14 +49,18 @@ public:
 			context);
 	}
 
-	uint64_t add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name)> fn, const ks_async_context& context = {}) const {
+	uint64_t add_task_running_observer(
+		const char* task_name_pattern, 
+		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name)> fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->add_task_running_observer(
 			task_name_pattern, apartment,
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow, const char* task_name) { fn(ks_async_flow::__from_raw(flow), task_name); },
 			context);
 	}
-	uint64_t add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name, const ks_error& error)> fn, const ks_async_context& context = {}) const {
+	uint64_t add_task_completed_observer(
+		const char* task_name_pattern, 
+		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name, const ks_error& error)> fn, const ks_async_context& context = {}) const {
 		ASSERT(this->is_valid());
 		return m_raw_flow->add_task_completed_observer(
 			task_name_pattern, apartment,

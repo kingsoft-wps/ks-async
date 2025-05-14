@@ -245,7 +245,9 @@ bool ks_raw_async_flow::add_flat_task(
 }
 
 
-uint64_t ks_raw_async_flow::add_flow_running_observer(ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+uint64_t ks_raw_async_flow::add_flow_running_observer(
+	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
+
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
@@ -265,7 +267,9 @@ uint64_t ks_raw_async_flow::add_flow_running_observer(ks_apartment* apartment, s
 	return observer_id;
 }
 
-uint64_t ks_raw_async_flow::add_flow_completed_observer(ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context) {
+uint64_t ks_raw_async_flow::add_flow_completed_observer(
+	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context) {
+
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
@@ -285,7 +289,10 @@ uint64_t ks_raw_async_flow::add_flow_completed_observer(ks_apartment* apartment,
 	return observer_id;
 }
 
-uint64_t ks_raw_async_flow::add_task_running_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context) {
+uint64_t ks_raw_async_flow::add_task_running_observer(
+	const char* task_name_pattern, 
+	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context) {
+
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
@@ -306,7 +313,10 @@ uint64_t ks_raw_async_flow::add_task_running_observer(const char* task_name_patt
 	return observer_id;
 }
 
-uint64_t ks_raw_async_flow::add_task_completed_observer(const char* task_name_pattern, ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context) {
+uint64_t ks_raw_async_flow::add_task_completed_observer(
+	const char* task_name_pattern, ks_apartment* apartment, 
+	std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context) {
+
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {

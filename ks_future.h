@@ -129,7 +129,7 @@ public: //then, transform
 		std::is_convertible_v<FN, std::function<R(const T&, ks_cancel_inspector*)>> ||
 		std::is_convertible_v<FN, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>> ||
 		std::is_convertible_v<FN, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>>>>
-	ks_future<R> then(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
+	ks_future<R> then(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const { 
 		ASSERT(this->is_valid());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
@@ -242,14 +242,7 @@ public: //on_success, on_failure, on_completion
 		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
-public: //cast, map, map_value
-	template <class R, class _ = std::enable_if_t<std::is_convertible_v<T, R> || std::is_void_v<R> || std::is_nothing_v<R>>>
-	ks_future<R> cast() const {
-		ASSERT(this->is_valid());
-		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
-		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
-	}
-
+public: //map, map_value, cast
 	template <class R, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<R(const T&)>>>>
 	ks_future<R> map(FN&& fn) const {
@@ -271,6 +264,13 @@ public: //cast, map, map_value
 			},
 			make_async_context().set_priority(0x10000), nullptr);
 		return ks_future<R>::__from_raw(raw_future2);
+	}
+
+	template <class R, class _ = std::enable_if_t<std::is_convertible_v<T, R> || std::is_void_v<R> || std::is_nothing_v<R>>>
+	ks_future<R> cast() const {
+		ASSERT(this->is_valid());
+		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
+		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
 public: //try_cancel, set_timeout
@@ -946,4 +946,3 @@ private:
 
 
 #include "ks_future_void.inl"
-#include "ks_future_util.inl"

@@ -27,7 +27,15 @@ class ks_defer {
 public:
 	ks_defer() {}
 	explicit ks_defer(std::function<void()>&& fn) { this->add(std::move(fn)); }
-	_DISABLE_COPY_CONSTRUCTOR(ks_defer);
+
+	ks_defer(const ks_defer&) = delete;
+	ks_defer(ks_defer&& other) noexcept { //仅支持移动构造
+		m_pri_fn.swap(other.m_pri_fn);
+		m_more_fns.swap(other.m_more_fns);
+	}
+
+	ks_defer& operator=(const ks_defer&) = delete;
+	ks_defer& operator=(ks_defer&&) noexcept = delete;
 
 	~ks_defer() { this->apply(); }
 

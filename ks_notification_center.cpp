@@ -400,7 +400,7 @@ ks_notification_center::__ks_notification_center_data::_PARSED_NOTIFICATION_NAME
 ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NAME_SEQ ks_notification_center::__ks_notification_center_data::do_expand_notification_name(const char* notification_name) {
 	//post_notification时，传入的notification_name（无*通配符后缀）
 	//notification_name本是用.做分段符，但为满足内部逻辑对notification_name排序的需要，内部将.改为空格进行使用和保存
-	//返回的seq内容形式为：[ "a b c d", "a b c", "a b", "a", "" ]
+	//返回的seq内容形式为：[ "a b c d", "a b c", "a b", "a" ]
 
 	std::string alt_notification_name(notification_name != nullptr ? notification_name : "");
 	ASSERT(alt_notification_name.find(' ') == -1);
@@ -415,7 +415,7 @@ ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NA
 	_EXPANDED_NOTIFICATION_NAME_SEQ ret;
 
 	//首项是name全名，用于完全匹配
-	//后接依次截短的上溯名称列表，用于通配（目前策略实际上相当于仅上溯至父级通配）
+	//后接依次截短的上溯名称列表，用于通配
 	while (!alt_notification_name.empty()) {
 		ret.push_back(alt_notification_name);
 

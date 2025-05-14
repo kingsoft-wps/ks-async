@@ -39,6 +39,7 @@ public:
 public:
 	virtual const char* name() override;
 	virtual uint features() override;
+	virtual size_t concurrency() override;
 
 	virtual bool start() override;
 	virtual void async_stop() override;
@@ -58,8 +59,8 @@ public:
 	virtual void atfork_child() override;
 #endif
 
-	virtual bool __run_nested_pump_loop_for_extern_waiting(void* object, std::function<bool()>&& extern_pred_fn) override;
-	virtual void __awaken_nested_pump_loop_for_extern_waiting_once(void* object) override;
+	virtual bool __run_nested_pump_loop_for_extern_waiting(void* extern_obj, std::function<bool()>&& extern_pred_fn) override;
+	virtual void __awaken_nested_pump_loop_for_extern_waiting_once(void* extern_obj) override;
 
 private:
 	struct _SINGLE_THREAD_APARTMENT_DATA;

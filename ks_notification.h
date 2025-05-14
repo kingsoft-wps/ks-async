@@ -26,7 +26,7 @@ class ks_notification;
 class ks_notification_builder;
 
 
-_ABSTRACT class ks_notification {
+class ks_notification final {
 public:
 	ks_notification(const ks_notification&) = default;
 	ks_notification(ks_notification&&) noexcept = default;

@@ -18,8 +18,7 @@ limitations under the License.
 template <>
 class ks_result<void> final {
 public:
-	ks_result(const nothing_t&) : m_nothing_result(nothing) {}
-	ks_result(nothing_t&&) : m_nothing_result(nothing) {}
+	ks_result(nothing_t) : m_nothing_result(nothing) {}
 
 	ks_result(const ks_error& error) : m_nothing_result(error) {}
 	ks_result(ks_error&& error) : m_nothing_result(std::move(error)) {}
@@ -45,11 +44,6 @@ public:
 	nothing_t to_value() const noexcept(false) { return (m_nothing_result.to_value(), nothing); }
 	ks_error to_error() const noexcept(false) { return m_nothing_result.to_error(); }
 
-	template <class R, class _ = std::enable_if_t<std::is_void_v<R> || std::is_nothing_v<R>>>
-	ks_result<R> cast() const {
-		return m_nothing_result.template cast<R>();
-	}
-
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<FN>, R>>>
 	ks_result<R> map(FN&& fn) const {
 		if (this->is_value())
@@ -68,6 +62,11 @@ public:
 			return ks_result<R>(this->to_error());
 		else
 			return ks_result<R>::__bare();
+	}
+
+	template <class R, class _ = std::enable_if_t<std::is_void_v<R> || std::is_nothing_v<R>>>
+	ks_result<R> cast() const {
+		return m_nothing_result.template cast<R>();
 	}
 
 private:

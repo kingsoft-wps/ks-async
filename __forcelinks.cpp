@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "ks_async_base.h"
 
 extern void __forcelink_to_ks_raw_future_cpp();
 extern void __forcelink_to_ks_raw_promise_cpp();
+extern void __forcelink_to_ks_future_util_cpp();
 extern void __forcelink_to_ks_raw_flow_cpp();
 extern void __forcelink_to_ks_apartment_cpp();
 extern void __forcelink_to_ks_cancel_inspector_cpp();
@@ -27,6 +27,7 @@ extern void __forcelink_to_ks_notification_center_cpp();
 void __ks_async_forcelinks() {
     __forcelink_to_ks_raw_future_cpp();
     __forcelink_to_ks_raw_promise_cpp();
+    __forcelink_to_ks_future_util_cpp();
     __forcelink_to_ks_raw_flow_cpp();
     __forcelink_to_ks_apartment_cpp();
     __forcelink_to_ks_cancel_inspector_cpp();

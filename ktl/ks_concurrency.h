@@ -20,7 +20,6 @@ limitations under the License.
 #include <shared_mutex>
 #include <condition_variable>
 #include <atomic>
-#include <thread>
 
 
 #ifndef __KS_MUTEX_DEF
@@ -61,9 +60,10 @@ public:
 	void release(std::ptrdiff_t n = 1) {
 		std::unique_lock<ks_mutex> lock(m_mutex);
 		m_counter += n;
-		lock.unlock();
-		for (std::ptrdiff_t i = 0; i < n; ++i) 
+		if (m_counter == 1)
 			m_counter_nonzero_cv.notify_one();
+		else
+			m_counter_nonzero_cv.notify_all();
 	}
 
 private:
@@ -92,10 +92,8 @@ public:
 		std::unique_lock<ks_mutex> lock(m_mutex);
 		if (m_counter != 0) {
 			m_counter = (m_counter > n ? m_counter - n : 0);
-			if (m_counter == 0) {
-				lock.unlock();
+			if (m_counter == 0) 
 				m_counter_zero_cv.notify_all();
-			}
 		}
 	}
 

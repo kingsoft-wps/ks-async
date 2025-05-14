@@ -65,6 +65,10 @@ uint ks_thread_pool_apartment_imp::features() {
 		 | atfork_aware_future | nested_pump_aware_future;
 }
 
+size_t ks_thread_pool_apartment_imp::concurrency() {
+	return m_d->max_thread_count;
+}
+
 
 bool ks_thread_pool_apartment_imp::start() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
@@ -488,16 +492,25 @@ void ks_thread_pool_apartment_imp::atfork_child() {
 #endif
 
 
-bool ks_thread_pool_apartment_imp::__run_nested_pump_loop_for_extern_waiting(void* object, std::function<bool()>&& extern_pred_fn) {
-	auto d = m_d;
-	bool was_satisified = false;
+bool ks_thread_pool_apartment_imp::__run_nested_pump_loop_for_extern_waiting(void* extern_obj, std::function<bool()>&& extern_pred_fn) {
+	if (ks_apartment::current_thread_apartment() != this) {
+		ASSERT(false);
+		return false;
+	}
 
-	ASSERT(ks_apartment::current_thread_apartment() == this);
 	ASSERT(tls_current_thread_index_plus != 0);
 	const size_t thread_index = tls_current_thread_index_plus - 1;
 
 	ASSERT(tls_current_thread_pump_loop_depth >= 1);
 	++tls_current_thread_pump_loop_depth;
+
+	ks_defer defer_dec_tls_current_thread_pump_loop_depth([]() {
+		--tls_current_thread_pump_loop_depth;
+		ASSERT(tls_current_thread_pump_loop_depth >= 1);
+	});
+
+	auto d = m_d;
+	bool was_satisified = false;
 
 	while (true) {
 		if (extern_pred_fn()) {
@@ -595,13 +608,10 @@ bool ks_thread_pool_apartment_imp::__run_nested_pump_loop_for_extern_waiting(voi
 		}
 	}
 
-	--tls_current_thread_pump_loop_depth;
-	ASSERT(tls_current_thread_pump_loop_depth >= 1);
-
 	return was_satisified;
 }
 
-void ks_thread_pool_apartment_imp::__awaken_nested_pump_loop_for_extern_waiting_once(void* object) {
+void ks_thread_pool_apartment_imp::__awaken_nested_pump_loop_for_extern_waiting_once(void* extern_obj) {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 	m_d->any_fn_queue_cv.notify_all();
 }

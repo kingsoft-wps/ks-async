@@ -19,7 +19,7 @@ limitations under the License.
 #include "ktl/ks_type_traits.h"
 #include <string>
 #include <memory>
-
+#include <stdexcept>
 
 #if !defined(KS_ASYNC_API)
 #   ifdef KS_ASYNC_EXPORTS
@@ -43,7 +43,7 @@ limitations under the License.
 #define __KS_ASYNC_CONTEXT_FROM_SOURCE_LOCATION_ENABLED  0
 
 #ifdef _WIN32
-#   define __KS_APARTMENT_ATFORK_ENABLED  0  //开启也可通过编译，只是没有被使用需求
+#   define __KS_APARTMENT_ATFORK_ENABLED  0  //WIN下开启也可通过编译，只是没有被使用需求
 #else
 #   define __KS_APARTMENT_ATFORK_ENABLED  1
 #endif

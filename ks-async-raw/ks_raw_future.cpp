@@ -33,11 +33,6 @@ void __forcelink_to_ks_raw_future_cpp() {}
 	using __native_pid_t = DWORD;
 	static inline __native_pid_t __native_get_current_pid() { return ::GetCurrentProcessId(); }
 	static constexpr __native_pid_t __native_pid_none = 0;
-#elif defined(__APPLE__)
-	#include <sys/proc.h>
-	using __native_pid_t = int;
-	static inline __native_pid_t __native_get_current_pid() { return proc_selfpid(); }
-	static constexpr __native_pid_t __native_pid_none = 0;
 #else
 	#include <unistd.h>
 	using __native_pid_t = pid_t;
@@ -750,7 +745,7 @@ private:
 	}
 
 private:
-	class ks_raw_promise_representative : public ks_raw_promise, public std::enable_shared_from_this<ks_raw_promise> {
+	class ks_raw_promise_representative final : public ks_raw_promise, public std::enable_shared_from_this<ks_raw_promise> {
 	public:
 		explicit ks_raw_promise_representative(std::shared_ptr<ks_raw_promise_future>&& promise_future)
 			: m_promise_future(std::move(promise_future)) {
@@ -781,7 +776,8 @@ private:
 
 		virtual void try_settle(const ks_raw_result & result) override {
 			ASSERT(result.is_completed());
-			m_promise_future->do_complete(result.is_completed() ? result : ks_raw_result(ks_error::unexpected_error()), nullptr, false);
+			if (result.is_completed())
+				m_promise_future->do_complete(result, nullptr, false);
 		}
 
 	private:

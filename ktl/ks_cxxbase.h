@@ -89,7 +89,7 @@ namespace std {
 #	elif defined(__GNUC__)
 #		define _DECL_DEPRECATED __attribute__((__deprecated__))
 #	else
-#		define _DECL_DEPRECATED
+#		error how to decl-deprecated?
 #	endif
 #endif
 
@@ -97,8 +97,10 @@ namespace std {
 #ifndef _NODISCARD
 #	if defined(_MSC_VER)
 #		define _NODISCARD _Check_return_
-#	else
+#	elif defined(__GNUC__)
 #		define _NODISCARD __attribute__((warn_unused_result))
+#	else
+#		error how to decl-nodiscard?
 #	endif
 #endif
 
