@@ -27,12 +27,12 @@ public:
 	ks_async_controller(ks_async_controller&&) noexcept = default;
 
 public:
-	void try_cancel_all() {
-		m_controller_data_ptr->cancel_all_ctrl_v = true;
+	void try_cancel() {
+		m_controller_data_ptr->cancel_ctrl_v = true;
 	}
 
-	bool check_cancel_all() {
-		return m_controller_data_ptr->cancel_all_ctrl_v;
+	bool check_cancel() {
+		return m_controller_data_ptr->cancel_ctrl_v;
 	}
 
 private: //注：下面方法暂不对外提供！
@@ -52,7 +52,7 @@ private: //注：下面方法暂不对外提供！
 private:
 	struct _CONTROLLER_DATA {
 		ks_latch pending_latch { 0 };
-		volatile bool cancel_all_ctrl_v = false;
+		volatile bool cancel_ctrl_v = false;
 	};
 
 	std::shared_ptr<_CONTROLLER_DATA> m_controller_data_ptr;

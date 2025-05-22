@@ -63,13 +63,15 @@ public:
 
 public:
 	KS_ASYNC_API bool start();
-	KS_ASYNC_API void try_cancel();
 
-	//强制清理，一般不需要调用，出现循环引用时可用
-	KS_ASYNC_API void __force_cleanup();
+	//不希望直接使用flow.try_cancel，更应使用controller.try_cancel
+	KS_ASYNC_API void __try_cancel();
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	KS_ASYNC_API void __wait();
+
+	//强制清理，一般不需要调用，出现循环引用时可用
+	KS_ASYNC_API void __force_cleanup();
 
 public:
 	KS_ASYNC_API bool is_task_running(const char* task_name);

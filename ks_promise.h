@@ -25,8 +25,9 @@ limitations under the License.
 template <class T>
 class ks_promise final {
 public:
+	ks_promise(nullptr_t) : m_raw_promise(nullptr) {}
 	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
-	static ks_promise<T> create() { return ks_promise<T>(std::create_inst); }
+	static ks_promise<T> __create() { return ks_promise<T>(std::create_inst); }
 
 	ks_promise(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;

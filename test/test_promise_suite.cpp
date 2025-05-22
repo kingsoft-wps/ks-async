@@ -20,7 +20,7 @@ TEST(test_promise_suite, test_promise) {
     ks_latch work_latch(0);
     work_latch.add(1);
 
-    auto promise_succ = ks_promise<std::string>::create();
+    auto promise_succ = ks_promise<std::string>::__create();
     promise_succ.get_future()
         .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
         EXPECT_EQ(_result_to_str(result), "pass");
@@ -34,7 +34,7 @@ TEST(test_promise_suite, test_promise) {
     work_latch.wait();
     work_latch.add(1);
 
-    auto promise_error = ks_promise<std::string>::create();
+    auto promise_error = ks_promise<std::string>::__create();
     ks_error ret = ks_error().unexpected_error();
 
     promise_error.get_future()
@@ -51,7 +51,7 @@ TEST(test_promise_suite, test_promise) {
     work_latch.wait();
     work_latch.add(1);
 
-    auto promise_sett = ks_promise<std::string>::create();
+    auto promise_sett = ks_promise<std::string>::__create();
     promise_succ.get_future()
         .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
         EXPECT_EQ(_result_to_str(result), "pass");

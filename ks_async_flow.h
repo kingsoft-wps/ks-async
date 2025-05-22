@@ -92,9 +92,10 @@ public:
 		return m_raw_flow->start();
 	}
 
-	void try_cancel() const {
+	//不希望直接使用flow.try_cancel，更应使用controller.try_cancel
+	void __try_cancel() const {
 		ASSERT(this->is_valid());
-		return m_raw_flow->try_cancel();
+		return m_raw_flow->__try_cancel();
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！

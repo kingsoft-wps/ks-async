@@ -67,9 +67,8 @@ void put_custom_value<T>(const char* key, const T& value);
 
 ```C++
 bool start();
-void try_cancel();
 ```
-#### 描述：开始、取消。
+#### 描述：开始。
 <br>
 <br>
 

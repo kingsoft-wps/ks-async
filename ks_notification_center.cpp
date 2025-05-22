@@ -251,7 +251,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 			while (entry_ptr_it != group.entry_ptr_list.end()) {
 				std::shared_ptr<_ENTRY_DATA>& entry_ptr = *entry_ptr_it;
 
-				if (entry_ptr->context.__check_cancel_all_ctrl() || entry_ptr->context.__check_owner_expired()) { //cancelled, auto remove entry
+				if (entry_ptr->context.__check_cancel_ctrl() || entry_ptr->context.__check_owner_expired()) { //cancelled, auto remove entry
 					entry_ptr->removed_flag_v = true;
 					do_erase_entry_from_observer_map_locked(entry_ptr, lock);
 					entry_ptr_it = group.entry_ptr_list.erase(entry_ptr_it);
@@ -296,7 +296,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 		__ks_async_raw::ks_raw_living_context_rtstt notification_context_rtstt;
 		notification_context_rtstt.apply(notification_context);
 
-		if (!notification_context.__check_cancel_all_ctrl() && !notification_context.__check_owner_expired()) {
+		if (!notification_context.__check_cancel_ctrl() && !notification_context.__check_owner_expired()) {
 			for (auto& entry_ptr : matched_entries) {
 				ks_apartment* entry_partment = entry_ptr->apartment;
 				entry_partment->schedule([entry_ptr, notification, notification_context, notification_context_owner_locker = notification_context_rtstt.get_owner_locker()]() {
@@ -306,7 +306,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 					entry_context_rtstt.apply(entry_context);
 
 					//try {
-						if (!entry_ptr->context.__check_cancel_all_ctrl() && !entry_context.__check_owner_expired())
+						if (!entry_ptr->context.__check_cancel_ctrl() && !entry_context.__check_owner_expired())
 							entry_ptr->fn(notification);
 					//}
 					//catch (...) {

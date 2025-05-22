@@ -269,15 +269,6 @@ ks_result<T> peek_result() const;
 <br>
 
 ```C++
-void try_cancel();
-```
-#### 描述：请求中止此异步过程。（但并不能保证能成功中止）
-#### 特别说明：此方法会自动向上游回溯递归执行try_cancel，直至根future。<br>
-在异步过程实现体中，可以调用`cancel_inspector->check_cancel()`方法检查对应的"取消"控制标志。<br>
-慎用，因为决大多数异步过程实现者都会忽视此标志、或者根本就无法中止其执行过程。<br>
-<br>
-
-```C++
 void set_timeout(int64_t timeout);
 ```
 #### 描述：设置此异步过程的超时时间。（但并不能保证能成功中止）

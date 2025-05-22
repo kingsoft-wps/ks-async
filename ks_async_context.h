@@ -211,10 +211,10 @@ public: //called by ks_raw_future internally
 		return (m_fat_data_p != nullptr && m_fat_data_p->controller_data_ptr != nullptr);
 	}
 
-	bool __check_cancel_all_ctrl() const {
+	bool __check_cancel_ctrl() const {
 		//注：递归
 		for (_FAT_DATA* fat_data_p = m_fat_data_p; fat_data_p != nullptr; fat_data_p = fat_data_p->parent_fat_data_p) {
-			if (m_fat_data_p->controller_data_ptr && m_fat_data_p->controller_data_ptr->cancel_all_ctrl_v)
+			if (m_fat_data_p->controller_data_ptr && m_fat_data_p->controller_data_ptr->cancel_ctrl_v)
 				return true;
 		}
 		return false;

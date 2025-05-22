@@ -30,7 +30,7 @@ ks_future<std::tuple<Ts...>> ks_future_util::__all_for_tuple(std::index_sequence
 	if (true) {
 		raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<std::tuple<Ts...>>::__from_raw(raw_future);
@@ -56,7 +56,7 @@ ks_future<std::vector<T>> ks_future_util::__all_for_vector(const std::vector<ks_
 	if (true) {
 		raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<std::vector<T>>::__from_raw(raw_future);
@@ -75,7 +75,7 @@ ks_future<void> ks_future_util::__all_for_tuple_x(std::index_sequence<IDXs...>, 
 	if (true) {
 		raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<void>::__from_raw(raw_future);
@@ -96,7 +96,7 @@ ks_future<void> ks_future_util::__all_for_vector_x(const std::vector<ks_future<v
 	if (true) {
 		raw_future->on_failure([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<void>::__from_raw(raw_future);
@@ -112,7 +112,7 @@ ks_future<std::variadic_element_t<0, Ts...>> ks_future_util::__any_for_tuple(std
 	if (true) {
 		raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<T>::__from_raw(raw_future);
@@ -129,7 +129,7 @@ ks_future<T> ks_future_util::__any_for_vector(const std::vector<ks_future<T>>& f
 	if (true) {
 		raw_future->on_success([raw_arg_futures = std::move(raw_arg_futures)](const auto&) {
 			for (auto& rawf : raw_arg_futures)
-				rawf->try_cancel(true);
+				rawf->__try_cancel(true);
 		}, make_async_context().set_priority(0x10000), nullptr);
 	}
 	return ks_future<T>::__from_raw(raw_future);
@@ -334,7 +334,7 @@ ks_future<void> ks_future_util::repeat_periodic(
 			if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
 				auto data = data_weak.lock();
 				if (data != nullptr)
-					data->controller.try_cancel_all();
+					data->controller.try_cancel();
 			}
 		},
 		make_async_context().set_priority(0x10000), apartment);
@@ -372,7 +372,7 @@ ks_future<void> ks_future_util::repeat_productive(
 			if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
 				auto data = data_weak.lock();
 				if (data != nullptr)
-					data->controller.try_cancel_all();
+					data->controller.try_cancel();
 			}
 		}, 
 		make_async_context().set_priority(0x10000), produce_apartment);

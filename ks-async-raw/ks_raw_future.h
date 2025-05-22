@@ -63,11 +63,12 @@ public:
 	virtual bool is_completed() = 0;
 	virtual ks_raw_result peek_result() = 0;
 
-	virtual void try_cancel(bool backtrack);
+	virtual void set_timeout(int64_t timeout, bool backtrack);
+
+	//不希望直接使用future.try_cancel，更应使用controller.try_cancel
+	virtual void __try_cancel(bool backtrack);
 	KS_ASYNC_API static bool __check_current_future_cancel(bool with_extra);
 	KS_ASYNC_API static ks_error __acquire_current_future_cancel_error(const ks_error& def_error, bool with_extra);
-
-	virtual void set_timeout(int64_t timeout, bool backtrack);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	virtual void __wait();
@@ -79,12 +80,12 @@ protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) = 0;
 	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal) = 0;
 
+	virtual void do_set_timeout(int64_t timeout, const ks_error& error, bool backtrack) = 0;
+
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) = 0;
 	virtual bool is_cancelable_self() = 0;
 	virtual bool do_check_cancel() = 0;
 	virtual ks_error do_acquire_cancel_error(const ks_error& def_error) = 0;
-
-	virtual void do_set_timeout(int64_t timeout, const ks_error& error, bool backtrack) = 0;
 
 	virtual bool do_wait() = 0;
 

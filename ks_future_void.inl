@@ -451,14 +451,15 @@ public: //map, map_value, cast
 		return m_nothing_future.template cast<R>();
 	}
 
-public: //try_cancel, set_timeout
-	const this_future_type& try_cancel() const {
-		m_nothing_future.try_cancel();
+public: //set_timeout, try_cancel
+	const this_future_type& set_timeout(int64_t timeout) const {
+		m_nothing_future.set_timeout(timeout);
 		return *this;
 	}
 
-	const this_future_type& set_timeout(int64_t timeout) const {
-		m_nothing_future.set_timeout(timeout);
+	//不希望直接使用future.try_cancel，更应使用controller.try_cancel
+	const this_future_type& __try_cancel() const {
+		m_nothing_future.__try_cancel();
 		return *this;
 	}
 

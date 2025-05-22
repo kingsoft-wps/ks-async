@@ -215,7 +215,7 @@ bool ks_raw_async_flow::add_flat_task(
 				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
-			if (this_ptr->m_flow_controller.check_cancel_all()) {
+			if (this_ptr->m_flow_controller.check_cancel()) {
 				return ks_raw_future::rejected(ks_error::cancelled_error(), ks_apartment::current_thread_apartment());
 			}
 
@@ -375,23 +375,13 @@ bool ks_raw_async_flow::start() {
 	return do_start_locked(lock);
 }
 
-void ks_raw_async_flow::try_cancel() {
+void ks_raw_async_flow::__try_cancel() {
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
-	m_flow_controller.try_cancel_all();
+	m_flow_controller.try_cancel();
 
 	if (m_flow_status_v == status_t::not_start) {
 		do_start_locked(lock); //自动start，使cancel生效
-	}
-}
-
-void ks_raw_async_flow::__force_cleanup() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
-
-	m_force_cleanup_flag_v = true;
-
-	if (m_flow_status_v == status_t::not_start) {
-		do_start_locked(lock); //自动start，使force_cleanup生效
 	}
 }
 
@@ -402,6 +392,16 @@ void ks_raw_async_flow::__wait() {
 
 	lock.unlock();
 	return this->get_flow_future_void()->__wait();
+}
+
+void ks_raw_async_flow::__force_cleanup() {
+	std::unique_lock<ks_mutex> lock(m_mutex);
+
+	m_force_cleanup_flag_v = true;
+
+	if (m_flow_status_v == status_t::not_start) {
+		do_start_locked(lock); //自动start，使force_cleanup生效
+	}
 }
 
 bool ks_raw_async_flow::is_task_running(const char* task_name) {
@@ -889,7 +889,7 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, c
 			ks_raw_living_context_rtstt observer_context_rtstt;
 			observer_context_rtstt.apply(observer_item->observer_context);
 
-			if (observer_item->observer_context.__check_cancel_all_ctrl() || observer_item->observer_context.__check_owner_expired()) {
+			if (observer_item->observer_context.__check_cancel_ctrl() || observer_item->observer_context.__check_owner_expired()) {
 				it = m_flow_observer_map.erase(it);
 				continue;
 			}
@@ -928,7 +928,7 @@ void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, c
 			ks_raw_living_context_rtstt observer_context_rtstt;
 			observer_context_rtstt.apply(observer_item->observer_context);
 
-			if (observer_item->observer_context.__check_cancel_all_ctrl() || observer_item->observer_context.__check_owner_expired()) {
+			if (observer_item->observer_context.__check_cancel_ctrl() || observer_item->observer_context.__check_owner_expired()) {
 				it = m_task_observer_map.erase(it);
 				continue;
 			}

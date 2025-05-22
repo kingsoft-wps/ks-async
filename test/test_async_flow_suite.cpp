@@ -347,7 +347,7 @@ TEST(test_async_flow_suite, test_try_cancel) {
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    flow.try_cancel();
+    flow.__try_cancel();
     
     work_latch.wait();
     EXPECT_TRUE(flow.is_flow_completed());

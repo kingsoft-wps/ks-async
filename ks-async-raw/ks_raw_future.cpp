@@ -186,7 +186,7 @@ protected:
 				return true;
 
 			if (intermediate_data_ptr->m_living_context.__is_controller_present()) {
-				if (intermediate_data_ptr->m_living_context.__check_cancel_all_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
+				if (intermediate_data_ptr->m_living_context.__check_cancel_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
 					return true;
 			}
 
@@ -213,7 +213,7 @@ protected:
 				return intermediate_data_ptr->m_cancel_error;
 
 			if (intermediate_data_ptr->m_living_context.__is_controller_present()) {
-				if (intermediate_data_ptr->m_living_context.__check_cancel_all_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
+				if (intermediate_data_ptr->m_living_context.__check_cancel_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
 					return ks_error::cancelled_error();
 			}
 
@@ -498,8 +498,6 @@ protected:
 		}
 	}
 
-	virtual void do_try_cancel(const ks_error& error, bool backtrack) override = 0;
-
 	virtual void do_set_timeout(int64_t timeout, const ks_error& error, bool backtrack) override final {
 		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
@@ -555,6 +553,8 @@ protected:
 			return;
 		}
 	}
+
+	virtual void do_try_cancel(const ks_error& error, bool backtrack) override = 0;
 
 protected:
 	static inline ks_apartment* do_determine_prefer_apartment(ks_apartment* spec_apartment) {
@@ -1669,7 +1669,11 @@ ks_raw_future_ptr ks_raw_future::any(const std::vector<ks_raw_future_ptr>& futur
 	return aggr_future;
 }
 
-void ks_raw_future::try_cancel(bool backtrack) {
+void ks_raw_future::set_timeout(int64_t timeout, bool backtrack) {
+	return this->do_set_timeout(timeout, ks_error::timeout_error(), backtrack);
+}
+
+void ks_raw_future::__try_cancel(bool backtrack) {
 	this->do_try_cancel(ks_error::cancelled_error(), backtrack);
 }
 
@@ -1712,10 +1716,6 @@ ks_error ks_raw_future::__acquire_current_future_cancel_error(const ks_error& de
 	}
 
 	return def_error;
-}
-
-void ks_raw_future::set_timeout(int64_t timeout, bool backtrack) {
-	return this->do_set_timeout(timeout, ks_error::timeout_error(), backtrack); 
 }
 
 void ks_raw_future::__wait() {

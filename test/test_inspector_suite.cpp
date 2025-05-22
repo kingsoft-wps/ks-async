@@ -33,7 +33,7 @@ TEST(test_inspector_suite, test_inspector) {
         work_latch.count_down();
      });
 
-    future.try_cancel();
+    future.__try_cancel();
 
     work_latch.wait();
 }
