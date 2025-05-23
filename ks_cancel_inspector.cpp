@@ -27,8 +27,8 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector_for_future);
 
 public:
-	virtual bool check_cancel() override {
-		return ks_raw_future::__check_current_future_cancel(true);
+	virtual bool check_cancelled() override {
+		return ks_raw_future::__check_current_future_cancelled(true);
 	}
 
 private:

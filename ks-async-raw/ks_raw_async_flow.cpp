@@ -215,7 +215,7 @@ bool ks_raw_async_flow::add_flat_task(
 				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
-			if (this_ptr->m_flow_controller.check_cancel()) {
+			if (this_ptr->m_flow_controller.check_cancelled()) {
 				return ks_raw_future::rejected(ks_error::cancelled_error(), ks_apartment::current_thread_apartment());
 			}
 
@@ -889,7 +889,7 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, c
 			ks_raw_living_context_rtstt observer_context_rtstt;
 			observer_context_rtstt.apply(observer_item->observer_context);
 
-			if (observer_item->observer_context.__check_cancel_ctrl() || observer_item->observer_context.__check_owner_expired()) {
+			if (observer_item->observer_context.__check_controller_cancelled() || observer_item->observer_context.__check_owner_expired()) {
 				it = m_flow_observer_map.erase(it);
 				continue;
 			}
@@ -928,7 +928,7 @@ void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, c
 			ks_raw_living_context_rtstt observer_context_rtstt;
 			observer_context_rtstt.apply(observer_item->observer_context);
 
-			if (observer_item->observer_context.__check_cancel_ctrl() || observer_item->observer_context.__check_owner_expired()) {
+			if (observer_item->observer_context.__check_controller_cancelled() || observer_item->observer_context.__check_owner_expired()) {
 				it = m_task_observer_map.erase(it);
 				continue;
 			}

@@ -164,17 +164,17 @@ public:
 protected:
 	virtual bool is_cancelable_self() override = 0;
 
-	virtual bool do_check_cancel() override final {
+	virtual bool do_check_cancelled() override final {
 		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
-		return this->do_check_cancel_locked(lock);
+		return this->do_check_cancelled_locked(lock);
 	}
 
-	virtual ks_error do_acquire_cancel_error(const ks_error& def_error) override final {
+	virtual ks_error do_acquire_cancelled_error(const ks_error& def_error) override final {
 		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
-		return this->do_acquire_cancel_error_locked(def_error, lock);
+		return this->do_acquire_cancelled_error_locked(def_error, lock);
 	}
 
-	__REAL_IMP bool do_check_cancel_locked(ks_raw_future_lock& lock) {
+	__REAL_IMP bool do_check_cancelled_locked(ks_raw_future_lock& lock) {
 		if (!this->is_cancelable_self())
 			return false;
 
@@ -182,13 +182,11 @@ protected:
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
 
-			if (intermediate_data_ptr->m_cancel_error.get_code() != 0)
+			if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
 				return true;
 
-			if (intermediate_data_ptr->m_living_context.__is_controller_present()) {
-				if (intermediate_data_ptr->m_living_context.__check_cancel_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
-					return true;
-			}
+			if (intermediate_data_ptr->m_living_context.__check_controller_cancelled() || intermediate_data_ptr->m_living_context.__check_owner_expired())
+				return true;
 
 			if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now()) {
 				return true;
@@ -201,7 +199,7 @@ protected:
 		return false;
 	}
 
-	__REAL_IMP ks_error do_acquire_cancel_error_locked(const ks_error& def_error, ks_raw_future_lock& lock) {
+	__REAL_IMP ks_error do_acquire_cancelled_error_locked(const ks_error& def_error, ks_raw_future_lock& lock) {
 		if (!this->is_cancelable_self())
 			return ks_error();
 
@@ -209,13 +207,11 @@ protected:
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
 
-			if (intermediate_data_ptr->m_cancel_error.get_code() != 0)
-				return intermediate_data_ptr->m_cancel_error;
+			if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
+				return intermediate_data_ptr->m_cancelled_error;
 
-			if (intermediate_data_ptr->m_living_context.__is_controller_present()) {
-				if (intermediate_data_ptr->m_living_context.__check_cancel_ctrl() || intermediate_data_ptr->m_living_context.__check_owner_expired())
-					return ks_error::cancelled_error();
-			}
+			if (intermediate_data_ptr->m_living_context.__check_controller_cancelled() || intermediate_data_ptr->m_living_context.__check_owner_expired())
+				return ks_error::cancelled_error();
 
 			if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && (intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now())) {
 				return ks_error::timeout_error();
@@ -608,7 +604,7 @@ protected:
 		ks_apartment* m_waiting_for_me_apartment_1st = nullptr;
 		std::vector<ks_apartment*> m_waiting_for_me_apartment_more{};
 
-		ks_error m_cancel_error{}; //volatile-like
+		ks_error m_cancelled_error{}; //volatile-like
 
 		//fork子进程中操作cv有几率死锁，故子进程中不要使用它！
 		//记录cv所属pid，保证进程内操作cv的一致性
@@ -834,8 +830,8 @@ private:
 
 			ks_raw_result result;
 			try {
-				if (this->do_check_cancel_locked(lock2))
-					result = this->do_acquire_cancel_error_locked(ks_error::cancelled_error(), lock2);
+				if (this->do_check_cancelled_locked(lock2))
+					result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock2);
 				else {
 					std::function<ks_raw_result()> task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
 					lock2.unlock();
@@ -890,7 +886,7 @@ protected:
 
 		//task-future标记cancel
 		ASSERT(error.get_code() != 0);
-		intermediate_data_ex_ptr->m_cancel_error = error;
+		intermediate_data_ex_ptr->m_cancelled_error = error;
 
 		//若为未到期的延时task-future，则立即do_complete
 		if (m_task_mode == ks_raw_future_mode::TASK_DELAYED && intermediate_data_ex_ptr->m_create_time + std::chrono::milliseconds(intermediate_data_ex_ptr->m_delay) > std::chrono::steady_clock::now()) {
@@ -996,9 +992,9 @@ protected:
 		intermediate_data_ex_ptr->m_prev_future_completed_flag = true;
 
 		ks_raw_result alt_prev_result = prev_result;
-		if (prev_result.is_value() && this->do_check_cancel_locked(lock)) {
+		if (prev_result.is_value() && this->do_check_cancelled_locked(lock)) {
 			//若this已被cancel，则将prev_result立即强制改为cancelled
-			alt_prev_result = this->do_acquire_cancel_error_locked(ks_error::cancelled_error(), lock);
+			alt_prev_result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock);
 		}
 
 		bool could_skip_run = false;
@@ -1013,6 +1009,9 @@ protected:
 			break;
 		case ks_raw_future_mode::FORWARD:
 			could_skip_run = true;
+			break;
+		default:
+			could_skip_run = false;
 			break;
 		}
 
@@ -1085,7 +1084,7 @@ protected:
 		//pipe-future标记cancel
 		ASSERT(error.get_code() != 0);
 		if (__my_cancelable_flag())
-			intermediate_data_ex_ptr->m_cancel_error = error;
+			intermediate_data_ex_ptr->m_cancelled_error = error;
 
 		if (!backtrack) {
 			if (__my_cancelable_flag()) {
@@ -1209,9 +1208,9 @@ protected:
 		intermediate_data_ex_ptr->m_prev_future_completed_flag = true;
 
 		ks_raw_result alt_prev_result = prev_result;
-		if (prev_result.is_value() && this->do_check_cancel_locked(lock)) {
+		if (prev_result.is_value() && this->do_check_cancelled_locked(lock)) {
 			//若this已被cancel，则将prev_result立即强制改为cancelled
-			alt_prev_result = this->do_acquire_cancel_error_locked(ks_error::cancelled_error(), lock);
+			alt_prev_result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock);
 		}
 
 		bool could_skip_run = false;
@@ -1221,6 +1220,9 @@ protected:
 			break;
 		case ks_raw_future_mode::FLATTEN_TRAP:
 			could_skip_run = !alt_prev_result.is_error();
+			break;
+		default:
+			could_skip_run = false;
 			break;
 		}
 
@@ -1308,7 +1310,7 @@ protected:
 
 		//flatten-future标记cancel（都是cancelable的）
 		ASSERT(error.get_code() != 0);
-		intermediate_data_ex_ptr->m_cancel_error = error;
+		intermediate_data_ex_ptr->m_cancelled_error = error;
 
 		lock.unlock();
 		//无条件对extern做cancel
@@ -1498,7 +1500,7 @@ private:
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 
 		//aggr-future是非cancelable的
-		ASSERT(!this->do_check_cancel_locked(lock));
+		ASSERT(!this->do_check_cancelled_locked(lock));
 
 		//check and try settle me ...
 		switch (m_aggr_mode) {
@@ -1677,13 +1679,13 @@ void ks_raw_future::__try_cancel(bool backtrack) {
 	this->do_try_cancel(ks_error::cancelled_error(), backtrack);
 }
 
-bool ks_raw_future::__check_current_future_cancel(bool with_extra) {
+bool ks_raw_future::__check_current_future_cancelled(bool with_extra) {
 	ks_raw_future* cur_future = tls_current_thread_running_future;
 	if (cur_future == nullptr || !cur_future->is_cancelable_self())
 		return false;
 
 	ASSERT(!cur_future->is_completed());
-	if (cur_future->do_check_cancel())
+	if (cur_future->do_check_cancelled())
 		return true;
 
 	if (with_extra) {
@@ -1697,13 +1699,13 @@ bool ks_raw_future::__check_current_future_cancel(bool with_extra) {
 	return false;
 }
 
-ks_error ks_raw_future::__acquire_current_future_cancel_error(const ks_error& def_error, bool with_extra) {
+ks_error ks_raw_future::__acquire_current_future_cancelled_error(const ks_error& def_error, bool with_extra) {
 	ks_raw_future* cur_future = tls_current_thread_running_future;
 	if (cur_future == nullptr || !cur_future->is_cancelable_self())
 		return ks_error();
 
 	ASSERT(!cur_future->is_completed());
-	ks_error error = cur_future->do_acquire_cancel_error(ks_error());
+	ks_error error = cur_future->do_acquire_cancelled_error(ks_error());
 	if (error.get_code() != 0)
 		return error;
 

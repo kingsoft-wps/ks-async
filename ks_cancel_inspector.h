@@ -20,7 +20,7 @@ limitations under the License.
 
 _ABSTRACT class ks_cancel_inspector {
 public:
-	virtual bool check_cancel() = 0;
+	virtual bool check_cancelled() = 0;
 
 protected:
 	ks_cancel_inspector() = default;

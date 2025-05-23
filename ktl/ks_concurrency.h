@@ -60,7 +60,7 @@ public:
 	void release(std::ptrdiff_t n = 1) {
 		std::unique_lock<ks_mutex> lock(m_mutex);
 		m_counter += n;
-		if (m_counter == 1)
+		if (n == 1)
 			m_counter_nonzero_cv.notify_one();
 		else
 			m_counter_nonzero_cv.notify_all();

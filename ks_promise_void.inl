@@ -18,12 +18,16 @@ limitations under the License.
 template <>
 class ks_promise<void> final {
 public:
-	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
 	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
 	static ks_promise<void> __create() { return ks_promise<void>(std::create_inst); }
 
+	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
+
 	ks_promise(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
+
+	ks_promise& operator=(const ks_promise&) = default;
+	ks_promise& operator=(ks_promise&&) noexcept = default;
 
 	//让ks_promise看起来像一个智能指针
 	ks_promise* operator->() { return this; }

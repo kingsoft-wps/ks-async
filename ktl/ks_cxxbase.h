@@ -25,21 +25,29 @@ limitations under the License.
 using byte = uint8_t;
 using uint = unsigned int;
 using nullptr_t = decltype(nullptr);
-using HRESULT = std::conditional<sizeof(long) == 4, long, int>::type;
 
-#ifndef __NOTHING_DEF
-#define __NOTHING_DEF
-struct nothing_t { explicit nothing_t() = default; };
-constexpr nothing_t nothing = nothing_t{};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
+#ifndef _HRESULT_DEFINED
+#define _HRESULT_DEFINED
+#	ifdef _WIN32
+	using HRESULT = long;
+#	else
+	using HRESULT = int32_t;
+#	endif
+#endif
+
+#ifndef _NOTHING_DEFINED
+#define _NOTHING_DEFINED
+	struct nothing_t { explicit nothing_t() = default; };
+	constexpr nothing_t nothing = nothing_t{};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
 #endif //__NOTHING_DEF
 
-#ifndef __CREATE_INST_DEF
-#define __CREATE_INST_DEF
+#ifndef _CREATE_INST_DEFINED
+#define _CREATE_INST_DEFINED
 namespace std {
 	struct create_inst_t { explicit create_inst_t() = default; };
 	constexpr create_inst_t create_inst = create_inst_t{};  //这类似于KComObjectPtr构造函数的create_instance参数，是通用版本，用于明确指示实例化
 }
-#endif //__CREATE_INST_DEF
+#endif //_CREATE_INST_DEFINED
 
 
 //宏_ABSTRACT定义
