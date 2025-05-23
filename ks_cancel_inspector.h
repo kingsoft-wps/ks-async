@@ -20,11 +20,11 @@ limitations under the License.
 
 _ABSTRACT class ks_cancel_inspector {
 public:
-	virtual bool check_cancel() = 0;
+	virtual bool check_cancelled() = 0;
 
 protected:
 	ks_cancel_inspector() = default;
-	~ks_cancel_inspector() = default;
+	~ks_cancel_inspector() = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector);
 
 private:

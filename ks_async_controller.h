@@ -16,43 +16,40 @@ limitations under the License.
 #pragma once
 
 #include "ks_async_base.h"
+#include "ks_apartment.h"
 #include "ktl/ks_concurrency.h"
 
 
 class ks_async_controller final {
 public:
-	ks_async_controller() : m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {}
+	KS_ASYNC_INLINE_API ks_async_controller() : m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
-	ks_async_controller(ks_async_controller&&) noexcept = default;
+	KS_ASYNC_INLINE_API ks_async_controller(ks_async_controller&&) noexcept = default;
+
+	KS_ASYNC_INLINE_API ~ks_async_controller() { ASSERT(this->is_all_completed()); }
 
 public:
-	void try_cancel() {
+	KS_ASYNC_INLINE_API void try_cancel() {
 		m_controller_data_ptr->cancel_ctrl_v = true;
 	}
 
-	bool check_cancel() {
+	KS_ASYNC_INLINE_API bool check_cancelled() {
 		return m_controller_data_ptr->cancel_ctrl_v;
 	}
 
-private: //注：下面方法暂不对外提供！
-	bool __has_pending_futures() const {
-		return m_controller_data_ptr->pending_latch.try_wait() == false;
+public:
+	KS_ASYNC_INLINE_API bool is_all_completed() const {
+		return m_controller_data_ptr->pending_count == 0;
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
-	template <class _ = void>
-	_DECL_DEPRECATED bool __wait_pending_futures_done() const {
-		//特别说明：
-		//与ks_raw_future::wait情况类似，甚至更危险，因为这里连基本的跨apartment检查都没有，极易死锁。
-		m_controller_data_ptr->pending_latch.wait();
-		return true;
-	}
+	_DECL_DEPRECATED KS_ASYNC_API void __wait_all() const;
 
 private:
 	struct _CONTROLLER_DATA {
-		ks_latch pending_latch { 0 };
 		volatile bool cancel_ctrl_v = false;
+		std::atomic<int> pending_count{ 0 };
 	};
 
 	std::shared_ptr<_CONTROLLER_DATA> m_controller_data_ptr;

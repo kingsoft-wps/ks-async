@@ -189,7 +189,7 @@ TEST(test_future_suite, test_then) {
 
     ks_future<void>::resolved()
         .then<void>(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_result<void> {
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;
@@ -264,7 +264,7 @@ TEST(test_future_suite, test_transform) {
 
     ks_future<void>::resolved()
         .transform<void>(ks_apartment::default_mta(), make_async_context(), [](const ks_result<void>&result, ks_cancel_inspector* inspector) -> ks_result<void> {
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;
@@ -328,7 +328,7 @@ TEST(test_future_suite, test_flat_then) {
 
     ks_future<void>::resolved()
         .flat_then<void>(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_future<void> {
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_future<void>::rejected(ks_error::cancelled_error());
         else
             return ks_future<void>::resolved();
@@ -398,7 +398,7 @@ TEST(test_future_suite, test_flat_transform) {
 
     ks_future<void>::resolved()
         .flat_transform<void>(ks_apartment::default_mta(), make_async_context(), [](const ks_result<void>&result, ks_cancel_inspector* inspector) -> ks_future<void> {
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_future<void>::rejected(ks_error::cancelled_error());
         else
             return ks_future<void>::resolved();

@@ -34,7 +34,7 @@ public:
 		m_data_p = r.m_data_p;
 		m_embed_tiny_trivial_x_mem = r.m_embed_tiny_trivial_x_mem;
 		if (m_data_p != nullptr && m_data_p != (void*)(-1))
-			++m_data_p->ref_count;
+			m_data_p->ref_count.fetch_add(1, std::memory_order_relaxed);
 #ifdef _DEBUG
 		m_x_typeinfo = r.m_x_typeinfo;
 		m_x_sizeof = r.m_x_sizeof;
@@ -48,7 +48,7 @@ public:
 				m_data_p = r.m_data_p;
 				m_embed_tiny_trivial_x_mem = r.m_embed_tiny_trivial_x_mem;
 				if (m_data_p != nullptr && m_data_p != (void*)(-1))
-					++m_data_p->ref_count;
+					m_data_p->ref_count.fetch_add(1, std::memory_order_relaxed);
 			}
 			else {
 				m_embed_tiny_trivial_x_mem = r.m_embed_tiny_trivial_x_mem;
@@ -98,7 +98,7 @@ return *this;
 
 	void reset() noexcept {
 		if (m_data_p != nullptr && m_data_p != (void*)(-1)) {
-			if (--m_data_p->ref_count == 0) {
+			if (m_data_p->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
 				m_data_p->x_dtor(m_data_p->x_addr());
 				m_data_p->~_DATA_HEADER();
 				delete[](unsigned char*)m_data_p;

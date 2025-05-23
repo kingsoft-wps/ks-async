@@ -13,29 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "ks_cancel_inspector.h"
-#include "ks-async-raw/ks_raw_future.h"
+#include "ks_async_controller.h"
+#include <thread>
+
+void __forcelink_to_ks_async_controller_cpp() {}
 
 
-void __forcelink_to_ks_cancel_inspector_cpp() {}
-
-
-class ks_cancel_inspector_for_future final : public ks_cancel_inspector {
-public:
-	ks_cancel_inspector_for_future() = default;
-	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector_for_future);
-
-public:
-	virtual bool check_cancelled() override {
-		return ks_raw_future::__check_current_future_cancelled(true);
+//慎用，使用不当可能会造成死锁或卡顿！
+_DECL_DEPRECATED void ks_async_controller::__wait_all() const {
+	//暂以最简陋的手段实现，最小化内存占用
+	while (m_controller_data_ptr->pending_count != 0) {
+		std::this_thread::yield(); 
 	}
-
-private:
-	using ks_raw_future = __ks_async_raw::ks_raw_future;
-};
-
-
-ks_cancel_inspector* ks_cancel_inspector::__for_future() {
-	static ks_cancel_inspector_for_future g_cancel_inspector_for_future;
-	return &g_cancel_inspector_for_future;
 }

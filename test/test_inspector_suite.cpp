@@ -21,7 +21,7 @@ TEST(test_inspector_suite, test_inspector) {
 
     ks_pending_trigger trigger;
     auto future = ks_future<void>::post_pending(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_result<void>{
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;

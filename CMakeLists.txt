@@ -55,7 +55,9 @@ set(MY_SOURCE_FILES
 
 	#about context and controller
 	ks_async_context.h
+	ks_async_context.cpp
 	ks_async_controller.h
+	ks_async_controller.cpp
 
 	#about async-flow
 	ks_async_flow.h
@@ -66,9 +68,10 @@ set(MY_SOURCE_FILES
 	ks_notification_center.cpp
 
 	#others
+	ks_pending_trigger.h
+	ks_pending_trigger.cpp
 	ks_cancel_inspector.h
 	ks_cancel_inspector.cpp
-	ks_pending_trigger.h
 	ks_async_base.h
 	ks_error.h
 )

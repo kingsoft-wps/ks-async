@@ -59,7 +59,7 @@ TEST(test_post_suite, test_post) {
     work_latch.add(1);
 
     auto future_T_insp = ks_future<void>::post(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_result<void>{
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;
@@ -77,7 +77,7 @@ TEST(test_post_suite, test_post) {
     work_latch.add(1);
 
     auto future_fu_insp = ks_future<void>::post(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_future<void>{
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_future<void>::rejected(ks_error::cancelled_error());
         else
             return ks_future<void>::resolved();
@@ -150,7 +150,7 @@ TEST(test_post_suite, test_post_pending) {
     work_latch.add(1);
 
     auto future_T_insp = ks_future<void>::post_pending(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_result<void>{
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;
@@ -170,7 +170,7 @@ TEST(test_post_suite, test_post_pending) {
     work_latch.add(1);
 
     auto future_fu_insp = ks_future<void>::post_pending(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_future<void>{
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_future<void>::rejected(ks_error::cancelled_error());
         else
             return ks_future<void>::resolved();
@@ -265,7 +265,7 @@ TEST(test_post_suite, test_post_delayed) {
         auto duration = std::chrono::steady_clock::now() - post_time4;
         int64_t real_delay = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         EXPECT_LE(real_delay, 230);
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_error::cancelled_error();
         else
             return nothing;
@@ -287,7 +287,7 @@ TEST(test_post_suite, test_post_delayed) {
         auto duration = std::chrono::steady_clock::now() - post_time5;
         int64_t real_delay = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
         EXPECT_LE(real_delay, 230);
-        if (inspector->check_cancel())
+        if (inspector->check_cancelled())
             return ks_future<void>::rejected(ks_error::cancelled_error());
         else
             return ks_future<void>::resolved();
