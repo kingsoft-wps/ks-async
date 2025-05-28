@@ -67,8 +67,8 @@ public:
 
 	//不希望直接使用future.try_cancel，更应使用controller.try_cancel
 	virtual void __try_cancel(bool backtrack);
-	KS_ASYNC_API static bool __check_current_future_cancelled(bool with_extra);
-	KS_ASYNC_API static ks_error __acquire_current_future_cancelled_error(const ks_error& def_error, bool with_extra);
+	KS_ASYNC_API static bool __check_current_future_cancelled();
+	KS_ASYNC_API static ks_error __acquire_current_future_cancelled_error(const ks_error& def_error);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	virtual void __wait();

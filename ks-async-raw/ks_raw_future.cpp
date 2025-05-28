@@ -175,50 +175,52 @@ protected:
 	}
 
 	__REAL_IMP bool do_check_cancelled_locked(ks_raw_future_lock& lock) {
-		if (!this->is_cancelable_self())
-			return false;
-
 		if (!m_completed_result.is_completed()) {
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
 
-			if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
-				return true;
+			if (this->is_cancelable_self()) {
+				if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
+					return true;
 
-			if (intermediate_data_ptr->m_living_context.__check_controller_cancelled() || intermediate_data_ptr->m_living_context.__check_owner_expired())
-				return true;
+				if (intermediate_data_ptr->m_living_context.__check_controller_cancelled())
+					return true;
 
-			if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now()) {
-				return true;
+				if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && (intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now()))
+					return true;
 			}
+
+			if (intermediate_data_ptr->m_living_context.__check_owner_expired())
+				return true;
 		}
 		else if (m_completed_result.is_error()) {
-			return true;
+			return false; //这里返回false，这与下面的acquire方法实现并不一致，但逻辑上更可靠
 		}
 
 		return false;
 	}
 
 	__REAL_IMP ks_error do_acquire_cancelled_error_locked(const ks_error& def_error, ks_raw_future_lock& lock) {
-		if (!this->is_cancelable_self())
-			return ks_error();
-
 		if (!m_completed_result.is_completed()) {
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
 
-			if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
-				return intermediate_data_ptr->m_cancelled_error;
+			if (this->is_cancelable_self()) {
+				if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
+					return intermediate_data_ptr->m_cancelled_error;
 
-			if (intermediate_data_ptr->m_living_context.__check_controller_cancelled() || intermediate_data_ptr->m_living_context.__check_owner_expired())
-				return ks_error::cancelled_error();
+				if (intermediate_data_ptr->m_living_context.__check_controller_cancelled())
+					return ks_error::cancelled_error();
 
-			if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && (intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now())) {
-				return ks_error::timeout_error();
+				if (intermediate_data_ptr->m_timeout_time != std::chrono::steady_clock::time_point{} && (intermediate_data_ptr->m_timeout_time <= std::chrono::steady_clock::now()))
+					return ks_error::timeout_error();
 			}
+
+			if (intermediate_data_ptr->m_living_context.__check_owner_expired())
+				return this->is_cancelable_self() ? ks_error::cancelled_error() : ks_error::interrupted_error();
 		}
 		else if (m_completed_result.is_error()) {
-			return m_completed_result.to_error();
+			return m_completed_result.to_error(); //参见上面check方法实现对应说明
 		}
 
 		return def_error;
@@ -541,7 +543,7 @@ protected:
 
 			lock2.unlock();
 			this->do_try_cancel(error, backtrack); //will become timeout
-		}, 0, timeout_remain_ms);
+		}, 0x8000, timeout_remain_ms);
 
 		if (intermediate_data_ptr->m_timeout_schedule_id == 0) {
 			//we can just ignore scheduling timeout-fn failure, simply.
@@ -835,7 +837,7 @@ private:
 			ks_raw_result result;
 			try {
 				if (this->do_check_cancelled_locked(lock2))
-					result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock2);
+					result = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
 				else {
 					std::function<ks_raw_result()> task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
 					lock2.unlock();
@@ -997,21 +999,15 @@ protected:
 		ASSERT(!intermediate_data_ex_ptr->m_prev_future_completed_flag);
 		intermediate_data_ex_ptr->m_prev_future_completed_flag = true;
 
-		ks_raw_result alt_prev_result = prev_result;
-		if (prev_result.is_value() && this->do_check_cancelled_locked(lock)) {
-			//若this已被cancel，则将prev_result立即强制改为cancelled
-			alt_prev_result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock);
-		}
-
 		bool could_skip_run = false;
 		switch (m_pipe_mode) {
 		case ks_raw_future_mode::THEN:
 		case ks_raw_future_mode::ON_SUCCESS:
-			could_skip_run = !alt_prev_result.is_value();
+			could_skip_run = !prev_result.is_value();
 			break;
 		case ks_raw_future_mode::TRAP:
 		case ks_raw_future_mode::ON_FAILURE:
-			could_skip_run = !alt_prev_result.is_error();
+			could_skip_run = !prev_result.is_error();
 			break;
 		case ks_raw_future_mode::FORWARD:
 			could_skip_run = true;
@@ -1024,7 +1020,7 @@ protected:
 		if (could_skip_run) {
 			//可直接skip-run，则立即将this进行settle即可
 			ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
-			this->do_complete_locked(alt_prev_result, prefer_apartment, true, lock, false);
+			this->do_complete_locked(prev_result, prefer_apartment, true, lock, false);
 			return;
 		}
 
@@ -1032,7 +1028,7 @@ protected:
 		ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 		bool could_run_locally = (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 
-		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, alt_prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
+		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
 			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return; //pre-check cancelled
@@ -1044,12 +1040,16 @@ protected:
 
 			ks_raw_result result;
 			try {
-				std::function<ks_raw_result(const ks_raw_result&)> fn_ex = std::move(intermediate_data_ex_ptr->m_fn_ex);
-				lock2.unlock();
-				ks_defer defer_relock2([&lock2]() { lock2.lock(); });
-				result = fn_ex(alt_prev_result).require_completed_or_error();
-				fn_ex = {};
-				defer_relock2.apply();
+				if (this->do_check_cancelled_locked(lock2))
+					result = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
+				else {
+					std::function<ks_raw_result(const ks_raw_result&)> fn_ex = std::move(intermediate_data_ex_ptr->m_fn_ex);
+					lock2.unlock();
+					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+					result = fn_ex(prev_result).require_completed_or_error();
+					fn_ex = {};
+					defer_relock2.apply();
+				}
 			}
 			catch (ks_error error) {
 				result = error;
@@ -1215,19 +1215,13 @@ protected:
 		ASSERT(!intermediate_data_ex_ptr->m_prev_future_completed_flag);
 		intermediate_data_ex_ptr->m_prev_future_completed_flag = true;
 
-		ks_raw_result alt_prev_result = prev_result;
-		if (prev_result.is_value() && this->do_check_cancelled_locked(lock)) {
-			//若this已被cancel，则将prev_result立即强制改为cancelled
-			alt_prev_result = this->do_acquire_cancelled_error_locked(ks_error::cancelled_error(), lock);
-		}
-
 		bool could_skip_run = false;
 		switch (m_flatten_mode) {
 		case ks_raw_future_mode::FLATTEN_THEN:
-			could_skip_run = !alt_prev_result.is_value();
+			could_skip_run = !prev_result.is_value();
 			break;
 		case ks_raw_future_mode::FLATTEN_TRAP:
-			could_skip_run = !alt_prev_result.is_error();
+			could_skip_run = !prev_result.is_error();
 			break;
 		default:
 			could_skip_run = false;
@@ -1237,7 +1231,7 @@ protected:
 		if (could_skip_run) {
 			//可直接skip-run，则立即将this进行settle即可
 			ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
-			this->do_complete_locked(alt_prev_result, prefer_apartment, true, lock, false);
+			this->do_complete_locked(prev_result, prefer_apartment, true, lock, false);
 			return;
 		}
 
@@ -1245,7 +1239,7 @@ protected:
 		ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 		bool could_run_locally = (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 
-		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, alt_prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
+		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
 			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return; //pre-check cancelled
@@ -1256,35 +1250,47 @@ protected:
 			living_context_rtstt.apply(context);
 
 			ks_raw_future_ptr extern_future;
+			ks_error immediate_error;
 			try {
-				std::function<ks_raw_future_ptr(const ks_raw_result&)> afn_ex = std::move(intermediate_data_ex_ptr->m_afn_ex);
-				lock2.unlock();
-				ks_defer defer_relock2([&lock2]() { lock2.lock(); });
-				extern_future = afn_ex(alt_prev_result);
-				if (extern_future == nullptr) {
-					ASSERT(false);
-					extern_future = ks_raw_future::rejected(ks_error::unexpected_error(), prefer_apartment);
+				if (this->do_check_cancelled_locked(lock2))
+					immediate_error = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
+				else {
+					std::function<ks_raw_future_ptr(const ks_raw_result&)> afn_ex = std::move(intermediate_data_ex_ptr->m_afn_ex);
+					lock2.unlock();
+					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+					extern_future = afn_ex(prev_result);
+					if (extern_future == nullptr) {
+						ASSERT(false);
+						immediate_error = ks_error::unexpected_error();
+					}
+					afn_ex = {};
+					defer_relock2.apply();
 				}
-				afn_ex = {};
-				defer_relock2.apply();
 			}
 			catch (ks_error error) {
-				extern_future = ks_raw_future::rejected(error, prefer_apartment);
+				immediate_error = error;
 			}
 
-			ASSERT(extern_future != nullptr);
-			intermediate_data_ex_ptr->m_extern_future_weak = extern_future;
+			if (extern_future == nullptr) {
+				//立即失败
+				ASSERT(immediate_error.get_code() != 0);
+				this->do_complete_locked(immediate_error, prefer_apartment, false, lock2, false);
+			}
+			else {
+				//extern_future出现
+				intermediate_data_ex_ptr->m_extern_future_weak = extern_future;
 
-			lock2.unlock();
-			extern_future->on_completion([this, this_shared, intermediate_data_ex_ptr, prefer_apartment](const ks_raw_result& extern_result) {
-				//注：在extern_future完成回调中，直接调用this的do_complete方法
-				ks_raw_future_lock lock3(__get_mutex(), __is_using_pseudo_mutex());
+				lock2.unlock();
+				extern_future->on_completion([this, this_shared, intermediate_data_ex_ptr, prefer_apartment](const ks_raw_result& extern_result) {
+					//注：在extern_future完成回调中，直接调用this的do_complete方法
+					ks_raw_future_lock lock3(__get_mutex(), __is_using_pseudo_mutex());
 
-				ASSERT(!intermediate_data_ex_ptr->m_extern_future_completed_flag);
-				intermediate_data_ex_ptr->m_extern_future_completed_flag = true;
+					ASSERT(!intermediate_data_ex_ptr->m_extern_future_completed_flag);
+					intermediate_data_ex_ptr->m_extern_future_completed_flag = true;
 
-				this->do_complete_locked(extern_result, prefer_apartment, false, lock3, false);
-			}, make_async_context().set_priority(0x10000), prefer_apartment);
+					this->do_complete_locked(extern_result, prefer_apartment, false, lock3, false);
+				}, make_async_context().set_priority(0x10000), prefer_apartment);
+			}
 		};
 
 		if (could_run_locally) {
@@ -1509,7 +1515,7 @@ private:
 		auto intermediate_data_ex_ptr = __get_intermediate_data_ex_ptr(lock);
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 
-		//aggr-future是非cancelable的
+		//aggr-future是非cancelable的（且也无context，故无owner失效问题）
 		ASSERT(!this->do_check_cancelled_locked(lock));
 
 		//check and try settle me ...
@@ -1691,43 +1697,22 @@ void ks_raw_future::__try_cancel(bool backtrack) {
 	this->do_try_cancel(ks_error::cancelled_error(), backtrack);
 }
 
-bool ks_raw_future::__check_current_future_cancelled(bool with_extra) {
+bool ks_raw_future::__check_current_future_cancelled() {
 	ks_raw_future* cur_future = tls_current_thread_running_future;
-	if (cur_future == nullptr || !cur_future->is_cancelable_self())
+	if (cur_future == nullptr)
 		return false;
 
-	ASSERT(!cur_future->is_completed());
-	if (cur_future->do_check_cancelled())
-		return true;
-
-	if (with_extra) {
-		ks_apartment* cur_apartment = ks_apartment::current_thread_apartment();
-		if (cur_apartment != nullptr) {
-			if (cur_apartment->is_stopping_or_stopped())
-				return true;
-		}
-	}
-
-	return false;
+	return cur_future->do_check_cancelled();
 }
 
-ks_error ks_raw_future::__acquire_current_future_cancelled_error(const ks_error& def_error, bool with_extra) {
+ks_error ks_raw_future::__acquire_current_future_cancelled_error(const ks_error& def_error) {
 	ks_raw_future* cur_future = tls_current_thread_running_future;
-	if (cur_future == nullptr || !cur_future->is_cancelable_self())
-		return ks_error();
+	if (cur_future == nullptr)
+		return def_error;
 
-	ASSERT(!cur_future->is_completed());
 	ks_error error = cur_future->do_acquire_cancelled_error(ks_error());
 	if (error.get_code() != 0)
 		return error;
-
-	if (with_extra) {
-		ks_apartment* cur_apartment = ks_apartment::current_thread_apartment();
-		if (cur_apartment != nullptr) {
-			if (cur_apartment->is_stopping_or_stopped())
-				return ks_error::terminated_error();
-		}
-	}
 
 	return def_error;
 }

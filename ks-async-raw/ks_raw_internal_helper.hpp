@@ -103,6 +103,10 @@ public:
 		return m_cur_context_owner_locker;
 	}
 
+	bool is_owner_locker_ready() const {
+		return m_cur_context_owner_locker.has_value();
+	}
+
 private:
 	bool m_applied_flag = false;
 	ks_async_context m_cur_context;

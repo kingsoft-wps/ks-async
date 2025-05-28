@@ -23,14 +23,14 @@ ks_async_controller::ks_async_controller();
 # 一般成员方法
 
 ```C++
-void try_cancel_all();
+void try_cancel();
 ```
 #### 描述：请求取消（中止）所有相关异步过程。（但并不能保证能成功中止）
 #### 返回值：无。
 <br>
 
 ```C++
-bool check_cancel_all();
+bool check_cancelled();
 ```
 #### 描述：查询当前取消（中止）标志状态。
 #### 返回值：当前取消（中止）标志状态。

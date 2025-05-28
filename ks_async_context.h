@@ -108,7 +108,7 @@ public:
 		return *this;
 	}
 
-	KS_ASYNC_INLINE_API ks_async_context& set_parent(const ks_async_context& parent, bool inherit_common_props = true) {
+	KS_ASYNC_INLINE_API ks_async_context& set_parent(const ks_async_context& parent, bool inherit_attrs) {
 		//注：只保存parent.m_fat_data_p，不必保存parent.m_priority（因为无用）
 		if (parent.m_fat_data_p != nullptr) {
 			do_prepare_fat_data_cow();
@@ -123,7 +123,7 @@ public:
 			}
 		}
 
-		if (inherit_common_props) {
+		if (inherit_attrs) {
 			m_priority = parent.__get_priority();
 		}
 

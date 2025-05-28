@@ -22,12 +22,16 @@ limitations under the License.
 
 class ks_async_controller final {
 public:
-	KS_ASYNC_INLINE_API ks_async_controller() : m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {}
+	KS_ASYNC_INLINE_API ks_async_controller() 
+		: m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {
+	}
+
+	KS_ASYNC_INLINE_API ~ks_async_controller() {
+		ASSERT(this->is_all_completed());
+		this->try_cancel();  //析构时自动try_cancel
+	}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
-	KS_ASYNC_INLINE_API ks_async_controller(ks_async_controller&&) noexcept = default;
-
-	KS_ASYNC_INLINE_API ~ks_async_controller() { ASSERT(this->is_all_completed()); }
 
 public:
 	KS_ASYNC_INLINE_API void try_cancel() {
@@ -52,7 +56,7 @@ private:
 		std::atomic<int> pending_count{ 0 };
 	};
 
-	std::shared_ptr<_CONTROLLER_DATA> m_controller_data_ptr;
+	const std::shared_ptr<_CONTROLLER_DATA> m_controller_data_ptr;
 
 	friend class ks_async_context;
 };

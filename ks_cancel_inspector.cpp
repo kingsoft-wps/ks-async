@@ -27,7 +27,7 @@ public:
 
 public:
 	virtual bool check_cancelled() override {
-		return ks_raw_future::__check_current_future_cancelled(true);
+		return ks_raw_future::__check_current_future_cancelled();
 	}
 
 private:

@@ -47,12 +47,12 @@ void bind_controller(const ks_async_controller* controller);
 <br>
 
 ```C++
-void set_parent(const ks_async_context& parent, bool inherit_common_props = true);
+void set_parent(const ks_async_context& parent, bool inherit_attrs = true);
 ```
 #### 描述：设置父context。
 #### 参数：
   - parent：父context。
-  - inherit_common_props: 是否继承parent的一般属性。（目前即为priority属性）
+  - inherit_attrs: 是否继承parent的一般属性。（目前即priority属性）
 <br>
 
 ```C++

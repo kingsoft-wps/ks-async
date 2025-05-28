@@ -54,21 +54,6 @@ const char* name();
 #### 返回值：套间名称。
 <br>
 
-```C++
-const char* features();
-```
-#### 描述：获取套间特征。
-#### 返回值：套间特征。
-<br>
-
-```C++
-const char* concurrency();
-```
-#### 描述：获取套间理想并行度值。
-#### 返回值：套间理想并行度值。
-<br>
-<br>
-
 
 ```C++
 bool start();
