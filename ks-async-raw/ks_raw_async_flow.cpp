@@ -518,10 +518,13 @@ ks_raw_future_ptr ks_raw_async_flow::get_flow_future_void() {
 	if (m_flow_promise_void_opt == nullptr) {
 		m_flow_promise_void_opt = ks_raw_promise::create(ks_apartment::default_mta());
 		if (m_flow_status_v == status_t::succeeded || m_flow_status_v == status_t::failed) {
-			if (m_last_error.get_code() == 0)
+			if (m_flow_status_v == status_t::succeeded) {
 				m_flow_promise_void_opt->resolve(ks_raw_value::of_nothing());
-			else
+			}
+			else {
+				ASSERT(m_last_error.has_code());
 				m_flow_promise_void_opt->reject(m_last_error);
+			}
 		}
 	}
 
@@ -547,11 +550,12 @@ ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_this_wrapped() {
 		m_flow_promise_this_wrapped_weak = flow_promise_this_wrapped;
 
 		if (m_flow_status_v == status_t::succeeded || m_flow_status_v == status_t::failed) {
-			if (m_last_error.get_code() == 0) {
+			if (m_flow_status_v == status_t::succeeded) {
 				ks_async_flow flow_wrapped = ks_async_flow::__from_raw(this->shared_from_this());
 				flow_promise_this_wrapped->resolve(ks_raw_value::of<ks_async_flow>(std::move(flow_wrapped)));
 			}
 			else {
+				ASSERT(m_last_error.has_code());
 				flow_promise_this_wrapped->reject(m_last_error);
 			}
 
@@ -685,29 +689,33 @@ void ks_raw_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& 
 void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error, std::unique_lock<ks_mutex>& lock) {
 	ASSERT(m_flow_status_v == status_t::running);
 
-	m_flow_status_v = flow_error.get_code() == 0 ? status_t::succeeded : status_t::failed;
+	m_flow_status_v = !flow_error.has_code() ? status_t::succeeded : status_t::failed;
 
-	if (flow_error.get_code() != 0 && m_last_error.get_code() == 0) {
+	if (flow_error.has_code() && !m_last_error.has_code()) {
 		m_last_error = flow_error;
 	}
 
 	//settle flow-promise (void)
 	if (m_flow_promise_void_opt != nullptr) {
-		if (flow_error.get_code() == 0)
+		if (m_flow_status_v == status_t::succeeded) {
 			m_flow_promise_this_wrapped_keepper_until_completed->resolve(ks_raw_value::of_nothing());
-		else
+		}
+		else {
+			ASSERT(flow_error.has_code());
 			m_flow_promise_this_wrapped_keepper_until_completed->reject(flow_error);
+		}
 	}
 
 	//settle flow-promise (wrapped)
 	if (m_flow_promise_this_wrapped_keepper_until_completed != nullptr) {
 		ASSERT(m_flow_promise_this_wrapped_keepper_until_completed == m_flow_promise_this_wrapped_weak.lock());
 
-		if (flow_error.get_code() == 0) {
+		if (m_flow_status_v == status_t::succeeded) {
 			ks_async_flow flow_wrapped = ks_async_flow::__from_raw(this->shared_from_this());
 			m_flow_promise_this_wrapped_keepper_until_completed->resolve(ks_raw_value::of<ks_async_flow>(std::move(flow_wrapped)));
 		}
 		else {
+			ASSERT(flow_error.has_code());
 			m_flow_promise_this_wrapped_keepper_until_completed->reject(flow_error);
 		}
 
@@ -716,10 +724,13 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	}
 
 	//fire flow-observers
-	if (flow_error.get_code() == 0)
+	if (m_flow_status_v == status_t::succeeded) {
 		do_fire_flow_observers_locked(_x_observer_kind_t::for_completed, ks_error(), lock);
-	else
+	}
+	else {
+		ASSERT(flow_error.has_code());
 		do_fire_flow_observers_locked(_x_observer_kind_t::for_completed, flow_error, lock);
+	}
 
 	//cleanup if need
 	if (m_force_cleanup_flag_v) {
@@ -790,12 +801,13 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	}
 
 	if (task_result.is_error()) {
-		if (m_1st_failed_task_name.empty())
-			m_1st_failed_task_name = task_item->task_name;
-		if (m_last_error.get_code() == 0) {
+		if (!m_last_error.has_code()) {
 			m_last_error = task_result.to_error();
-			if (m_last_error.get_code() == 0)
-				m_last_error = ks_error::unexpected_error();
+			ASSERT(m_last_error.has_code());
+		}
+		if (m_1st_failed_task_name.empty()) {
+			m_1st_failed_task_name = task_item->task_name;
+			ASSERT(!m_1st_failed_task_name.empty());
 		}
 	}
 
@@ -854,8 +866,8 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	if (m_succeeded_task_count + m_failed_task_count == m_task_map.size()) {
 		ks_error flow_error;
 		if (m_failed_task_count != 0) {
-			ASSERT(m_last_error.get_code() != 0);
-			flow_error = m_last_error.get_code() != 0 ? m_last_error : ks_error::unexpected_error();
+			ASSERT(m_last_error.has_code());
+			flow_error = m_last_error.has_code() ? m_last_error : ks_error::unexpected_error();
 		}
 
 		do_make_flow_completed_locked(flow_error, lock);

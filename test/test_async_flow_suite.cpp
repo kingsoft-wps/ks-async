@@ -99,14 +99,14 @@ TEST(test_async_flow_suite, test_task_observer) {
     ASSERT_TRUE(id != 0);
 
     id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [&task_completed_count,&work_latch](const ks_async_flow& flow, const char* task_name, const ks_error& error) {
-        if (error.get_code() == 0)
+        if (!error.has_code())
             task_completed_count++;
         work_latch.count_down();
         }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
      id = flow.add_task_completed_observer("a1", ks_apartment::background_sta(), [&a1_completed](const ks_async_flow& flow, const char* task_name, const ks_error& error) {
-        if (error.get_code() == 0)
+        if (!error.has_code())
             a1_completed=true;
         }, ks_async_context());
     ASSERT_TRUE(id != 0);

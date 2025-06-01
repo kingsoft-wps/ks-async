@@ -169,9 +169,8 @@ private:
 	}
 
 public:
-	bool has_value() const {
-		return m_data_p != nullptr;
-	}
+	bool has_value() const { return m_data_p != nullptr; }
+	bool has_value() const volatile { return m_data_p != nullptr; }
 
 	template <class T>
 	const T& get() const {

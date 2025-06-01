@@ -30,16 +30,21 @@ public:
 	ks_result& operator=(ks_result&&) noexcept = default;
 
 	static ks_result<void> __bare() { return ks_result(__raw_ctor::v); }
-	static ks_result<void> __either(const nothing_t& value, const ks_error& error) { return error.get_code() == 0 ? ks_result<void>(value) : ks_result<void>(error); }
-	static ks_result<void> __either(const nothing_t* value, const ks_error* error) { return error == nullptr || error->get_code() == 0 ? (value != nullptr ? ks_result<void>(*value) : ks_result<void>::__bare()) : (error != nullptr ? ks_result<void>(*error) : ks_result<void>::__bare()); }
+	static ks_result<void> __either(const nothing_t& value, const ks_error& error) { return !error.has_code() ? ks_result<void>(value) : ks_result<void>(error); }
+	static ks_result<void> __either(const nothing_t* value, const ks_error* error) { return !(error != nullptr && error->has_code()) ? (value != nullptr ? ks_result<void>(*value) : ks_result<void>::__bare()) : (error != nullptr ? ks_result<void>(*error) : ks_result<void>::__bare()); }
 
 	using value_type = void;
 	using this_result_type = ks_result<void>;
 
 public:
 	bool is_completed() const { return m_nothing_result.is_completed(); }
+	bool is_completed() const volatile { return m_nothing_result.is_completed(); }
+
 	bool is_value() const { return m_nothing_result.is_value(); }
+	bool is_value() const volatile { return m_nothing_result.is_value(); }
+
 	bool is_error() const { return m_nothing_result.is_error(); }
+	bool is_error() const volatile { return m_nothing_result.is_error(); }
 
 	nothing_t to_value() const noexcept(false) { return (m_nothing_result.to_value(), nothing); }
 	ks_error to_error() const noexcept(false) { return m_nothing_result.to_error(); }

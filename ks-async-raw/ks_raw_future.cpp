@@ -180,7 +180,7 @@ protected:
 			ASSERT(intermediate_data_ptr != nullptr);
 
 			if (this->is_cancelable_self()) {
-				if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
+				if (intermediate_data_ptr->m_cancelled_error.has_code())
 					return true;
 
 				if (intermediate_data_ptr->m_living_context.__check_controller_cancelled())
@@ -206,7 +206,7 @@ protected:
 			ASSERT(intermediate_data_ptr != nullptr);
 
 			if (this->is_cancelable_self()) {
-				if (intermediate_data_ptr->m_cancelled_error.get_code() != 0)
+				if (intermediate_data_ptr->m_cancelled_error.has_code())
 					return intermediate_data_ptr->m_cancelled_error;
 
 				if (intermediate_data_ptr->m_living_context.__check_controller_cancelled())
@@ -250,7 +250,7 @@ protected:
 			lock.unlock();
 			bool was_satisfied = cur_apartment->__run_nested_pump_loop_for_extern_waiting(
 				this,
-				[this, this_shared = this->shared_from_this()]() -> bool { return m_completed_result.is_completed(); });
+				[this, this_shared = this->shared_from_this()]() -> bool { return ((ks_raw_result volatile&)m_completed_result).is_completed(); });
 			ASSERT(was_satisfied ? m_completed_result.is_completed() : true);
 
 			lock.lock();
@@ -656,7 +656,7 @@ protected:
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
 		//dx-future无cancel行为
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		ASSERT(this->is_completed());
 		_NOOP();
 	}
@@ -713,7 +713,7 @@ protected:
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
 		//promise-future立即reject即可
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		this->do_complete(error, nullptr, false);
 	}
 
@@ -891,7 +891,7 @@ protected:
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 
 		//task-future标记cancel
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		intermediate_data_ex_ptr->m_cancelled_error = error;
 
 		//若为未到期的延时task-future，则立即do_complete
@@ -1088,7 +1088,7 @@ protected:
 		ks_raw_future_ptr not_completed_prev_future = !intermediate_data_ex_ptr->m_prev_future_completed_flag ? intermediate_data_ex_ptr->m_prev_future_weak.lock() : nullptr;
 
 		//pipe-future标记cancel
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		if (__my_cancelable_flag())
 			intermediate_data_ex_ptr->m_cancelled_error = error;
 
@@ -1273,7 +1273,7 @@ protected:
 
 			if (extern_future == nullptr) {
 				//立即失败
-				ASSERT(immediate_error.get_code() != 0);
+				ASSERT(immediate_error.has_code());
 				this->do_complete_locked(immediate_error, prefer_apartment, false, lock2, false);
 			}
 			else {
@@ -1323,7 +1323,7 @@ protected:
 		ks_raw_future_ptr not_completed_extern_future = !intermediate_data_ex_ptr->m_extern_future_completed_flag ? intermediate_data_ex_ptr->m_extern_future_weak.lock() : nullptr;
 
 		//flatten-future标记cancel（都是cancelable的）
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		intermediate_data_ex_ptr->m_cancelled_error = error;
 
 		lock.unlock();
@@ -1485,7 +1485,7 @@ protected:
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 
 		//aggr-future实质上都是forward，都可认为是非cancelable的
-		ASSERT(error.get_code() != 0);
+		ASSERT(error.has_code());
 		_NOOP();
 
 		//既然是forward，那么始终要无条件backtrack
@@ -1711,7 +1711,7 @@ ks_error ks_raw_future::__acquire_current_future_cancelled_error(const ks_error&
 		return def_error;
 
 	ks_error error = cur_future->do_acquire_cancelled_error(ks_error());
-	if (error.get_code() != 0)
+	if (error.has_code())
 		return error;
 
 	return def_error;

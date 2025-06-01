@@ -56,13 +56,14 @@ public:
 	}
 
 public:
-	HRESULT get_code() const {
-		return (volatile HRESULT&)m_code;
-	}
+	bool has_code() const { return m_code != 0; }
+	bool has_code() const volatile { return m_code != 0; }
 
-	bool has_payload() const {
-		return m_payload_any.has_value();
-	}
+	HRESULT get_code() const { return m_code; }
+	HRESULT get_code() const volatile { return m_code; } //也额外提供get_code的volatile版本实现
+
+	bool has_payload() const { return m_payload_any.has_value(); }
+	bool has_payload() const volatile { return m_payload_any.has_value(); }
 
 	template <class T>
 	const T& get_payload() const {
