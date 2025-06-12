@@ -45,7 +45,7 @@ __KS_ASYNC_RAW_BEGIN
 
 static thread_local ks_raw_future* tls_current_thread_running_future = nullptr;
 
-#if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED || __KS_ASYNC_DX_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
+#if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
 static ks_mutex g_raw_future_global_mutex;  //global mutex
 #endif
 
@@ -665,10 +665,10 @@ private:
 	virtual ks_raw_future_mode __get_mode() override { return ks_raw_future_mode::DX; }
 	virtual bool __is_head_future() override { return true; }
 
-#if __KS_ASYNC_DX_RAW_FUTURE_PSEUDO_MUTEX_ENABLED
+#if __KS_ASYNC_JUST_DX_RAW_FUTURE_NO_MUTEX_ENABLED
 	virtual ks_mutex* __get_mutex() override { return nullptr; }
 	virtual bool __is_using_pseudo_mutex() override { return true; }
-#elif __KS_ASYNC_DX_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
+#elif __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
 	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
