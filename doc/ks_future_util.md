@@ -33,8 +33,8 @@ ks_future<T> ks_future_util::post_pending<T>(ks_apartment* apartment, function<k
 
 
 ```C++
-ks_future<tuple<T0, T1, ...>> ks_future_util::all(const ks_future<T0>& future0, const ks_future<T1>& future1, ...);
 ks_future<vector<T>> ks_future_util::all(const vector<ks_future<T>>& futures);
+ks_future<tuple<T0, T1, ...>> ks_future_util::all(const ks_future<T0>& future0, const ks_future<T1>& future1, ...);
 ```
 #### 描述：创建一个ks_future对象，代表所有指定futures全部 “成功”。
 #### 参数：
