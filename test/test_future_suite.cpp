@@ -1,4 +1,4 @@
-/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
+﻿/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -199,7 +199,7 @@ TEST(test_future_suite, test_then) {
             EXPECT_EQ(result.to_error().get_code(), 0xFF338003);
         else
             EXPECT_EQ(_result_to_str(result), "VOID");
-            work_latch.count_down();
+        work_latch.count_down();
         });
 
     work_latch.wait();
@@ -270,11 +270,11 @@ TEST(test_future_suite, test_transform) {
             return nothing;
         })
         .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const ks_result<void>& result) -> void {
-        if(result.is_error())
+        if(result.is_error()) 
             EXPECT_EQ(result.to_error().get_code(), 0xFF338003);
         else
             EXPECT_EQ(_result_to_str(result), "VOID");
-            work_latch.count_down();
+        work_latch.count_down();
         });
 
     work_latch.wait();
@@ -338,7 +338,7 @@ TEST(test_future_suite, test_flat_then) {
             EXPECT_EQ(result.to_error().get_code(), 0xFF338003);
         else
             EXPECT_EQ(_result_to_str(result), "VOID");
-            work_latch.count_down();
+        work_latch.count_down();
         });
 
     work_latch.wait();
@@ -408,7 +408,7 @@ TEST(test_future_suite, test_flat_transform) {
             EXPECT_EQ(result.to_error().get_code(), 0xFF338003);
         else
             EXPECT_EQ(_result_to_str(result), "VOID");
-            work_latch.count_down();
+        work_latch.count_down();
         });
 
     work_latch.wait();
@@ -492,11 +492,10 @@ TEST(test_future_suite, test_cast) {
 
     ks_future<std::string>::resolved("a")
         .cast<nothing_t>()
-        .then<nothing_t>(ks_apartment::default_mta(), make_async_context(), [](nothing_t nothing) {
-        return nothing;
+        .then<nothing_t>(ks_apartment::default_mta(), make_async_context(), [](nothing_t) {
+            return nothing;
         })
         .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const ks_result<nothing_t>& result) -> void {
-            
             work_latch.count_down();
         });
 

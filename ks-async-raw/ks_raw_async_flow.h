@@ -105,9 +105,14 @@ private:
 		running = 0,  //正在执行
 		succeeded = 1,  //成功
 		failed = 2,  //失败
+		__not_start_but_queuing_status = -1001, //额外的：虽未开始，但已入队
 	};
 
-	static const status_t __not_start_but_pending_status = (status_t)(-1001);
+#if __KS_ASYNC_RAW_FUTURE_SPINLOCK_ENABLED
+	using ks_flow_mutex = ks_spinlock;
+#else
+	using ks_flow_mutex = ks_mutex;
+#endif
 
 	struct _TASK_ITEM {
 		std::string task_name; //const-like
@@ -121,7 +126,7 @@ private:
 
 		status_t task_status = status_t::not_start;
 
-		ks_raw_result task_pending_arg_void;
+		ks_raw_result task_queuing_arg_void;
 		ks_raw_promise_ptr task_trigger_void;
 		ks_raw_result task_result{}; //ks_result<T>
 
@@ -148,24 +153,24 @@ private:
 	};
 
 private:
-	bool do_start_locked(std::unique_lock<ks_mutex>& lock);
+	bool do_start_locked(std::unique_lock<ks_flow_mutex>& lock);
 
-	void do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock);
-	void do_make_flow_completed_locked(const ks_error& flow_error, std::unique_lock<ks_mutex>& lock);
+	void do_make_flow_running_locked(std::unique_lock<ks_flow_mutex>& lock);
+	void do_make_flow_completed_locked(const ks_error& flow_error, std::unique_lock<ks_flow_mutex>& lock);
 
-	void do_make_task_pending_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& arg, std::unique_lock<ks_mutex>& lock);
-	void do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock);
-	void do_make_task_completed_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& task_result, std::unique_lock<ks_mutex>& lock);
+	void do_make_task_queuing_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& arg, std::unique_lock<ks_flow_mutex>& lock);
+	void do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_flow_mutex>& lock);
+	void do_make_task_completed_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& task_result, std::unique_lock<ks_flow_mutex>& lock);
 
-	void do_drain_pending_task_queue_locked(std::unique_lock<ks_mutex>& lock);
+	void do_drain_queuing_task_queue_locked(std::unique_lock<ks_flow_mutex>& lock);
 
-	void do_fire_flow_observers_locked(_x_observer_kind_t kind, const ks_error& error, std::unique_lock<ks_mutex>& lock);
-	void do_fire_task_observers_locked(_x_observer_kind_t kind, const std::string& task_name, const ks_error& error, std::unique_lock<ks_mutex>& lock);
+	void do_fire_flow_observers_locked(_x_observer_kind_t kind, const ks_error& error, std::unique_lock<ks_flow_mutex>& lock);
+	void do_fire_task_observers_locked(_x_observer_kind_t kind, const std::string& task_name, const ks_error& error, std::unique_lock<ks_flow_mutex>& lock);
 
-	void do_final_force_cleanup_value_refs_locked(std::unique_lock<ks_mutex>& lock);
+	void do_final_force_cleanup_value_refs_locked(std::unique_lock<ks_flow_mutex>& lock);
 
 private:
-	ks_mutex m_mutex;
+	ks_flow_mutex m_mutex;
 
 	size_t m_j = size_t(-1);
 
@@ -178,11 +183,11 @@ private:
 	std::map<std::string, ks_raw_value> m_raw_value_map{};
 
 	size_t m_not_start_task_count = 0;
-	size_t m_pending_task_count = 0;
+	size_t m_queuing_task_count = 0;
 	size_t m_running_task_count = 0;
 	size_t m_succeeded_task_count = 0;
 	size_t m_failed_task_count = 0;
-	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_pending_task_queue{};
+	std::vector<std::shared_ptr<_TASK_ITEM>> m_temp_queuing_task_queue{};
 
 	volatile status_t m_flow_status_v = status_t::not_start;
 	volatile bool m_force_cleanup_flag_v = false;

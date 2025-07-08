@@ -16,14 +16,8 @@ limitations under the License.
 #include "test_base.h"
 
 
-DEFINE_int32(parallel_num, 5, "numbers of parallel");
-DEFINE_int32(future_num, 5, "numbers of future");
-
-
 int main(int argc, char** argv) {
-    gflags::ParseCommandLineNonHelpFlags(&argc, &argv, false);
     testing::InitGoogleTest(&argc, argv);
-
     int exit_code = RUN_ALL_TESTS();
 
     ks_apartment::default_mta()->async_stop();

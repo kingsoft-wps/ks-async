@@ -5,30 +5,35 @@ project(ks-async)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if (CMAKE_COMPILER_IS_GNUCC)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden -fPIC")
-	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -D_DEBUG -fPIC")
-endif()
-if (CMAKE_COMPILER_IS_GNUCXX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden -fPIC")
-	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -D_DEBUG -fPIC")
-endif()
+set(MY_GENERAL_COMPILE_OPTIONS
+		$<$<CXX_COMPILER_ID:MSVC>:
+			/permissive- /MP
+			/W3>
+			#/WX
+		$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:
+			-fvisibility=hidden
+			-fvisibility-inlines-hidden
+			-fPIC
+			-Wall -Wextra
+			-Wshadow -Wpointer-arith
+			-Wno-deprecated-declarations
+			-Wno-unused-parameter>
+			#-Werror
+)
 
 
 if (NOT DEFINED KS_ASYNC_LIB_TYPE)
 	set(KS_ASYNC_LIB_TYPE "SHARED")  #default is SHARED
 endif()
 
-if (${KS_ASYNC_LIB_TYPE} STREQUAL "SHARED")
-	set(MY_LIB_NAME ks-async)
-	set(MY_LIB_TEST_NAME ks-async-test)
-elseif (${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED")
-	set(MY_LIB_NAME ks-async-embedded) #特殊命名
-	set(MY_LIB_TEST_NAME ks-async-embedded-test)
-	set(MY_LIB_TEST_EMBEDDED_HOST_NAME ks-async-embedded-host-for-test)
-else()
+if (NOT(${KS_ASYNC_LIB_TYPE} STREQUAL "SHARED" OR ${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED"))
 	message(FATAL_ERROR "KS_ASYNC_LIB_TYPE=${KS_ASYNC_LIB_TYPE} is invalid")
 endif()
+
+
+set(MY_LIB_NAME ks-async)
+set(MY_LIB_TEST_NAME ks-async-test)
+set(MY_LIB_BENCH_NAME ks-async-bench)
 
 
 set(MY_SOURCE_FILES
@@ -89,7 +94,7 @@ set(MY_ASYNC_RAW_SOURCE_FILES
 	ks-async-raw/ks_raw_internal_helper.hpp
 )
 
-set(MY_KTL_SOURCE_FILES
+set(MY_KTL_SOURCE_FILES 
 	#ktl
 	ktl/ks_cxxbase.h
 	ktl/ks_functional.h
@@ -98,7 +103,35 @@ set(MY_KTL_SOURCE_FILES
 	ktl/ks_defer.h
 	ktl/ks_concurrency.h
 	ktl/ks_source_location.h
+
+	#ktl/ks_concurrency/* (internal)
+	ktl/ks_concurrency/ks_atomic.h
+	ktl/ks_concurrency/ks_spinlock.h
+	ktl/ks_concurrency/ks_mutex.h
+	ktl/ks_concurrency/ks_condition_variable.h
+	ktl/ks_concurrency/ks_semaphore.h
+	ktl/ks_concurrency/ks_latch.h
+	ktl/ks_concurrency/ks_event.h
+	#ktl/ks_concurrency/_implement/* (internal)
+	ktl/ks_concurrency/_implement/ks_spinlock_std.h
+	ktl/ks_concurrency/_implement/ks_spinlock_win.h
+	ktl/ks_concurrency/_implement/ks_spinlock_mac.h
+	ktl/ks_concurrency/_implement/ks_spinlock_linux.h
+	ktl/ks_concurrency/_implement/ks_semaphore_std.h
+	ktl/ks_concurrency/_implement/ks_semaphore_win.h
+	ktl/ks_concurrency/_implement/ks_semaphore_mac.h
+	ktl/ks_concurrency/_implement/ks_semaphore_linux.h
+	ktl/ks_concurrency/_implement/ks_latch_std.h
+	ktl/ks_concurrency/_implement/ks_latch_win.h
+	ktl/ks_concurrency/_implement/ks_latch_mac.h
+	ktl/ks_concurrency/_implement/ks_latch_linux.h
+	ktl/ks_concurrency/_implement/ks_event_std.h
+	ktl/ks_concurrency/_implement/ks_event_win.h
+	ktl/ks_concurrency/_implement/ks_event_mac.h
+	ktl/ks_concurrency/_implement/ks_event_linux.h
+	ktl/ks_concurrency/_implement/ks_concurrency_helper.h
 )
+
 
 set(PUBLIC_HEADER_FILES
 	#about apartment
@@ -145,6 +178,7 @@ set(PUBLIC_ASYNC_RAW_HEADER_FILES
 	ks-async-raw/ks_raw_async_flow.h
 )
 
+
 set(PUBLIC_KTL_HEADER_FILES
 	#ktl
 	ktl/ks_cxxbase.h
@@ -156,6 +190,39 @@ set(PUBLIC_KTL_HEADER_FILES
 	ktl/ks_source_location.h
 )
 
+set(PUBLIC_KTL_CONCURRENCY_HEADER_FILES
+	#ktl/ks_concurrency/* (internal)
+	ktl/ks_concurrency/ks_atomic.h
+	ktl/ks_concurrency/ks_spinlock.h
+	ktl/ks_concurrency/ks_mutex.h
+	ktl/ks_concurrency/ks_condition_variable.h
+	ktl/ks_concurrency/ks_semaphore.h
+	ktl/ks_concurrency/ks_latch.h
+	ktl/ks_concurrency/ks_event.h
+)
+
+set(PUBLIC_KTL_CONCURRENCY_IMPLEMENT_HEADER_FILES
+	#ktl/ks_concurrency/_implement/* (internal)
+	ktl/ks_concurrency/_implement/ks_spinlock_std.h
+	ktl/ks_concurrency/_implement/ks_spinlock_win.h
+	ktl/ks_concurrency/_implement/ks_spinlock_mac.h
+	ktl/ks_concurrency/_implement/ks_spinlock_linux.h
+	ktl/ks_concurrency/_implement/ks_semaphore_std.h
+	ktl/ks_concurrency/_implement/ks_semaphore_win.h
+	ktl/ks_concurrency/_implement/ks_semaphore_mac.h
+	ktl/ks_concurrency/_implement/ks_semaphore_linux.h
+	ktl/ks_concurrency/_implement/ks_latch_std.h
+	ktl/ks_concurrency/_implement/ks_latch_win.h
+	ktl/ks_concurrency/_implement/ks_latch_mac.h
+	ktl/ks_concurrency/_implement/ks_latch_linux.h
+	ktl/ks_concurrency/_implement/ks_event_std.h
+	ktl/ks_concurrency/_implement/ks_event_win.h
+	ktl/ks_concurrency/_implement/ks_event_mac.h
+	ktl/ks_concurrency/_implement/ks_event_linux.h
+	ktl/ks_concurrency/_implement/ks_concurrency_helper.h
+)
+
+
 source_group(
 	TREE  ${CMAKE_CURRENT_SOURCE_DIR}
 	FILES ${MY_SOURCE_FILES} ${MY_ASYNC_RAW_SOURCE_FILES} ${MY_KTL_SOURCE_FILES} 
@@ -164,15 +231,19 @@ source_group(
 
 if (KS_ASYNC_TEST_ENABLED)
     file(GLOB_RECURSE MY_TEST_SOURCE_FILES "test/*.h" "test/*.cpp")
-
 	source_group(
 		TREE  ${CMAKE_CURRENT_SOURCE_DIR}
 		FILES ${MY_TEST_SOURCE_FILES}
 	)
+
+	file(GLOB_RECURSE MY_BENCH_SOURCE_FILES "bench/*.h" "bench/*.cpp")
+	source_group(
+		TREE  ${CMAKE_CURRENT_SOURCE_DIR}
+		FILES ${MY_BENCH_SOURCE_FILES}
+	)
 endif()
 
-
-#fetch extern gtest and gflags
+#fetch extern gtest and gbench
 if (KS_ASYNC_TEST_ENABLED)
 	include(FetchContent)
 
@@ -194,66 +265,73 @@ if (KS_ASYNC_TEST_ENABLED)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
-	### gflags ...
-    if (KS_ASYNC_EXTERNAL_GFLAGS_PROJECT_URL)
+	### gbench ...
+    if (KS_ASYNC_EXTERNAL_GBENCH_PROJECT_URL)
         FetchContent_Declare(
-            gflags
-            URL ${KS_ASYNC_EXTERNAL_GFLAGS_URL}
+            benchmark
+            GIT_REPOSITORY ${KS_ASYNC_EXTERNAL_GBENCH_PROJECT_URL}
+            GIT_TAG master
         )
     else()
         FetchContent_Declare(
-            gflags
-            URL https://github.com/gflags/gflags/archive/v2.2.2.tar.gz
+            benchmark
+            URL https://github.com/google/benchmark/archive/v1.9.4.zip
         )
     endif()
-
-    set(BUILD_gflags_LIB ON CACHE BOOL "" FORCE)
-    set(BUILD_gflags_nothreads_LIB OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(FORCE BUILD_gflags_LIB BUILD_gflags_nothreads_LIB)
-
-    # For Windows: Prevent overriding the parent project's compiler/linker settings
-    set(gflags_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(gflags)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(benchmark)
 endif()
 
 
 #lib
-if (${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED")
-	add_library(${MY_LIB_NAME} STATIC ${MY_SOURCE_FILES} ${MY_ASYNC_RAW_SOURCE_FILES} ${MY_KTL_SOURCE_FILES} __forcelinks.cpp)
-	target_compile_definitions(${MY_LIB_NAME} PRIVATE KS_ASYNC_EXPORTS)
-	set_property(TARGET ${MY_LIB_NAME} PROPERTY __EMBEDDED TRUE)
-else()
+if (${KS_ASYNC_LIB_TYPE} STREQUAL "SHARED")
 	add_library(${MY_LIB_NAME} SHARED ${MY_SOURCE_FILES} ${MY_ASYNC_RAW_SOURCE_FILES} ${MY_KTL_SOURCE_FILES})
 	target_compile_definitions(${MY_LIB_NAME} PRIVATE KS_ASYNC_EXPORTS)
+	target_compile_options(${MY_LIB_NAME} PRIVATE ${MY_GENERAL_COMPILE_OPTIONS})
+elseif (${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED")
+	add_library(${MY_LIB_NAME} STATIC ${MY_SOURCE_FILES} ${MY_ASYNC_RAW_SOURCE_FILES} ${MY_KTL_SOURCE_FILES} __forcelinks.cpp)
+	target_compile_definitions(${MY_LIB_NAME} PRIVATE KS_ASYNC_EXPORTS)
+	target_compile_options(${MY_LIB_NAME} PRIVATE ${MY_GENERAL_COMPILE_OPTIONS})
+	set_property(TARGET ${MY_LIB_NAME} PROPERTY __EMBEDDED TRUE)
 endif()
 
-#test
-if (KS_ASYNC_TEST_ENABLED)
-    add_executable(${MY_LIB_TEST_NAME} ${MY_TEST_SOURCE_FILES})
-    target_include_directories(${MY_LIB_TEST_NAME} 
-        PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR}/test  
-    )
-	
-    if (${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED")
-        add_library(${MY_LIB_NAME}-embedding SHARED __dll_forcelinker.cpp)
-        target_link_libraries(${MY_LIB_NAME}-embedding PRIVATE ${MY_LIB_NAME})
-        target_compile_definitions(${MY_LIB_NAME}-embedding PRIVATE KS_ASYNC_EXPORTS)
-        target_link_libraries(${MY_LIB_TEST_NAME} PRIVATE ${MY_LIB_NAME}-embedding)
-    else()
-		target_link_libraries(${MY_LIB_TEST_NAME} PRIVATE ${MY_LIB_NAME})
-    endif()
 
+#test & bench
+if (KS_ASYNC_TEST_ENABLED)
+	#shared embedding library (for test)
+	set(MY_TEST_LINKING_LIB_NAME ${MY_LIB_NAME})
+    if (${KS_ASYNC_LIB_TYPE} STREQUAL "EMBEDDED")
+		set(MY_TEST_LINKING_LIB_NAME ${MY_LIB_NAME}-test-embedding)
+        add_library(${MY_TEST_LINKING_LIB_NAME} SHARED __dll_forcelinker.cpp)
+        target_link_libraries(${MY_TEST_LINKING_LIB_NAME} PRIVATE ${MY_LIB_NAME})
+        target_compile_definitions(${MY_TEST_LINKING_LIB_NAME} PRIVATE KS_ASYNC_EXPORTS)
+	endif()
+
+	# test
+    add_executable(${MY_LIB_TEST_NAME} ${MY_TEST_SOURCE_FILES})
+	target_compile_options(${MY_LIB_TEST_NAME} PRIVATE ${MY_GENERAL_COMPILE_OPTIONS})
+    target_include_directories(${MY_LIB_TEST_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/test)
+	target_link_libraries(${MY_LIB_TEST_NAME} PRIVATE ${MY_TEST_LINKING_LIB_NAME})
 	target_link_libraries(${MY_LIB_TEST_NAME} PRIVATE gtest)
-	target_link_libraries(${MY_LIB_TEST_NAME} PRIVATE gflags)
+
+	# bench
+	add_executable(${MY_LIB_BENCH_NAME} ${MY_BENCH_SOURCE_FILES})
+	target_compile_options(${MY_LIB_TEST_NAME} PRIVATE ${MY_GENERAL_COMPILE_OPTIONS})
+	target_include_directories(${MY_LIB_BENCH_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bench)	
+	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE ${MY_TEST_LINKING_LIB_NAME})
+	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE benchmark::benchmark)
+	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE benchmark::benchmark_main)
+
 endif()
 
 
 #install
 install(TARGETS ${MY_LIB_NAME})
-install(FILES ${PUBLIC_HEADER_FILES} DESTINATION include/ks-async)
-install(FILES ${PUBLIC_ASYNC_RAW_HEADER_FILES} DESTINATION include/ks-async/ks-async-raw)
-install(FILES ${PUBLIC_KTL_HEADER_FILES} DESTINATION include/ks-async/ktl)
-install(FILES "README.md" DESTINATION include/ks-async)
-install(FILES "LICENSE" DESTINATION include/ks-async)
-install(DIRECTORY "doc" DESTINATION include/ks-async)
+install(FILES ${PUBLIC_HEADER_FILES} DESTINATION include/ks-async/)
+install(FILES ${PUBLIC_ASYNC_RAW_HEADER_FILES} DESTINATION include/ks-async/ks-async-raw/)
+install(FILES ${PUBLIC_KTL_HEADER_FILES} DESTINATION include/ks-async/ktl/)
+install(FILES ${PUBLIC_KTL_CONCURRENCY_HEADER_FILES} DESTINATION include/ks-async/ktl/ks_concurrency/)
+install(FILES ${PUBLIC_KTL_CONCURRENCY_IMPLEMENT_HEADER_FILES} DESTINATION include/ks-async/ktl/ks_concurrency/_implement/)
+install(FILES "README.md" DESTINATION include/ks-async/)
+install(FILES "LICENSE" DESTINATION include/ks-async/)
+install(DIRECTORY "doc" DESTINATION include/ks-async/)

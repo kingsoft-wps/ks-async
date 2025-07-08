@@ -18,6 +18,7 @@ limitations under the License.
 #include "ks_thread_pool_apartment_imp.h"
 #include <thread>
 #include <map>
+#include <cmath>
 
 void __forcelink_to_ks_apartment_cpp() {}
 
@@ -75,10 +76,10 @@ static ks_apartment* g_ui_sta = nullptr;
 static ks_apartment* g_master_sta = nullptr;
 static thread_local ks_apartment* tls_current_thread_apartment = nullptr;
 
-static ks_mutex g_public_apartment_mutex {};
+static ks_spinlock g_public_apartment_mutex {};
 static std::map<std::string, ks_apartment*> g_public_apartment_map {};
 
-static size_t g_default_mta_max_thread_count = 0;
+static std::atomic<size_t> g_default_mta_max_thread_count = { 0 };
 
 
 ks_apartment* ks_apartment::ui_sta() {
@@ -99,16 +100,16 @@ ks_apartment* ks_apartment::background_sta() {
 ks_apartment* ks_apartment::default_mta() {
 	struct _default_mta_options {
 		static size_t max_thread_count() {
-			size_t max_thread_count = g_default_mta_max_thread_count;
-			if (max_thread_count == 0) {
-				int cpu_count = (int)std::thread::hardware_concurrency();
-				cpu_count -= 2; //留出2个核给其他线程
-				if (cpu_count < 2)
-					cpu_count = 2;  //至少2个线程
-				else if (cpu_count > 16)
-					cpu_count = 16; //至多16个线程
-
-				max_thread_count = (size_t)cpu_count;
+			ptrdiff_t max_thread_count = (ptrdiff_t)g_default_mta_max_thread_count.load(std::memory_order_relaxed);
+			if (max_thread_count <= 0) {
+				constexpr ptrdiff_t _CPU_COUNT_RESERVED = 2;   //留出2颗核给其他线程
+				constexpr ptrdiff_t _CPU_COUNT_MIN = 2;        //至少2个线程
+				constexpr ptrdiff_t _CPU_COUNT_THRESHOLD = 10; //线程数10个以上按对数增长
+				max_thread_count = (ptrdiff_t)std::thread::hardware_concurrency() - _CPU_COUNT_RESERVED; 
+				if (max_thread_count < _CPU_COUNT_MIN)
+					max_thread_count = _CPU_COUNT_MIN;  
+				else if (max_thread_count > _CPU_COUNT_THRESHOLD)
+					max_thread_count = (ptrdiff_t)(_CPU_COUNT_THRESHOLD + log2(max_thread_count - _CPU_COUNT_THRESHOLD));
 			}
 
 			return max_thread_count;
@@ -143,7 +144,7 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 }
 
 ks_apartment* ks_apartment::find_public_apartment(const char* name) {
-	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	std::unique_lock<ks_spinlock> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr);
 
 	auto it = g_public_apartment_map.find(name);
@@ -154,8 +155,8 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 		int ord = atoi(name + 1);
 		if (ord != 0) {
 			int index = ord > 0 ? ord - 1 : (int)g_public_apartment_map.size() + ord;
-			if (index >= 0 && index < g_public_apartment_map.size()) {
-				if (index <= g_public_apartment_map.size() / 2)
+			if (index >= 0 && index < (int)g_public_apartment_map.size()) {
+				if (index <= (int)g_public_apartment_map.size() / 2)
 					return std::next(g_public_apartment_map.cbegin(), index)->second;
 				else
 					return std::prev(g_public_apartment_map.cend(), g_public_apartment_map.size() - index)->second;
@@ -169,7 +170,7 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 
 void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
 	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
-	g_default_mta_max_thread_count = max_thread_count;
+	g_default_mta_max_thread_count.store(max_thread_count, std::memory_order_relaxed);
 }
 
 
@@ -196,14 +197,14 @@ void ks_apartment::__set_current_thread_name(const char* thread_name) {
 }
 
 void ks_apartment::__register_public_apartment(const char* name, ks_apartment* apartment) {
-	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	std::unique_lock<ks_spinlock> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr && apartment != nullptr);
 	ASSERT(g_public_apartment_map.find(name) == g_public_apartment_map.cend());
 	g_public_apartment_map[name] = apartment;
 }
 
 void ks_apartment::__unregister_public_apartment(const char* name, ks_apartment* apartment) {
-	std::unique_lock<ks_mutex> lock(g_public_apartment_mutex);
+	std::unique_lock<ks_spinlock> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr && apartment != nullptr);
 	auto it = g_public_apartment_map.find(name);
 	ASSERT(it != g_public_apartment_map.cend());

@@ -119,7 +119,7 @@ ks_raw_async_flow_ptr ks_raw_async_flow::create() {
 
 
 void ks_raw_async_flow::set_j(size_t j) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	m_j = j;
 	if (m_j == 0)
 		m_j = size_t(-1);
@@ -159,7 +159,7 @@ bool ks_raw_async_flow::add_flat_task(
 	bool need_apply_value,
 	const std::type_info* value_typeinfo) {
 
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
 		ASSERT(false);
 		return false;
@@ -205,34 +205,34 @@ bool ks_raw_async_flow::add_flat_task(
 	task_item->task_trigger_void = ks_raw_promise::create(task_item->task_apartment);
 	task_item->task_trigger_void->get_future()->flat_then(
 		[this_weak = std::weak_ptr<ks_raw_async_flow>(this->shared_from_this()), fn = std::move(fn)](const ks_raw_value& _) -> ks_raw_future_ptr {
-			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
-			if (this_ptr == nullptr) {
+			std::shared_ptr< ks_raw_async_flow> this_held = this_weak.lock();
+			if (this_held == nullptr) {
 				ASSERT(false);
 				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
-			if (this_ptr->m_force_cleanup_flag_v) {
+			if (this_held->m_force_cleanup_flag_v) {
 				return ks_raw_future::rejected(ks_error::terminated_error(), ks_apartment::current_thread_apartment());
 			}
 
-			if (this_ptr->m_flow_controller.check_cancelled()) {
+			if (this_held->m_flow_controller.check_cancelled()) {
 				return ks_raw_future::rejected(ks_error::cancelled_error(), ks_apartment::current_thread_apartment());
 			}
 
-			return fn(this_ptr);
+			return fn(this_held);
 		}, 
 		make_async_context().bind_controller(&m_flow_controller).set_parent(context, true),
 		task_item->task_apartment
 	)->transform(
 		[this_weak = std::weak_ptr<ks_raw_async_flow>(this->shared_from_this()), task_item](const ks_raw_result& task_result)->ks_raw_result {
-			std::shared_ptr< ks_raw_async_flow> this_ptr = this_weak.lock();
-			if (this_ptr == nullptr) {
+			std::shared_ptr< ks_raw_async_flow> this_held = this_weak.lock();
+			if (this_held == nullptr) {
 				ASSERT(false);
 				return ks_error::terminated_error();
 			}
 
-			std::unique_lock<ks_mutex> lock(this_ptr->m_mutex);
-			this_ptr->do_make_task_completed_locked(task_item, task_result, lock);
+			std::unique_lock<ks_flow_mutex> lock2(this_held->m_mutex);
+			this_held->do_make_task_completed_locked(task_item, task_result, lock2);
 			return task_result;
 		},
 		make_async_context().set_priority(0x10000), 
@@ -248,7 +248,7 @@ bool ks_raw_async_flow::add_flat_task(
 uint64_t ks_raw_async_flow::add_flow_running_observer(
 	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow)>&& fn, const ks_async_context& context) {
 
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
 		ASSERT(false);
@@ -270,7 +270,7 @@ uint64_t ks_raw_async_flow::add_flow_running_observer(
 uint64_t ks_raw_async_flow::add_flow_completed_observer(
 	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const ks_error& error)>&& fn, const ks_async_context& context) {
 
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
 		ASSERT(false);
@@ -293,7 +293,7 @@ uint64_t ks_raw_async_flow::add_task_running_observer(
 	const char* task_name_pattern, 
 	ks_apartment* apartment, std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name)>&& fn, const ks_async_context& context) {
 
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
 		ASSERT(false);
@@ -317,7 +317,7 @@ uint64_t ks_raw_async_flow::add_task_completed_observer(
 	const char* task_name_pattern, ks_apartment* apartment, 
 	std::function<void(const ks_raw_async_flow_ptr& flow, const char* task_name, const ks_error& error)>&& fn, const ks_async_context& context) {
 
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_flow_status_v != status_t::not_start || m_force_cleanup_flag_v) {
 		ASSERT(false);
@@ -338,7 +338,7 @@ uint64_t ks_raw_async_flow::add_task_completed_observer(
 }
 
 void ks_raw_async_flow::remove_observer(uint64_t observer_id) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	if (m_flow_observer_map.erase(observer_id) != 0)
 		return;
 	if (m_task_observer_map.erase(observer_id) != 0)
@@ -347,7 +347,7 @@ void ks_raw_async_flow::remove_observer(uint64_t observer_id) {
 
 
 ks_raw_value ks_raw_async_flow::get_value(const char* key) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	auto it = m_raw_value_map.find(key);
 	if (it == m_raw_value_map.cend()) {
@@ -359,7 +359,7 @@ ks_raw_value ks_raw_async_flow::get_value(const char* key) {
 }
 
 void ks_raw_async_flow::put_custom_value(const char* key, const ks_raw_value& value) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_force_cleanup_flag_v && m_flow_status_v == status_t::not_start) {
 		ASSERT(false);
@@ -371,12 +371,12 @@ void ks_raw_async_flow::put_custom_value(const char* key, const ks_raw_value& va
 
 
 bool ks_raw_async_flow::start() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	return do_start_locked(lock);
 }
 
 void ks_raw_async_flow::__try_cancel() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	m_flow_controller.try_cancel();
 
@@ -386,7 +386,7 @@ void ks_raw_async_flow::__try_cancel() {
 }
 
 void ks_raw_async_flow::__wait() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	if (m_flow_status_v == status_t::succeeded || m_flow_status_v == status_t::failed)
 		return;
 
@@ -395,7 +395,7 @@ void ks_raw_async_flow::__wait() {
 }
 
 void ks_raw_async_flow::__force_cleanup() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	m_force_cleanup_flag_v = true;
 
@@ -405,7 +405,7 @@ void ks_raw_async_flow::__force_cleanup() {
 }
 
 bool ks_raw_async_flow::is_task_running(const char* task_name) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
@@ -418,7 +418,7 @@ bool ks_raw_async_flow::is_task_running(const char* task_name) {
 }
 
 bool ks_raw_async_flow::is_task_completed(const char* task_name) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
@@ -431,31 +431,31 @@ bool ks_raw_async_flow::is_task_completed(const char* task_name) {
 }
 
 bool ks_raw_async_flow::is_flow_running() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	status_t flow_status = m_flow_status_v;
 	return flow_status == status_t::running;
 }
 
 bool ks_raw_async_flow::is_flow_completed() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	status_t flow_status = m_flow_status_v;
 	return flow_status == status_t::succeeded || flow_status == status_t::failed;
 }
 
 ks_error ks_raw_async_flow::get_last_error() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	return m_last_error;
 }
 
 std::string ks_raw_async_flow::get_last_failed_task_name() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	return m_1st_failed_task_name;
 }
 
 __ks_async_raw::ks_raw_result ks_raw_async_flow::peek_task_result(const char* task_name, const std::type_info* value_typeinfo) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
@@ -468,7 +468,7 @@ __ks_async_raw::ks_raw_result ks_raw_async_flow::peek_task_result(const char* ta
 }
 
 ks_error ks_raw_async_flow::peek_task_error(const char* task_name) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 	auto it = m_task_map.find(task_name);
 	if (it == m_task_map.cend()) {
 		ASSERT(false);
@@ -480,7 +480,7 @@ ks_error ks_raw_async_flow::peek_task_error(const char* task_name) {
 }
 
 __ks_async_raw::ks_raw_future_ptr ks_raw_async_flow::get_task_future(const char* task_name, const std::type_info* value_typeinfo) {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_force_cleanup_flag_v && m_flow_status_v == status_t::not_start) {
 		ASSERT(false);
@@ -508,7 +508,7 @@ __ks_async_raw::ks_raw_future_ptr ks_raw_async_flow::get_task_future(const char*
 }
 
 ks_raw_future_ptr ks_raw_async_flow::get_flow_future_void() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_force_cleanup_flag_v && m_flow_status_v == status_t::not_start) {
 		ASSERT(false);
@@ -532,7 +532,7 @@ ks_raw_future_ptr ks_raw_async_flow::get_flow_future_void() {
 }
 
 ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_this_wrapped() {
-	std::unique_lock<ks_mutex> lock(m_mutex);
+	std::unique_lock<ks_flow_mutex> lock(m_mutex);
 
 	if (m_force_cleanup_flag_v && m_flow_status_v == status_t::not_start) {
 		ASSERT(false);
@@ -570,7 +570,7 @@ ks_future<ks_async_flow> ks_raw_async_flow::get_flow_future_this_wrapped() {
 }
 
 
-bool ks_raw_async_flow::do_start_locked(std::unique_lock<ks_mutex>& lock) {
+bool ks_raw_async_flow::do_start_locked(std::unique_lock<ks_flow_mutex>& lock) {
 	if (m_flow_status_v != status_t::not_start) {
 		ASSERT(false);
 		return false;
@@ -658,7 +658,7 @@ bool ks_raw_async_flow::do_start_locked(std::unique_lock<ks_mutex>& lock) {
 	return true;
 }
 
-void ks_raw_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_make_flow_running_locked(std::unique_lock<ks_flow_mutex>& lock) {
 	ASSERT(m_flow_status_v == status_t::not_start);
 
 	ASSERT(m_self_running_keeper == nullptr);
@@ -671,22 +671,22 @@ void ks_raw_async_flow::do_make_flow_running_locked(std::unique_lock<ks_mutex>& 
 		do_make_flow_completed_locked(ks_error(), lock);
 	}
 	else {
-		m_temp_pending_task_queue.reserve(m_task_map.size());
+		m_temp_queuing_task_queue.reserve(m_task_map.size());
 
 		for (auto& entry : m_task_map) {
 			const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
 			ASSERT(task_item->task_status == status_t::not_start);
 			if (task_item->task_waiting_for_dependencies.empty()) {
-				do_make_task_pending_locked(task_item, ks_raw_value::of_nothing(), lock);
+				do_make_task_queuing_locked(task_item, ks_raw_value::of_nothing(), lock);
 			}
 		}
 
-		ASSERT(!m_temp_pending_task_queue.empty());
-		do_drain_pending_task_queue_locked(lock);
+		ASSERT(!m_temp_queuing_task_queue.empty());
+		do_drain_queuing_task_queue_locked(lock);
 	}
 }
 
-void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error, std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error, std::unique_lock<ks_flow_mutex>& lock) {
 	ASSERT(m_flow_status_v == status_t::running);
 
 	m_flow_status_v = !flow_error.has_code() ? status_t::succeeded : status_t::failed;
@@ -742,33 +742,33 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	m_self_running_keeper.reset();
 }
 
-void ks_raw_async_flow::do_make_task_pending_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& arg_void, std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_make_task_queuing_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& arg_void, std::unique_lock<ks_flow_mutex>& lock) {
 	ASSERT(m_not_start_task_count != 0);
 	ASSERT(task_item->task_waiting_for_dependencies.empty());
 	ASSERT(task_item->task_status == status_t::not_start);
 	ASSERT(arg_void.is_completed());
 
 	m_not_start_task_count--;
-	m_pending_task_count++;
+	m_queuing_task_count++;
 
-	task_item->task_status = __not_start_but_pending_status;
-	task_item->task_pending_arg_void = arg_void;
-	m_temp_pending_task_queue.push_back(task_item);
+	task_item->task_status = status_t::__not_start_but_queuing_status;
+	task_item->task_queuing_arg_void = arg_void;
+	m_temp_queuing_task_queue.push_back(task_item);
 
-	//任务的pending状态相当于not_start，不必fire
+	//任务的queuing状态相当于not_start，不必fire
 	//do_fire_task_observers_locked(task_item->task_name, task_item->task_status, ks_error(), lock);
 }
 
-void ks_raw_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_mutex>& lock) {
-	ASSERT(m_pending_task_count != 0 && m_running_task_count < m_j);
+void ks_raw_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_ITEM>& task_item, std::unique_lock<ks_flow_mutex>& lock) {
+	ASSERT(m_queuing_task_count != 0 && m_running_task_count < m_j);
 	ASSERT(task_item->task_waiting_for_dependencies.empty());
-	ASSERT(task_item->task_status == status_t::not_start || task_item->task_status == __not_start_but_pending_status);
-	ASSERT(task_item->task_pending_arg_void.is_completed());
+	ASSERT(task_item->task_status == status_t::not_start || task_item->task_status == status_t::__not_start_but_queuing_status);
+	ASSERT(task_item->task_queuing_arg_void.is_completed());
 
 	if (task_item->task_status == status_t::not_start)
 		m_not_start_task_count--;
-	else if (task_item->task_status == __not_start_but_pending_status)
-		m_pending_task_count--;
+	else if (task_item->task_status == status_t::__not_start_but_queuing_status)
+		m_queuing_task_count--;
 	else
 		ASSERT(false);
 	m_running_task_count++;
@@ -776,11 +776,11 @@ void ks_raw_async_flow::do_make_task_running_locked(const std::shared_ptr<_TASK_
 	task_item->task_status = status_t::running;
 	do_fire_task_observers_locked(_x_observer_kind_t::for_running, task_item->task_name, ks_error(), lock);
 
-	ASSERT(task_item->task_pending_arg_void.is_completed());
-	task_item->task_trigger_void->try_settle(task_item->task_pending_arg_void);
+	ASSERT(task_item->task_queuing_arg_void.is_completed());
+	task_item->task_trigger_void->try_settle(task_item->task_queuing_arg_void);
 }
 
-void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& task_result, std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TASK_ITEM>& task_item, const ks_raw_result& task_result, std::unique_lock<ks_flow_mutex>& lock) {
 	ASSERT(task_result.is_completed());
 	ASSERT(task_item->task_status == status_t::running);
 	ASSERT(m_running_task_count != 0);
@@ -840,15 +840,15 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 			else
 				arg_void = task_result.to_error();
 
-			do_make_task_pending_locked(next_task_item, arg_void, lock);
+			do_make_task_queuing_locked(next_task_item, arg_void, lock);
 		}
 	}
 
-	do_drain_pending_task_queue_locked(lock);
+	do_drain_queuing_task_queue_locked(lock);
 
-	//若已无任何任务pending||running，但又有not-start的任务存在，则意味着这些not-start任务声明了根本不存在的上游，那么此时就让这些任务直接failed吧
+	//若已无任何任务queuing||running，但又有not-start的任务存在，则意味着这些not-start任务声明了根本不存在的上游，那么此时就让这些任务直接failed吧
 	//注：理论上不会出现这样的情况，因为在start时已作过dep合法性检查，故这里只是额外的容错
-	if (m_pending_task_count == 0 && m_running_task_count == 0 && m_not_start_task_count != 0) {
+	if (m_queuing_task_count == 0 && m_running_task_count == 0 && m_not_start_task_count != 0) {
 		ASSERT(false);
 
 		for (auto& entry : m_task_map) {
@@ -856,7 +856,7 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 			if (next_task_item->task_status != status_t::not_start)
 				continue;
 
-			do_make_task_pending_locked(next_task_item, ks_error::unexpected_error(), lock);
+			do_make_task_queuing_locked(next_task_item, ks_error::unexpected_error(), lock);
 			if (m_not_start_task_count == 0)
 				break;
 		}
@@ -874,21 +874,21 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 	}
 }
 
-void ks_raw_async_flow::do_drain_pending_task_queue_locked(std::unique_lock<ks_mutex>& lock) {
-	if (!m_temp_pending_task_queue.empty() && m_running_task_count < m_j) {
-		size_t c = m_temp_pending_task_queue.size();
+void ks_raw_async_flow::do_drain_queuing_task_queue_locked(std::unique_lock<ks_flow_mutex>& lock) {
+	if (!m_temp_queuing_task_queue.empty() && m_running_task_count < m_j) {
+		size_t c = m_temp_queuing_task_queue.size();
 		if (c > m_j - m_running_task_count)
 			c = m_j - m_running_task_count;
 
 		for (size_t i = 0; i < c; ++i) {
-			do_make_task_running_locked(m_temp_pending_task_queue[i], lock);
+			do_make_task_running_locked(m_temp_queuing_task_queue[i], lock);
 		}
 
-		m_temp_pending_task_queue.erase(m_temp_pending_task_queue.begin(), m_temp_pending_task_queue.begin() + c);
+		m_temp_queuing_task_queue.erase(m_temp_queuing_task_queue.begin(), m_temp_queuing_task_queue.begin() + c);
 	}
 }
 
-void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, const ks_error& error, std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, const ks_error& error, std::unique_lock<ks_flow_mutex>& lock) {
 	if (!m_flow_observer_map.empty()) {
 		auto it = m_flow_observer_map.begin();
 		while (it != m_flow_observer_map.end()) {
@@ -907,13 +907,13 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, c
 			}
 
 			observer_item->apartment->schedule(
-				[this_ptr = this->shared_from_this(), error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
+				[this_held = this->shared_from_this(), error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 					switch (observer_item->kind) {
 					case _x_observer_kind_t::for_running:
-						observer_item->on_flow_running_fn(this_ptr);
+						observer_item->on_flow_running_fn(this_held);
 						break;
 					case _x_observer_kind_t::for_completed:
-						observer_item->on_flow_completed_fn(this_ptr, error);
+						observer_item->on_flow_completed_fn(this_held, error);
 						break;
 					}
 				}, observer_item->observer_context.__get_priority());
@@ -923,7 +923,7 @@ void ks_raw_async_flow::do_fire_flow_observers_locked(_x_observer_kind_t kind, c
 	}
 }
 
-void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, const std::string& task_name, const ks_error& error, std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, const std::string& task_name, const ks_error& error, std::unique_lock<ks_flow_mutex>& lock) {
 	if (!m_task_observer_map.empty()) {
 		auto it = m_task_observer_map.begin();
 		while (it != m_task_observer_map.end()) {
@@ -946,13 +946,13 @@ void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, c
 			}
 
 			observer_item->apartment->schedule(
-				[this_ptr = this->shared_from_this(), task_name, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
+				[this_held = this->shared_from_this(), task_name, error, observer_item, observer_owner_locker = observer_context_rtstt.get_owner_locker()]() {
 					switch (observer_item->kind) {
 					case _x_observer_kind_t::for_running:
-						observer_item->on_task_running_fn(this_ptr, task_name.c_str());
+						observer_item->on_task_running_fn(this_held, task_name.c_str());
 						break;
 					case _x_observer_kind_t::for_completed:
-						observer_item->on_task_completed_fn(this_ptr, task_name.c_str(), error);
+						observer_item->on_task_completed_fn(this_held, task_name.c_str(), error);
 						break;
 					}
 				}, observer_item->observer_context.__get_priority());
@@ -962,7 +962,7 @@ void ks_raw_async_flow::do_fire_task_observers_locked(_x_observer_kind_t kind, c
 	}
 }
 
-void ks_raw_async_flow::do_final_force_cleanup_value_refs_locked(std::unique_lock<ks_mutex>& lock) {
+void ks_raw_async_flow::do_final_force_cleanup_value_refs_locked(std::unique_lock<ks_flow_mutex>& lock) {
 	ASSERT(m_force_cleanup_flag_v);
 	ASSERT(m_flow_status_v == status_t::succeeded || m_flow_status_v == status_t::failed);
 

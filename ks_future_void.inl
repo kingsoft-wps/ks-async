@@ -463,9 +463,18 @@ public: //set_timeout, try_cancel
 		return *this;
 	}
 
-public: //is_valid, is_completed, peek_result, wait
+public: //is_null, is_completed, peek_result, wait
+	bool is_null() const {
+		return m_nothing_future.is_null();
+	}
 	bool is_valid() const {
 		return m_nothing_future.is_valid();
+	}
+	bool operator==(nullptr_t) const {
+		return m_nothing_future == nullptr;
+	}
+	bool operator!=(nullptr_t) const {
+		return m_nothing_future != nullptr;
 	}
 
 	bool is_completed() const {

@@ -26,11 +26,18 @@ static std::atomic<uint64_t> g_last_fn_id { 0 };
 static thread_local int tls_current_thread_pump_loop_depth = 0;
 
 
-ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags) : m_d(std::make_shared<_SINGLE_THREAD_APARTMENT_DATA>()) {
+ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags) 
+	: ks_single_thread_apartment_imp(name, flags, nullptr, nullptr) {
+}
+
+ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name, uint flags, std::function<void()>&& thread_init_fn, std::function<void()>&& thread_term_fn) 
+	: m_d(std::make_shared<_SINGLE_THREAD_APARTMENT_DATA>()) {
 	ASSERT(name != nullptr);
 
 	m_d->name = name != nullptr ? name : "";
 	m_d->flags = flags;
+	m_d->thread_init_fn = std::move(thread_init_fn);
+	m_d->thread_term_fn = std::move(thread_term_fn);
 
 	if (m_d->flags & auto_register_flag) {
 		ks_apartment::__register_public_apartment(m_d->name.c_str(), this);
@@ -133,8 +140,14 @@ uint64_t ks_single_thread_apartment_imp::schedule(std::function<void()>&& fn, in
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	_try_start_locked(lock);
-	if (m_d->state_v != _STATE::RUNNING && m_d->state_v != _STATE::STOPPING) {
-		ASSERT(false);
+	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
+
+	if (!(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING)) {
+		fn = {};
+		return 0;
+	}
+	if (priority < 0 && m_d->state_v != _STATE::RUNNING) {
+		fn = {};
 		return 0;
 	}
 
@@ -157,8 +170,10 @@ uint64_t ks_single_thread_apartment_imp::schedule_delayed(std::function<void()>&
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	_try_start_locked(lock);
-	if (m_d->state_v != _STATE::RUNNING) {
-		ASSERT(false);
+	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
+
+	if (!(m_d->state_v == _STATE::RUNNING)) {
+		fn = {};
 		return 0;
 	}
 
@@ -221,15 +236,21 @@ void ks_single_thread_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>
 		if ((m_d->flags & no_isolated_thread_flag) || m_d->isolated_thread_opt != nullptr) {
 			m_d->state_v = _STATE::STOPPING;
 			m_d->any_fn_queue_cv.notify_all(); //trigger thread
+			m_d->now_fn_queue_idle.clear(); //cleanup idles at once
+			m_d->delaying_fn_queue.clear(); //cleanup delayings at once
 		}
 		else {
 			m_d->state_v = _STATE::STOPPED;
 			m_d->stopped_state_cv.notify_all();
+			m_d->thread_init_fn = nullptr; //final cleanup
+			m_d->thread_term_fn = nullptr; //final cleanup
 		}
 	}
 	else if (m_d->state_v == _STATE::NOT_START) {
 		m_d->state_v = _STATE::STOPPED;
 		m_d->stopped_state_cv.notify_all();
+		m_d->thread_init_fn = nullptr; //final cleanup
+		m_d->thread_term_fn = nullptr; //final cleanup
 	}
 }
 
@@ -259,6 +280,10 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 		std::stringstream thread_name_ss;
 		thread_name_ss << d->name << "'s work-thread";
 		ks_apartment::__set_current_thread_name(thread_name_ss.str().c_str());
+	}
+
+	if (d->thread_init_fn) {
+		d->thread_init_fn();
 	}
 
 	ASSERT(tls_current_thread_pump_loop_depth == 0);
@@ -350,7 +375,13 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 		if (d->state_v == _STATE::STOPPING) {
 			d->state_v = _STATE::STOPPED;
 			d->stopped_state_cv.notify_all();
+			d->thread_init_fn = nullptr; //final cleanup
+			d->thread_term_fn = nullptr; //final cleanup
 		}
+	}
+
+	if (d->thread_term_fn) {
+		d->thread_term_fn();
 	}
 
 	ASSERT(ks_apartment::current_thread_apartment() == self);
@@ -400,9 +431,9 @@ void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(c
 
 #ifdef _DEBUG
 bool ks_single_thread_apartment_imp::_check_fn_id_exists_when_debug_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, uint64_t fn_id, std::unique_lock<ks_mutex>& lock) {
-	auto do_check_fn_exists = [](std::deque<std::shared_ptr<_FN_ITEM>>* fn_queue, uint64_t fn_id) -> bool {
+	auto do_check_fn_exists = [](std::deque<std::shared_ptr<_FN_ITEM>>* fn_queue, uint64_t a_fn_id) -> bool {
 		return std::find_if(fn_queue->cbegin(), fn_queue->cend(),
-			[fn_id](const auto& item) {return item->fn_id == fn_id; }) != fn_queue->cend();
+			[a_fn_id](const auto& item) {return item->fn_id == a_fn_id; }) != fn_queue->cend();
 	};
 
 	return do_check_fn_exists(&d->now_fn_queue_prior, fn_id)

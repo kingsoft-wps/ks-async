@@ -242,7 +242,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 
 	//收集匹配的entries
 	//注：若entry以是cancelled状态，则将自动被移除
-	auto do_find_group_and_collect_entries_locked = [this](std::deque<std::shared_ptr<_ENTRY_DATA>>* p_matched_entries, _GROUP_MAP& group_map, const std::string& expanded_notification_name, std::unique_lock<ks_mutex>& lock) -> void {
+	auto do_find_group_and_collect_entries_locked = [this](std::deque<std::shared_ptr<_ENTRY_DATA>>* p_matched_entries, _GROUP_MAP& group_map, const std::string& expanded_notification_name, std::unique_lock<ks_mutex>& a_lock) -> void {
 		auto group_it = group_map.find(expanded_notification_name);
 		if (group_it != group_map.end()) {
 			_GROUP_DATA& group = group_it->second;
@@ -253,7 +253,7 @@ void ks_notification_center::__ks_notification_center_data::do_post_notification
 
 				if (entry_ptr->context.__check_controller_cancelled() || entry_ptr->context.__check_owner_expired()) { //cancelled, auto remove entry
 					entry_ptr->removed_flag_v = true;
-					do_erase_entry_from_observer_map_locked(entry_ptr, lock);
+					do_erase_entry_from_observer_map_locked(entry_ptr, a_lock);
 					entry_ptr_it = group.entry_ptr_list.erase(entry_ptr_it);
 				}
 				else {
@@ -373,8 +373,8 @@ ks_notification_center::__ks_notification_center_data::_PARSED_NOTIFICATION_NAME
 	std::string alt_notification_name(notification_name != nullptr ? notification_name : "");
 	bool is_wildcard_mode = false;
 	ASSERT(!alt_notification_name.empty());
-	ASSERT(alt_notification_name.find(' ') == -1);
-	ASSERT(alt_notification_name == "*" || alt_notification_name.find('.') != -1);
+	ASSERT(alt_notification_name.find(' ') == size_t(-1));
+	ASSERT(alt_notification_name == "*" || alt_notification_name.find('.') != size_t(-1));
 
 	if (alt_notification_name == "*") {
 		alt_notification_name = "*"; //*(spec)
@@ -383,10 +383,10 @@ ks_notification_center::__ks_notification_center_data::_PARSED_NOTIFICATION_NAME
 	else if (alt_notification_name.length() >= 2 && strncmp(alt_notification_name.data() + alt_notification_name.length() - 2, ".*", 2) == 0) {
 		alt_notification_name.resize(alt_notification_name.length() - 2);
 		is_wildcard_mode = true;
-		ASSERT(alt_notification_name.find('*') == -1);
+		ASSERT(alt_notification_name.find('*') == size_t(-1));
 	}
 	else {
-		ASSERT(alt_notification_name.find('*') == -1);
+		ASSERT(alt_notification_name.find('*') == size_t(-1));
 	}
 
 	for (auto& ch : alt_notification_name) {
@@ -403,9 +403,9 @@ ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NA
 	//返回的seq内容形式为：[ "a b c d", "a b c", "a b", "a" ]
 
 	std::string alt_notification_name(notification_name != nullptr ? notification_name : "");
-	ASSERT(alt_notification_name.find(' ') == -1);
-	ASSERT(alt_notification_name.find('.') != -1);
-	ASSERT(alt_notification_name.find('*') == -1);
+	ASSERT(alt_notification_name.find(' ') == size_t(-1));
+	ASSERT(alt_notification_name.find('.') != size_t(-1));
+	ASSERT(alt_notification_name.find('*') == size_t(-1));
 
 	for (auto& ch : alt_notification_name) {
 		if (ch == '.')
@@ -420,7 +420,7 @@ ks_notification_center::__ks_notification_center_data::_EXPANDED_NOTIFICATION_NA
 		ret.push_back(alt_notification_name);
 
 		size_t split_pos = alt_notification_name.rfind(' ');
-		if (split_pos != -1)
+		if (split_pos != size_t(-1))
 			alt_notification_name.resize(split_pos);
 		else
 			alt_notification_name.clear();

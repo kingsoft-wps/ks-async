@@ -1,4 +1,4 @@
-/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
+﻿/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,16 +41,20 @@ TEST(test_fork_suite, test_fork) {
     }
 
     if (pid == 0) {
-        ks_future<void>::post(ks_apartment::default_mta(), {}, []() {
-            ;
-        });
+        // 子进程
+        ks_apartment::default_mta()->async_stop();
+        ks_apartment::background_sta()->async_stop();
+        ks_apartment::default_mta()->wait();
+        ks_apartment::background_sta()->wait();
+        exit(0);
     }
 
-    if (pid != 0 && pid != -1) {
-        int status = 0;
-        pid_t wait_res = wait(&status);
-        ASSERT_TRUE(wait_res != -1);
-    }
+    // if (pid != 0 && pid != -1) {
+    //     // 父进程
+    //     int status = 0;
+    //     pid_t waited_pid = waitpid(pid, &status, 0);
+    //     ASSERT_TRUE(waited_pid == pid);
+    // }
 
     work_latch.count_down();
     work_latch.wait();

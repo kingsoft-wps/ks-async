@@ -23,51 +23,53 @@ limitations under the License.
 
 void __forcelink_to_ks_raw_future_cpp() {}
 
-#if (!__KS_APARTMENT_ATFORK_ENABLED)
-	using __native_pid_t = int;
-	static inline __native_pid_t __native_get_current_pid() { return -1; }  //pseudo
-	static constexpr __native_pid_t __native_pid_none = 0;
-#elif defined(_WIN32)
-	#include <Windows.h>
-	#include <processthreadsapi.h>
-	using __native_pid_t = DWORD;
-	static inline __native_pid_t __native_get_current_pid() { return ::GetCurrentProcessId(); }
-	static constexpr __native_pid_t __native_pid_none = 0;
-#else
-	#include <unistd.h>
-	using __native_pid_t = pid_t;
-	static inline __native_pid_t __native_get_current_pid() { return getpid(); }
-	static constexpr __native_pid_t __native_pid_none = 0;
-#endif
+// #if (!__KS_APARTMENT_ATFORK_ENABLED)
+// 	using __native_pid_t = int;
+// 	static inline __native_pid_t __native_get_current_pid() { return -1; }  //pseudo
+// 	static constexpr __native_pid_t __native_pid_none = 0;
+// #elif defined(_WIN32)
+// 	#include <Windows.h>
+// 	#include <processthreadsapi.h>
+// 	using __native_pid_t = DWORD;
+// 	static inline __native_pid_t __native_get_current_pid() { return ::GetCurrentProcessId(); }
+// 	static constexpr __native_pid_t __native_pid_none = 0;
+// #else
+// 	#include <unistd.h>
+// 	using __native_pid_t = pid_t;
+// 	static inline __native_pid_t __native_get_current_pid() { return getpid(); }
+// 	static constexpr __native_pid_t __native_pid_none = 0;
+// #endif
 
 
 __KS_ASYNC_RAW_BEGIN
 
 static thread_local ks_raw_future* tls_current_thread_running_future = nullptr;
 
-#if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-static ks_mutex g_raw_future_global_mutex;  //global mutex
+#if __KS_ASYNC_RAW_FUTURE_SPINLOCK_ENABLED
+using ks_raw_future_mutex = ks_spinlock;
+#else
+using ks_raw_future_mutex = ks_mutex;
 #endif
 
-class ks_raw_future_lock final { //like std::unique_lock, with supporting pseudo
+class ks_raw_future_unique_lock final { //like std::unique_lock, with supporting pseudo
 public:
-	ks_raw_future_lock(ks_mutex* mutex, bool pseudo) 
+	ks_raw_future_unique_lock(ks_raw_future_mutex* mutex, bool pseudo)
 		: m_mutex(mutex), m_pseudo(pseudo), m_owns_lock(false) {
 		ASSERT(m_mutex != nullptr || m_pseudo);
 		this->lock(); 
 	}
 
-	ks_raw_future_lock(ks_mutex* mutex, bool pseudo, std::defer_lock_t) 
+	ks_raw_future_unique_lock(ks_raw_future_mutex* mutex, bool pseudo, std::defer_lock_t)
 		: m_mutex(mutex), m_pseudo(pseudo), m_owns_lock(false) {
 		ASSERT(m_mutex != nullptr || m_pseudo);
 	}
 
-	~ks_raw_future_lock() {
+	~ks_raw_future_unique_lock() {
 		if (m_owns_lock)
 			this->unlock();
 	}
 
-	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future_lock);
+	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future_unique_lock);
 
 public:
 	void lock() {
@@ -84,15 +86,19 @@ public:
 	}
 
 public:
-	ks_mutex* mutex() const { return m_mutex; }
+	ks_raw_future_mutex* mutex() const { return m_mutex; }
 	bool is_pseudo() const { return m_pseudo; }
 	bool owns_lock() const { return m_owns_lock; }
 
 private:
-	ks_mutex* m_mutex;
+	ks_raw_future_mutex* m_mutex;
 	bool m_pseudo;
 	bool m_owns_lock;
 };
+
+#if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
+static ks_raw_future_mutex g_raw_future_global_mutex;  //global mutex
+#endif
 
 
 enum class ks_raw_future_mode {
@@ -113,7 +119,7 @@ protected:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future_baseimp);
 
 	struct __INTERMEDIATE_DATA;
-	void do_init_base_locked(ks_apartment* spec_apartment, const ks_async_context& living_context, __INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) {
+	void do_init_base_locked(ks_apartment* spec_apartment, const ks_async_context& living_context, __INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) {
 		ASSERT(intermediate_data_ptr != nullptr);
 		ASSERT(intermediate_data_ptr == __get_intermediate_data_ptr(lock));
 
@@ -125,7 +131,7 @@ protected:
 		intermediate_data_ptr->m_create_time = std::chrono::steady_clock::now();
 	}
 
-	void do_init_with_result_locked(ks_apartment* spec_apartment, const ks_raw_result& completed_result, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_init_with_result_locked(ks_apartment* spec_apartment, const ks_raw_result& completed_result, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 
 		if (spec_apartment == nullptr && __is_head_future())
@@ -133,6 +139,10 @@ protected:
 
 		ASSERT(__get_intermediate_data_ptr(lock) == nullptr);
 		this->do_complete_locked(completed_result, spec_apartment, true, lock, must_keep_locked);
+	}
+
+	~ks_raw_future_baseimp() {
+		ASSERT(m_completed_result.is_completed());
 	}
 
 public:
@@ -152,12 +162,12 @@ public:
 
 public:
 	virtual bool is_completed() override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return m_completed_result.is_completed();
 	}
 
 	virtual ks_raw_result peek_result() override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return m_completed_result;
 	}
 
@@ -165,16 +175,16 @@ protected:
 	virtual bool is_cancelable_self() override = 0;
 
 	virtual bool do_check_cancelled() override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return this->do_check_cancelled_locked(lock);
 	}
 
 	virtual ks_error do_acquire_cancelled_error(const ks_error& def_error) override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return this->do_acquire_cancelled_error_locked(def_error, lock);
 	}
 
-	__REAL_IMP bool do_check_cancelled_locked(ks_raw_future_lock& lock) {
+	__REAL_IMP bool do_check_cancelled_locked(ks_raw_future_unique_lock& lock) {
 		if (!m_completed_result.is_completed()) {
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
@@ -200,7 +210,7 @@ protected:
 		return false;
 	}
 
-	__REAL_IMP ks_error do_acquire_cancelled_error_locked(const ks_error& def_error, ks_raw_future_lock& lock) {
+	__REAL_IMP ks_error do_acquire_cancelled_error_locked(const ks_error& def_error, ks_raw_future_unique_lock& lock) {
 		if (!m_completed_result.is_completed()) {
 			auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 			ASSERT(intermediate_data_ptr != nullptr);
@@ -227,7 +237,7 @@ protected:
 	}
 
 	virtual bool do_wait() override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return true;
 
@@ -239,12 +249,8 @@ protected:
 		if (cur_apartment != nullptr && (cur_apartment->features() & ks_apartment::nested_pump_suppressed_future) == 0) {
 			//若嵌套loop可能会（但常规用法并不会）遭遇相同项，但也不必重复记录，因为一次awaken就触发全部
 			//另外，wait后也不必将cur_apartment从m_waiting_for_me_apartment_1st和m_waiting_for_me_apartment_more中移除，因为do_complete时自会在awaken后全部清除
-			if (intermediate_data_ptr->m_waiting_for_me_apartment_1st != cur_apartment &&
-				std::find(intermediate_data_ptr->m_waiting_for_me_apartment_more.cbegin(), intermediate_data_ptr->m_waiting_for_me_apartment_more.cend(), cur_apartment) == intermediate_data_ptr->m_waiting_for_me_apartment_more.cend()) {
-				if (intermediate_data_ptr->m_waiting_for_me_apartment_1st == nullptr)
-					intermediate_data_ptr->m_waiting_for_me_apartment_1st = cur_apartment;
-				else
-					intermediate_data_ptr->m_waiting_for_me_apartment_more.push_back(cur_apartment);
+			if (std::find(intermediate_data_ptr->m_waiting_for_me_apartments.cbegin(), intermediate_data_ptr->m_waiting_for_me_apartments.cend(), cur_apartment) == intermediate_data_ptr->m_waiting_for_me_apartments.cend()) {
+				intermediate_data_ptr->m_waiting_for_me_apartments.push_back(cur_apartment);
 			}
 
 			lock.unlock();
@@ -266,36 +272,11 @@ protected:
 			return true;
 		}
 		else {
-			if (intermediate_data_ptr->m_completion_cv_waiting_rc == 0) {
-				ASSERT(intermediate_data_ptr->m_completion_cv_belong_pid == __native_pid_none);
-				intermediate_data_ptr->m_completion_cv_belong_pid = __native_get_current_pid();
-			}
-			else if (intermediate_data_ptr->m_completion_cv_belong_pid != __native_get_current_pid()) {
-				ASSERT(false);
-				intermediate_data_ptr->m_completion_cv_belong_pid = __native_get_current_pid();
-				::new (&intermediate_data_ptr->m_completion_cv) ks_condition_variable(); //重建cv，在子进程中
-			}
-
-			++intermediate_data_ptr->m_completion_cv_waiting_rc;
-
-			if (true) {
-				ASSERT(lock.owns_lock() && !lock.is_pseudo());
-				std::unique_lock<ks_mutex> adopt_lock(*lock.mutex(), std::adopt_lock);
-
-				while (!m_completed_result.is_completed()) {
-					intermediate_data_ptr->m_completion_cv.wait(adopt_lock);
-				}
-
-				ASSERT(adopt_lock.owns_lock());
-				adopt_lock.release();
-			}
-
-			if (--intermediate_data_ptr->m_completion_cv_waiting_rc == 0) {
-				if (intermediate_data_ptr->m_completion_cv_belong_pid != __native_get_current_pid()) {
-					ASSERT(false);
-					intermediate_data_ptr->m_completion_cv_belong_pid = __native_get_current_pid();
-					::new (&intermediate_data_ptr->m_completion_cv) ks_condition_variable(); //重建cv，马上就要析构了
-				}
+			ASSERT(lock.owns_lock());
+			while (!m_completed_result.is_completed()) {
+				lock.unlock();
+				intermediate_data_ptr->m_completion_waitable_atomic_flag.__wait(false, std::memory_order_acquire); //注：已使用atomic取代cv
+				lock.lock();
 			}
 
 			return true;
@@ -304,23 +285,23 @@ protected:
 
 protected:
 	virtual void do_add_next(const ks_raw_future_ptr& next_future) override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return this->do_add_next_locked(next_future, lock, false);
 	}
 
 	virtual void do_add_next_multi(const std::vector<ks_raw_future_ptr>& next_futures) override final {
 		if (next_futures.empty()) {
-			ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 			return this->do_add_next_multi_locked(next_futures, lock, false);
 		}
 	}
 
 	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal) override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		return this->do_complete_locked(result, prefer_apartment, from_internal, lock, false);
 	}
 
-	virtual void do_add_next_locked(const ks_raw_future_ptr& next_future, ks_raw_future_lock& lock, bool must_keep_locked) {
+	virtual void do_add_next_locked(const ks_raw_future_ptr& next_future, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 
 		if (!m_completed_result.is_completed()) {
@@ -351,7 +332,7 @@ protected:
 		}
 	}
 
-	__REAL_IMP void do_add_next_multi_locked(const std::vector<ks_raw_future_ptr>& next_futures, ks_raw_future_lock& lock, bool must_keep_locked) {
+	__REAL_IMP void do_add_next_multi_locked(const std::vector<ks_raw_future_ptr>& next_futures, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 
 		if (!next_futures.empty()) {
@@ -388,7 +369,7 @@ protected:
 		}
 	}
 
-	__REAL_IMP void do_complete_locked(const ks_raw_result& completed_result, ks_apartment* hint_apartment, bool from_internal, ks_raw_future_lock& lock, bool must_keep_locked) {
+	__REAL_IMP void do_complete_locked(const ks_raw_result& completed_result, ks_apartment* hint_apartment, bool from_internal, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 		ASSERT(completed_result.is_completed());
 
@@ -413,8 +394,7 @@ protected:
 
 		ks_raw_future_ptr t_next_future_1st = nullptr;
 		std::vector<ks_raw_future_ptr> t_next_future_more{};
-		ks_apartment* t_waiting_for_me_apartment_1st = nullptr;
-		std::vector<ks_apartment*> t_waiting_for_me_apartment_more{};
+		std::vector<ks_apartment*> t_waiting_for_me_apartments{};
 		if (intermediate_data_ptr != nullptr) {
 			if (intermediate_data_ptr->m_timeout_schedule_id != 0) {
 				ASSERT(intermediate_data_ptr->m_timeout_apartment != nullptr);
@@ -423,24 +403,21 @@ protected:
 			}
 
 			//cv notify
-			if (intermediate_data_ptr->m_completion_cv_waiting_rc != 0) {
-				if (intermediate_data_ptr->m_completion_cv_belong_pid == __native_get_current_pid())
-					intermediate_data_ptr->m_completion_cv.notify_all();
-				else
-					ASSERT(false);  //子进程不要notify，会有几率卡死！（若子进程内执行wait，则会更新子进程内记录的belong_pid的，那么就会正常notify）
-			}
+			//注：已使用atomic取代cv
+			intermediate_data_ptr->m_completion_waitable_atomic_flag.test_and_set(std::memory_order_release);
+			intermediate_data_ptr->m_completion_waitable_atomic_flag.__notify_all();  //notify all waiting threads
 
 			//take next-futures
 			t_next_future_1st = std::move(intermediate_data_ptr->m_next_future_1st);
 			t_next_future_more.swap(intermediate_data_ptr->m_next_future_more);
 			intermediate_data_ptr->m_next_future_1st = nullptr;
 			intermediate_data_ptr->m_next_future_more.clear();
+			intermediate_data_ptr->m_next_future_more.shrink_to_fit();
 
 			//take waiting-apartments
-			t_waiting_for_me_apartment_1st = std::move(intermediate_data_ptr->m_waiting_for_me_apartment_1st);
-			t_waiting_for_me_apartment_more.swap(intermediate_data_ptr->m_waiting_for_me_apartment_more);
-			intermediate_data_ptr->m_waiting_for_me_apartment_1st = nullptr;
-			intermediate_data_ptr->m_waiting_for_me_apartment_more.clear();
+			t_waiting_for_me_apartments.swap(intermediate_data_ptr->m_waiting_for_me_apartments);
+			intermediate_data_ptr->m_waiting_for_me_apartments.clear();
+			intermediate_data_ptr->m_waiting_for_me_apartments.shrink_to_fit();
 
 			//完毕，自此刻起，本future进入completed稳态，可清除intermediate-data了
 			intermediate_data_ptr->m_living_context = {};
@@ -450,7 +427,7 @@ protected:
 
 		//触发流水线后续事项
 		const bool has_some_next_futures = t_next_future_1st != nullptr || !t_next_future_more.empty();
-		const bool has_some_waiting_apartments = t_waiting_for_me_apartment_1st != nullptr || !t_waiting_for_me_apartment_more.empty();
+		const bool has_some_waiting_apartments = !t_waiting_for_me_apartments.empty();
 		if (has_some_next_futures || has_some_waiting_apartments) {
 			//注：按说from_internal流程无需解锁（除非外部不合理乱用0x10000优先级），但我们这里无差别处理，没啥损失且更安全
 			lock.unlock();
@@ -485,9 +462,7 @@ protected:
 
 			//awaken waiting-apartments
 			if (has_some_waiting_apartments) {
-				if (t_waiting_for_me_apartment_1st != nullptr)
-					t_waiting_for_me_apartment_1st->__awaken_nested_pump_loop_for_extern_waiting_once(this);
-				for (ks_apartment* waiting_apartment : t_waiting_for_me_apartment_more)
+				for (ks_apartment* waiting_apartment : t_waiting_for_me_apartments)
 					waiting_apartment->__awaken_nested_pump_loop_for_extern_waiting_once(this);
 			}
 
@@ -497,7 +472,7 @@ protected:
 	}
 
 	virtual void do_set_timeout(int64_t timeout, const ks_error& error, bool backtrack) override final {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -531,7 +506,7 @@ protected:
 		intermediate_data_ptr->m_timeout_apartment = do_determine_timeout_apartment(intermediate_data_ptr->m_spec_apartment);
 		intermediate_data_ptr->m_timeout_schedule_id = intermediate_data_ptr->m_timeout_apartment->schedule_delayed(
 			[this, this_shared = this->shared_from_this(), intermediate_data_ptr, schedule_id = intermediate_data_ptr->m_timeout_schedule_id, error, backtrack]() -> void {
-			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return;
 
@@ -603,28 +578,26 @@ protected:
 		ks_raw_future_ptr m_next_future_1st = nullptr;
 		std::vector<ks_raw_future_ptr> m_next_future_more{};
 
-		ks_apartment* m_waiting_for_me_apartment_1st = nullptr;
-		std::vector<ks_apartment*> m_waiting_for_me_apartment_more{};
+		std::vector<ks_apartment*> m_waiting_for_me_apartments{};
 
 		ks_error m_cancelled_error{}; //volatile-like
 
 		//fork子进程中操作cv有几率死锁，故子进程中不要使用它！
 		//记录cv所属pid，保证进程内操作cv的一致性
 		//必要时会重建cv，避免子进程卡死（只是尽量容错而已，并不绝对安全，尤其是逻辑上的死等）
-		ks_condition_variable m_completion_cv{};
-		__native_pid_t m_completion_cv_belong_pid = __native_pid_none;
-		int m_completion_cv_waiting_rc = 0;
+		//注：用atomic代替cv，以获得内存空间上收益
+		ks_atomic_flag m_completion_waitable_atomic_flag = { false };
 	};
 
 	virtual ks_raw_future_mode __get_mode() = 0;
 	virtual bool __is_head_future() = 0;
 
-	virtual ks_mutex* __get_mutex() = 0;
+	virtual ks_raw_future_mutex* __get_mutex() = 0;
 	virtual bool __is_using_pseudo_mutex() = 0;
 
-	//virtual std::shared_ptr<__INTERMEDIATE_DATA> __get_intermediate_data_ptr(ks_raw_future_lock& lock) = 0;
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) = 0;
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) = 0; //completed后被清除
+	//virtual std::shared_ptr<__INTERMEDIATE_DATA> __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) = 0;
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) = 0;
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) = 0; //completed后被清除
 
 	friend class ks_raw_future;
 };
@@ -639,7 +612,7 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_dx_future);
 
 	void init(ks_apartment* spec_apartment, const ks_raw_result& completed_result) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_with_result_locked(spec_apartment, completed_result, lock, false);
 	}
 
@@ -665,20 +638,11 @@ private:
 	virtual ks_raw_future_mode __get_mode() override { return ks_raw_future_mode::DX; }
 	virtual bool __is_head_future() override { return true; }
 
-#if __KS_ASYNC_JUST_DX_RAW_FUTURE_NO_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return nullptr; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return nullptr; } //dx-future无需用锁
 	virtual bool __is_using_pseudo_mutex() override { return true; }
-#elif __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
-	virtual bool __is_using_pseudo_mutex() override { return false; }
-#else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
-	virtual bool __is_using_pseudo_mutex() override { return false; }
-#endif
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return nullptr; }
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override { ASSERT(false); }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return nullptr; }
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override { ASSERT(false); }
 };
 
 
@@ -692,7 +656,7 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise_future);
 
 	void init(ks_apartment* spec_apartment) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, ks_async_context{}, __get_intermediate_data_ex_ptr(lock), lock);
 	}
 
@@ -722,11 +686,11 @@ private:
 	virtual bool __is_head_future() override { return true; }
 
 #if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
+	ks_raw_future_mutex m_self_mutex;
+	virtual ks_raw_future_mutex* __get_mutex() override { return &m_self_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #endif
 
@@ -736,10 +700,10 @@ private:
 	//std::shared_ptr<__INTERMEDIATE_DATA_EX> m_intermediate_data_ex_ptr;
 	__INTERMEDIATE_DATA_EX m_intermediate_data_ex;
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return &m_intermediate_data_ex; }
-	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_lock& lock) { return &m_intermediate_data_ex; }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
+	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -750,8 +714,8 @@ private:
 	class ks_raw_promise_representative final : public ks_raw_promise, public std::enable_shared_from_this<ks_raw_promise> {
 	public:
 		explicit ks_raw_promise_representative(std::shared_ptr<ks_raw_promise_future>&& promise_future)
-			: m_promise_future(std::move(promise_future)) {
-		}
+			: m_promise_future(std::move(promise_future)) {}
+		_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise_representative);
 
 		~ks_raw_promise_representative() {
 			if (m_promise_future != nullptr && !m_promise_future->m_completed_result.is_completed()) {
@@ -760,8 +724,6 @@ private:
 				m_promise_future->do_complete(ks_error::unexpected_error(), nullptr, false);
 			}
 		}
-
-		_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise_representative);
 
 	public: //override ks_raw_promise's methods
 		virtual ks_raw_future_ptr get_future() override {
@@ -797,14 +759,26 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_task_future);
 
 	void init(ks_apartment* spec_apartment, std::function<ks_raw_result()>&& task_fn, const ks_async_context& living_context, int64_t delay) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_submit_locked(std::move(task_fn), delay, &m_intermediate_data_ex, lock, false);
 	}
 
+	~ks_raw_task_future() {
+		if (!m_completed_result.is_completed()) {
+			//若最终未被invoke，则自动reject，以确保future最终completed
+			ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+			if (!m_completed_result.is_completed()) {
+				ASSERT(__get_intermediate_data_ex_ptr(lock) != nullptr);
+				ASSERT(m_task_mode == ks_raw_future_mode::TASK_DELAYED || __get_intermediate_data_ex_ptr(lock)->m_living_context.__get_priority() < 0);
+				this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, lock, false);
+			}
+		}
+	}
+
 private:
 	struct __INTERMEDIATE_DATA_EX;
-	void do_submit_locked(std::function<ks_raw_result()>&& task_fn, int64_t delay, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_submit_locked(std::function<ks_raw_result()>&& task_fn, int64_t delay, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 		ASSERT(intermediate_data_ex_ptr == __get_intermediate_data_ex_ptr(lock));
 		ASSERT(lock.owns_lock() && !must_keep_locked);
@@ -820,7 +794,7 @@ private:
 		//pending_schedule_fn不对context进行捕获。
 		//这样做的意图是：对于delayed任务，当try_cancel时，即使apartment::try_unschedule失败，也不影响context的及时释放。
 		std::function<void()> pending_schedule_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
-			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return; //pre-check cancelled
 
@@ -839,11 +813,11 @@ private:
 				if (this->do_check_cancelled_locked(lock2))
 					result = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
 				else {
-					std::function<ks_raw_result()> task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
+					std::function<ks_raw_result()> t_task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
 					lock2.unlock();
 					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
-					result = task_fn().require_completed_or_error();
-					task_fn = {};
+					result = t_task_fn().require_completed_or_error();
+					t_task_fn = {};
 					defer_relock2.apply();
 				}
 			}
@@ -883,7 +857,7 @@ protected:
 	}
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -906,11 +880,11 @@ private:
 	virtual bool __is_head_future() override { return true; }
 
 #if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
+	ks_raw_future_mutex m_self_mutex;
+	virtual ks_raw_future_mutex* __get_mutex() override { return &m_self_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #endif
 
@@ -925,10 +899,10 @@ private:
 	//std::shared_ptr<__INTERMEDIATE_DATA_EX> m_intermediate_data_ex_ptr;
 	__INTERMEDIATE_DATA_EX m_intermediate_data_ex;
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return &m_intermediate_data_ex; }
-	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_lock& lock) { return &m_intermediate_data_ex; }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
+	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -960,14 +934,14 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_pipe_future);
 
 	void init(ks_apartment* spec_apartment, std::function<ks_raw_result(const ks_raw_result&)>&& fn_ex, const ks_async_context& living_context, const ks_raw_future_ptr& prev_future) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_connect_locked(std::move(fn_ex), prev_future, &m_intermediate_data_ex, lock, false);
 	}
 
 private:
 	struct __INTERMEDIATE_DATA_EX;
-	void do_connect_locked(std::function<ks_raw_result(const ks_raw_result&)>&& fn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_connect_locked(std::function<ks_raw_result(const ks_raw_result&)>&& fn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 		ASSERT(intermediate_data_ex_ptr == __get_intermediate_data_ex_ptr(lock));
 		ASSERT(lock.owns_lock() && !must_keep_locked);
@@ -989,7 +963,7 @@ protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
 		ASSERT(prev_result.is_completed());
 
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return; 
 
@@ -1029,7 +1003,7 @@ protected:
 		bool could_run_locally = (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 
 		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
-			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return; //pre-check cancelled
 
@@ -1077,7 +1051,7 @@ protected:
 	}
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -1130,11 +1104,11 @@ private:
 	virtual bool __is_head_future() override { return false; }
 
 #if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
+	ks_raw_future_mutex m_self_mutex;
+	virtual ks_raw_future_mutex* __get_mutex() override { return &m_self_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #endif
 
@@ -1147,10 +1121,10 @@ private:
 	//std::shared_ptr<__INTERMEDIATE_DATA_EX> m_intermediate_data_ex_ptr;
 	__INTERMEDIATE_DATA_EX m_intermediate_data_ex;
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return &m_intermediate_data_ex; }
-	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_lock& lock) { return &m_intermediate_data_ex; }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
+	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -1173,14 +1147,14 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_flatten_future);
 		
 	void init(ks_apartment* spec_apartment, std::function<ks_raw_future_ptr(const ks_raw_result&)>&& afn_ex, const ks_async_context& living_context, const ks_raw_future_ptr& prev_future) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_connect_locked(std::move(afn_ex), prev_future, &m_intermediate_data_ex, lock, false);
 	}
 
 private:
 	struct __INTERMEDIATE_DATA_EX;
-	void do_connect_locked(std::function<ks_raw_future_ptr(const ks_raw_result&)>&& afn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_connect_locked(std::function<ks_raw_future_ptr(const ks_raw_result&)>&& afn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 		ASSERT(intermediate_data_ex_ptr == __get_intermediate_data_ex_ptr(lock));
 		ASSERT(lock.owns_lock() && !must_keep_locked);
@@ -1205,7 +1179,7 @@ protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
 		ASSERT(prev_result.is_completed());
 
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -1240,7 +1214,7 @@ protected:
 		bool could_run_locally = (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 
 		std::function<void()> run_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prev_result, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
-			ks_raw_future_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return; //pre-check cancelled
 
@@ -1283,7 +1257,7 @@ protected:
 				lock2.unlock();
 				extern_future->on_completion([this, this_shared, intermediate_data_ex_ptr, prefer_apartment](const ks_raw_result& extern_result) {
 					//注：在extern_future完成回调中，直接调用this的do_complete方法
-					ks_raw_future_lock lock3(__get_mutex(), __is_using_pseudo_mutex());
+					ks_raw_future_unique_lock lock3(__get_mutex(), __is_using_pseudo_mutex());
 
 					ASSERT(!intermediate_data_ex_ptr->m_extern_future_completed_flag);
 					intermediate_data_ex_ptr->m_extern_future_completed_flag = true;
@@ -1311,7 +1285,7 @@ protected:
 	}
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -1341,11 +1315,11 @@ private:
 	virtual bool __is_head_future() override { return false; }
 
 #if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
+	ks_raw_future_mutex m_self_mutex;
+	virtual ks_raw_future_mutex* __get_mutex() override { return &m_self_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #endif
 
@@ -1360,10 +1334,10 @@ private:
 	//std::shared_ptr<__INTERMEDIATE_DATA_EX> m_intermediate_data_ex_ptr;
 	__INTERMEDIATE_DATA_EX m_intermediate_data_ex;
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return &m_intermediate_data_ex; }
-	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_lock& lock) { return &m_intermediate_data_ex; }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
+	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -1387,14 +1361,14 @@ public:
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_aggr_future);
 
 	void init(ks_apartment* spec_apartment, const std::vector<ks_raw_future_ptr>& prev_futures) {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, ks_async_context{}, &m_intermediate_data_ex, lock);
 		do_connect_locked(prev_futures, &m_intermediate_data_ex, lock, false);
 	}
 
 private:
 	struct __INTERMEDIATE_DATA_EX;
-	void do_connect_locked(const std::vector<ks_raw_future_ptr>& prev_futures, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_connect_locked(const std::vector<ks_raw_future_ptr>& prev_futures, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(intermediate_data_ex_ptr != nullptr);
 		ASSERT(intermediate_data_ex_ptr == __get_intermediate_data_ex_ptr(lock));
 		ASSERT(lock.owns_lock() && !must_keep_locked);
@@ -1429,7 +1403,7 @@ protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
 		ASSERT(prev_result.is_completed());
 
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -1447,7 +1421,7 @@ protected:
 				break; //miss prev_future (unexpected)
 
 			size_t prev_index = not_completed_prev_future_iter - intermediate_data_ex_ptr->m_not_completed_prev_future_raw_p_seq.cbegin();
-			if (prev_index_just == -1)
+			if (prev_index_just == size_t(-1))
 				prev_index_just = prev_index;
 
 			ASSERT(!intermediate_data_ex_ptr->m_prev_result_seq_cache[prev_index].is_completed());
@@ -1457,13 +1431,13 @@ protected:
 			intermediate_data_ex_ptr->m_prev_prefer_apartment_seq_cache[prev_index] = prev_advice_apartment;
 
 			intermediate_data_ex_ptr->m_prev_completed_count++;
-			if (intermediate_data_ex_ptr->m_prev_first_resolved_index == -1 && prev_result.is_value())
+			if (intermediate_data_ex_ptr->m_prev_first_resolved_index == size_t(-1) && prev_result.is_value())
 				intermediate_data_ex_ptr->m_prev_first_resolved_index = prev_index;
-			if (intermediate_data_ex_ptr->m_prev_first_rejected_index == -1 && !prev_result.is_value())
+			if (intermediate_data_ex_ptr->m_prev_first_rejected_index == size_t(-1) && !prev_result.is_value())
 				intermediate_data_ex_ptr->m_prev_first_rejected_index = prev_index;
 		}
 
-		if (prev_index_just == -1) {
+		if (prev_index_just == size_t(-1)) {
 			ASSERT(false);
 			return;
 		}
@@ -1477,7 +1451,7 @@ protected:
 	}
 
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
-		ks_raw_future_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		if (m_completed_result.is_completed())
 			return;
 
@@ -1507,7 +1481,7 @@ protected:
 	}
 
 private:
-	void do_check_and_try_settle_me_locked(const ks_raw_result& prev_result, ks_apartment* prev_advice_apartment, ks_raw_future_lock& lock, bool must_keep_locked) {
+	void do_check_and_try_settle_me_locked(const ks_raw_result& prev_result, ks_apartment* prev_advice_apartment, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 
 		ASSERT(!m_completed_result.is_completed());
@@ -1521,7 +1495,7 @@ private:
 		//check and try settle me ...
 		switch (m_aggr_mode) {
 		case ks_raw_future_mode::ALL:
-			if (intermediate_data_ex_ptr->m_prev_first_rejected_index != -1) {
+			if (intermediate_data_ex_ptr->m_prev_first_rejected_index != size_t(-1)) {
 				//前序任务出现失败
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_error prev_error_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_rejected_index].to_error();
@@ -1533,8 +1507,8 @@ private:
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				std::vector<ks_raw_value> prev_value_seq;
 				prev_value_seq.reserve(intermediate_data_ex_ptr->m_prev_result_seq_cache.size());
-				for (auto& prev_result : intermediate_data_ex_ptr->m_prev_result_seq_cache)
-					prev_value_seq.push_back(prev_result.to_value());
+				for (auto& prev_result_cached : intermediate_data_ex_ptr->m_prev_result_seq_cache)
+					prev_value_seq.push_back(prev_result_cached.to_value());
 				this->do_complete_locked(ks_raw_value::of<std::vector<ks_raw_value>>(std::move(prev_value_seq)), prefer_apartment, true, lock, must_keep_locked);
 				return;
 			}
@@ -1555,7 +1529,7 @@ private:
 			}
 
 		case ks_raw_future_mode::ANY:
-			if (intermediate_data_ex_ptr->m_prev_first_resolved_index != -1) {
+			if (intermediate_data_ex_ptr->m_prev_first_resolved_index != size_t(-1)) {
 				//前序任务出现成功
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_raw_value prev_value_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_resolved_index].to_value();
@@ -1564,7 +1538,7 @@ private:
 			}
 			else if (intermediate_data_ex_ptr->m_prev_completed_count == intermediate_data_ex_ptr->m_prev_total_count) {
 				//前序任务全部失败
-				ASSERT(intermediate_data_ex_ptr->m_prev_first_rejected_index != -1);
+				ASSERT(intermediate_data_ex_ptr->m_prev_first_rejected_index != size_t(-1));
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_error prev_error_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_rejected_index].to_error();
 				this->do_complete_locked(prev_error_first, prefer_apartment, true, lock, must_keep_locked);
@@ -1586,11 +1560,11 @@ private:
 	virtual bool __is_head_future() override { return false; }
 
 #if __KS_ASYNC_RAW_FUTURE_GLOBAL_MUTEX_ENABLED
-	virtual ks_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
+	virtual ks_raw_future_mutex* __get_mutex() override { return &g_raw_future_global_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #else
-	ks_mutex m_self_mutex;
-	virtual ks_mutex* __get_mutex() override { return &m_self_mutex; }
+	ks_raw_future_mutex m_self_mutex;
+	virtual ks_raw_future_mutex* __get_mutex() override { return &m_self_mutex; }
 	virtual bool __is_using_pseudo_mutex() override { return false; }
 #endif
 
@@ -1609,10 +1583,10 @@ private:
 	//std::shared_ptr<__INTERMEDIATE_DATA_EX> m_intermediate_data_ex_ptr;
 	__INTERMEDIATE_DATA_EX m_intermediate_data_ex;
 
-	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_lock& lock) override { return &m_intermediate_data_ex; }
-	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_lock& lock) { return &m_intermediate_data_ex; }
+	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
+	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -1620,6 +1594,10 @@ private:
 		m_intermediate_data_ex.m_not_completed_prev_future_raw_p_seq.clear();
 		m_intermediate_data_ex.m_prev_result_seq_cache.clear();
 		m_intermediate_data_ex.m_prev_prefer_apartment_seq_cache.clear();
+		m_intermediate_data_ex.m_prev_future_weak_seq.shrink_to_fit();
+		m_intermediate_data_ex.m_not_completed_prev_future_raw_p_seq.shrink_to_fit();
+		m_intermediate_data_ex.m_prev_result_seq_cache.shrink_to_fit();
+		m_intermediate_data_ex.m_prev_prefer_apartment_seq_cache.shrink_to_fit();
 
 		//m_intermediate_data_ex_ptr.reset();
 	}

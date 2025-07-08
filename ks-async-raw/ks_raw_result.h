@@ -26,36 +26,39 @@ class ks_raw_result final {
 public:
 	ks_raw_result() : m_state(_STATE::NOT_COMPLETED) {}
 
-	ks_raw_result(const ks_raw_value& value) : m_state(_STATE::JUST_VALUE) {
-		::new (this->__raw_value_data_ptr()) ks_raw_value(value);
+	ks_raw_result(const ks_raw_value& value) : m_state(_STATE::JUST_VALUE), m_value_u(value) {}
+	ks_raw_result(ks_raw_value&& value) noexcept : m_state(_STATE::JUST_VALUE), m_value_u(std::move(value)) {}
+
+	ks_raw_result(const ks_error& error) : m_state(_STATE::JUST_ERROR), m_error_u(error) {
+		if (!m_error_u.has_code()) {
+			ASSERT(false);
+			m_error_u = ks_error::unexpected_error(); 
+		}
 	}
-	ks_raw_result(ks_raw_value&& value) noexcept : m_state(_STATE::JUST_VALUE) {
-		::new (this->__raw_value_data_ptr()) ks_raw_value(std::move(value));
+	ks_raw_result(ks_error&& error) noexcept : m_state(_STATE::JUST_ERROR), m_error_u(std::move(error)) {
+		if (!m_error_u.has_code()) {
+			ASSERT(false);
+			m_error_u = ks_error::unexpected_error(); 
+		}
 	}
 
-	ks_raw_result(const ks_error& error) : m_state(_STATE::JUST_ERROR) {
-		ASSERT(error.has_code());
-		::new (this->__error_data_ptr()) ks_error(error.has_code() ? error : ks_error::unexpected_error());
-	}
-	ks_raw_result(ks_error&& error) noexcept : m_state(_STATE::JUST_ERROR) {
-		ASSERT(error.has_code());
-		::new (this->__error_data_ptr()) ks_error(error.has_code() ? std::move(error) : ks_error::unexpected_error());
-	}
-
-	ks_raw_result(const ks_raw_result& r) : m_state(r.m_state) {
+	ks_raw_result(const ks_raw_result& r) {
+		m_state = r.m_state;
 		switch (m_state) {
-		case _STATE::JUST_VALUE: ::new (this->__raw_value_data_ptr()) ks_raw_value(*r.__raw_value_data_ptr()); break;
-		case _STATE::JUST_ERROR: ::new (this->__error_data_ptr()) ks_error(*r.__error_data_ptr()); break;
+		case _STATE::JUST_VALUE: ::new (&m_value_u) ks_raw_value(r.m_value_u); break;
+		case _STATE::JUST_ERROR: ::new (&m_error_u) ks_error(r.m_error_u); break;
 		default: break;
 		}
 	}
-	ks_raw_result(ks_raw_result&& r) noexcept : m_state(r.m_state) {
+	ks_raw_result(ks_raw_result&& r) noexcept {
+		m_state = r.m_state;
 		switch (m_state) {
-		case _STATE::JUST_VALUE: ::new (this->__raw_value_data_ptr()) ks_raw_value(std::move(*r.__raw_value_data_ptr())); break;
-		case _STATE::JUST_ERROR: ::new (this->__error_data_ptr()) ks_error(std::move(*r.__error_data_ptr())); break;
+		case _STATE::JUST_VALUE: ::new (&m_value_u) ks_raw_value(std::move(r.m_value_u)); break;
+		case _STATE::JUST_ERROR: ::new (&m_error_u) ks_error(std::move(r.m_error_u)); break;
 		default: break;
 		}
 	}
+
 	ks_raw_result& operator=(const ks_raw_result& r) {
 		if (this != &r) {
 			this->~ks_raw_result();
@@ -72,8 +75,8 @@ public:
 
 	~ks_raw_result() {
 		switch (m_state) {
-		case _STATE::JUST_VALUE: this->__raw_value_data_ptr()->~ks_raw_value(); break;
-		case _STATE::JUST_ERROR: this->__error_data_ptr()->~ks_error(); break;
+		case _STATE::JUST_VALUE: m_value_u.~ks_raw_value(); break;
+		case _STATE::JUST_ERROR: m_error_u.~ks_error(); break;
 		default: break;
 		}
 	}
@@ -90,17 +93,17 @@ public:
 
 	const ks_raw_value& to_value() const noexcept(false) {
 		if (m_state == _STATE::JUST_VALUE) {
-			return *this->__raw_value_data_ptr();
+			return m_value_u;
 		}
 		else {
 			ASSERT(false);
-			throw m_state == _STATE::JUST_ERROR ? *this->__error_data_ptr() : ks_error::unexpected_error();
+			throw m_state == _STATE::JUST_ERROR ? m_error_u : ks_error::unexpected_error();
 		}
 	}
 
 	ks_error to_error() const noexcept(false) {
 		if (m_state == _STATE::JUST_ERROR) {
-			return *this->__error_data_ptr();
+			return m_error_u;
 		}
 		else {
 			ASSERT(false);
@@ -120,16 +123,12 @@ public:
 	}
 
 private:
-	ks_raw_value* __raw_value_data_ptr() { return (ks_raw_value*)(&m_data_memory); }
-	ks_error* __error_data_ptr() { return (ks_error*)(&m_data_memory); }
-
-	const ks_raw_value* __raw_value_data_ptr() const { return (ks_raw_value*)(&m_data_memory); }
-	const ks_error* __error_data_ptr() const { return (ks_error*)(&m_data_memory); }
-
-private:
 	enum class _STATE { NOT_COMPLETED, JUST_VALUE, JUST_ERROR };
 	_STATE m_state;
-	std::aligned_union_t<0, ks_raw_value, ks_error> m_data_memory;
+	union {
+		ks_raw_value m_value_u;
+		ks_error m_error_u;
+	};
 };
 
 

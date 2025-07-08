@@ -18,10 +18,10 @@ limitations under the License.
 template <>
 class ks_promise<void> final {
 public:
-	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
-	static ks_promise<void> __create() { return ks_promise<void>(std::create_inst); }
-
 	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
+
+	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
+	static ks_promise<void> create() { return ks_promise<void>(std::create_inst); }
 
 	ks_promise(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
@@ -38,8 +38,17 @@ public:
 	using this_promise_type = ks_promise<void>;
 
 public:
+	bool is_null() const {
+		return m_nothing_promise.is_null();
+	}
 	bool is_valid() const {
 		return m_nothing_promise.is_valid();
+	}
+	bool operator==(nullptr_t) const {
+		return m_nothing_promise == nullptr;
+	}
+	bool operator!=(nullptr_t) const {
+		return m_nothing_promise != nullptr;
 	}
 
 	ks_future<void> get_future() const {

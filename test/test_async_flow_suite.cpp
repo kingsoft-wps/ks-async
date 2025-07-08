@@ -1,4 +1,4 @@
-/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
+﻿/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,23 +24,23 @@ TEST(test_async_flow_suite, test_is_completed) {
     bool b;
     uint64_t id;
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("a1"));
+    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("a1"));
         return ks_future<std::string>::resolved("b1-tasktask");
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
         work_latch.count_down();
     }, ks_async_context());
@@ -69,43 +69,43 @@ TEST(test_async_flow_suite, test_task_observer) {
     flow.put_custom_value<int>("v1", 1);
     ASSERT_TRUE(flow.get_value<int>("v1") == 1);
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
     work_latch.add(1);
 
-    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
     work_latch.add(1);
 
-    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("a1"));
+    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("a1"));
         return ks_future<std::string>::resolved("b1-tasktask");
         });
     ASSERT_TRUE(b);
     work_latch.add(1);
 
-    id = flow.add_task_running_observer("*", ks_apartment::background_sta(), [&task_running_count](const ks_async_flow& flow, const char* task_name) {
+    id = flow.add_task_running_observer("*", ks_apartment::background_sta(), [&task_running_count](const ks_async_flow& this_flow, const char* task_name) {
         task_running_count++;
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    id = flow.add_task_running_observer("b1", ks_apartment::background_sta(), [&b1_running](const ks_async_flow& flow, const char* task_name) {
+    id = flow.add_task_running_observer("b1", ks_apartment::background_sta(), [&b1_running](const ks_async_flow& this_flow, const char* task_name) {
         b1_running=true;
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [&task_completed_count,&work_latch](const ks_async_flow& flow, const char* task_name, const ks_error& error) {
+    id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [&task_completed_count,&work_latch](const ks_async_flow& this_flow, const char* task_name, const ks_error& error) {
         if (!error.has_code())
             task_completed_count++;
         work_latch.count_down();
         }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-     id = flow.add_task_completed_observer("a1", ks_apartment::background_sta(), [&a1_completed](const ks_async_flow& flow, const char* task_name, const ks_error& error) {
+     id = flow.add_task_completed_observer("a1", ks_apartment::background_sta(), [&a1_completed](const ks_async_flow& this_flow, const char* task_name, const ks_error& error) {
         if (!error.has_code())
             a1_completed=true;
         }, ks_async_context());
@@ -190,22 +190,22 @@ TEST(test_async_flow_suite, test_get_future) {
     std::atomic<int> park{ 0 };
     std::atomic<int> task_future_count{ 0 };
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_future<std::string>::resolved("b1-tasktask");
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
         work_latch.count_down();
     }, ks_async_context());
@@ -263,23 +263,23 @@ TEST(test_async_flow_suite, test_error) {
     uint64_t id;
     std::atomic<int> a3{ 0 };
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_error().unexpected_error();
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a3: a2", ks_apartment::default_mta(), [&a3](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a3: a2", ks_apartment::default_mta(), [&a3](const ks_async_flow& this_flow) {
         a3++;
         return "a3-tasktask";
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338001);
         work_latch.count_down();
     }, ks_async_context());
@@ -301,12 +301,12 @@ TEST(test_async_flow_suite, test_error) {
 
     work_latch.add(1);
 
-    b = flow_error.add_task<std::string>("c1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow_error.add_task<std::string>("c1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_error().unexpected_error();
         });
     ASSERT_TRUE(b);
 
-     id = flow_error.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+     id = flow_error.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338001);
         work_latch.count_down();
     }, ks_async_context());
@@ -331,17 +331,17 @@ TEST(test_async_flow_suite, test_try_cancel) {
     bool b;
     uint64_t id;
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a2: a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338003);
         work_latch.count_down();
     }, ks_async_context());
@@ -368,57 +368,57 @@ TEST(test_async_flow_suite, test_complex_dependent) {
     flow.put_custom_value<int>("v1", 1);
     ASSERT_TRUE(flow.get_value<int>("v1") == 1);
 
-    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("a1"));
+    b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("a1"));
         return ks_future<std::string>::resolved("b1-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b2: a2,b1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("a2"));
-        EXPECT_TRUE(flow.is_task_completed("b1"));
+    b = flow.add_task<std::string>("b2: a2,b1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("a2"));
+        EXPECT_TRUE(this_flow.is_task_completed("b1"));
         return ks_future<std::string>::resolved("b2-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b4: b1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("b1"));
+    b = flow.add_task<std::string>("b4: b1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("b1"));
         return ks_future<std::string>::resolved("b4-tasktask");
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("b3: b1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("b1"));
+    b = flow.add_task<std::string>("b3: b1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("b1"));
         return ks_future<std::string>::resolved("b3-tasktask");
         });
     ASSERT_TRUE(b);
 
 
-    b = flow.add_task<std::string>("c1", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
+    b = flow.add_task<std::string>("c1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return "c1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    b = flow.add_task<std::string>("d1:c1,b2 b3;b4", ks_apartment::default_mta(), [](const ks_async_flow& flow) {
-        EXPECT_TRUE(flow.is_task_completed("c1"));
-        EXPECT_TRUE(flow.is_task_completed("b2"));
-        EXPECT_TRUE(flow.is_task_completed("b3"));
-        EXPECT_TRUE(flow.is_task_completed("b4"));
+    b = flow.add_task<std::string>("d1:c1,b2 b3;b4", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
+        EXPECT_TRUE(this_flow.is_task_completed("c1"));
+        EXPECT_TRUE(this_flow.is_task_completed("b2"));
+        EXPECT_TRUE(this_flow.is_task_completed("b3"));
+        EXPECT_TRUE(this_flow.is_task_completed("b4"));
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
         work_latch.count_down();
     }, ks_async_context());

@@ -241,6 +241,11 @@ namespace std { //helper funcs
 		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
 			(void)std::remove_cvref_t<T>(std::move(arg));
 	}
+	template <class T>
+	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>&& arg) noexcept {
+		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
+			(void)std::remove_cvref_t<T>(std::move(arg));
+	}
 }
 
 

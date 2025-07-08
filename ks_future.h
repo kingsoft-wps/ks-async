@@ -130,7 +130,7 @@ public: //then, transform
 		std::is_convertible_v<FN, std::function<ks_result<R>(const T&, ks_cancel_inspector*)>> ||
 		std::is_convertible_v<FN, std::function<ks_future<R>(const T&, ks_cancel_inspector*)>>>>
 	ks_future<R> then(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const { 
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::current_thread_apartment_or_default_mta();
@@ -149,7 +149,7 @@ public: //then, transform
 		std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<T>&, ks_cancel_inspector*)>> || 
 		std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<T>&, ks_cancel_inspector*)>>>>
 	ks_future<R> transform(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::current_thread_apartment_or_default_mta();
@@ -191,7 +191,7 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void(const T&)>> && std::is_void_v<std::invoke_result_t<FN, const T&>>>>
 	ks_future<T> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::current_thread_apartment_or_default_mta();
@@ -209,7 +209,7 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void(const ks_error&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_error&>>>>
 	ks_future<T> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::current_thread_apartment_or_default_mta();
@@ -227,7 +227,7 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void(const ks_result<T>&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_result<T>&>>>>
 	ks_future<T> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ASSERT(apartment != nullptr);
 		if (apartment == nullptr)
 			apartment = ks_apartment::current_thread_apartment_or_default_mta();
@@ -246,7 +246,7 @@ public: //map, map_value, cast
 	template <class R, class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<R(const T&)>>>>
 	ks_future<R> map(FN&& fn) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[fn = std::forward<FN>(fn)](const ks_raw_value& value)->ks_raw_result { 
 				return ks_raw_value::of<R>(fn(value.get<T>())); 
@@ -257,7 +257,7 @@ public: //map, map_value, cast
 
 	template <class R, class X = R, class _ = std::enable_if_t<std::is_convertible_v<X, R>>>
 	ks_future<R> map_value(X&& other_value) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		ks_raw_future_ptr raw_future2 = m_raw_future->then(
 			[other_value = std::forward<X>(other_value)](const ks_raw_value& value)->ks_raw_result {
 				return ks_raw_value::of<R>(other_value); 
@@ -268,43 +268,52 @@ public: //map, map_value, cast
 
 	template <class R, class _ = std::enable_if_t<std::is_convertible_v<T, R> || std::is_void_v<R> || std::is_nothing_v<R>>>
 	ks_future<R> cast() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		constexpr __raw_cast_mode_t cast_mode = __determine_raw_cast_mode<R>();
 		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
 public: //set_timeout, try_cancel
 	const this_future_type& set_timeout(int64_t timeout) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_future->set_timeout(timeout, true);
 		return *this;
 	}
 
 	//不希望直接使用future.try_cancel，更应使用controller.try_cancel
 	const this_future_type& __try_cancel() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_future->__try_cancel(true);
 		return *this;
 	}
 
-public: //is_valid, is_completed, peek_result, wait
+public: //is_null, is_completed, peek_result, wait
+	bool is_null() const {
+		return m_raw_future == nullptr;
+	}
 	bool is_valid() const {
+		return m_raw_future != nullptr;
+	}
+	bool operator==(nullptr_t) const {
+		return m_raw_future == nullptr;
+	}
+	bool operator!=(nullptr_t) const {
 		return m_raw_future != nullptr;
 	}
 
 	bool is_completed() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		return m_raw_future->is_completed();
 	}
 
 	ks_result<T> peek_result() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		return ks_result<T>::__from_raw(m_raw_future->peek_result());
 	}
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	void __wait() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		return m_raw_future->__wait();
 	}
 

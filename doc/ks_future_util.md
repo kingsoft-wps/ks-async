@@ -59,11 +59,11 @@ ks_future<T> ks_future_util::any(const ks_future<T>& future0, const ks_future<T>
 
 
 ```C++
-ks_future<void> parallel(
+ks_future<void> ks_future_util::parallel(
 		ks_apartment* apartment, 
     const vector<function<void()>>& fns, 
 		const ks_async_context& context = {});
-ks_future<void> parallel_n(
+ks_future<void> ks_future_util::parallel_n(
 		ks_apartment* apartment, 
     function<void()> fn, size_t n,
 		const ks_async_context& context = {});
@@ -78,11 +78,11 @@ ks_future<void> parallel_n(
 <br>
 
 ```C++
-ks_future<void> sequential(
+ks_future<void> ks_future_util::sequential(
 		ks_apartment* apartment, 
     const vector<function<void()>> fns, 
 		const ks_async_context& context = {});
-ks_future<void> sequential_n(
+ks_future<void> ks_future_util::sequential_n(
 		ks_apartment* apartment, 
     function<void()> fn, size_t n,
 		const ks_async_context& context = {});
@@ -99,7 +99,7 @@ ks_future<void> sequential_n(
 
 
 ```C++
-ks_future<void> repeat(
+ks_future<void> ks_future_util::repeat(
 		ks_apartment* apartment, 
     function<ks_result<void>()> fn, 
 		const ks_async_context& context = {});
@@ -113,7 +113,7 @@ ks_future<void> repeat(
 <br>
 
 ```C++
-ks_future<void> repeat_periodic(
+ks_future<void> ks_future_util::repeat_periodic(
 		ks_apartment* apartment, 
     function<ks_result<void>()> fn, 
     int64_t first_delay, int64_t interval, 

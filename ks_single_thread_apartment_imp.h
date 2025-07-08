@@ -33,8 +33,10 @@ public:
 	};
 
 	KS_ASYNC_API explicit ks_single_thread_apartment_imp(const char* name, uint flags = 0);
-	KS_ASYNC_API ~ks_single_thread_apartment_imp();
+	KS_ASYNC_API explicit ks_single_thread_apartment_imp(const char* name, uint flags, std::function<void()>&& thread_init_fn, std::function<void()>&& thread_term_fn);
 	_DISABLE_COPY_CONSTRUCTOR(ks_single_thread_apartment_imp);
+
+	KS_ASYNC_API ~ks_single_thread_apartment_imp();
 
 public:
 	virtual const char* name() override;
@@ -99,6 +101,8 @@ private:
 
 		std::string name; //const-like
 		uint flags; //const-like
+		std::function<void()> thread_init_fn = nullptr; //const-like, optional
+		std::function<void()> thread_term_fn = nullptr; //const-like, optional
 
 		//prior简化为三级：>0为高优先，=0为普通，<0为低且简单地加入到idle队列
 		std::deque<std::shared_ptr<_FN_ITEM>> now_fn_queue_prior;

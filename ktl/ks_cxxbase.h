@@ -20,6 +20,7 @@ limitations under the License.
 //基本数据类型定义
 #include <cstddef>
 #include <cstdint>
+#include <climits>
 #include <type_traits>
 
 using byte = uint8_t;
@@ -28,7 +29,7 @@ using nullptr_t = decltype(nullptr);
 
 #ifndef _HRESULT_DEFINED
 #define _HRESULT_DEFINED
-#	ifdef _WIN32
+#	if defined(_WIN32)
 	using HRESULT = long;
 #	else
 	using HRESULT = int32_t;

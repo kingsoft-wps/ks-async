@@ -28,13 +28,20 @@ static thread_local int  tls_current_thread_pump_loop_depth = 0;
 static thread_local bool tls_current_thread_pump_loop_busy_for_idle_flag = false;
 
 
-ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags) : m_d(std::make_shared<_THREAD_POOL_APARTMENT_DATA>()) {
+ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags) 
+	: ks_thread_pool_apartment_imp(name, max_thread_count, flags, nullptr, nullptr) {
+}
+
+ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags, std::function<void()>&& thread_init_fn, std::function<void()>&& thread_term_fn) 
+	: m_d(std::make_shared<_THREAD_POOL_APARTMENT_DATA>()) {
 	ASSERT(name != nullptr);
 	ASSERT(max_thread_count >= 1);
 
 	m_d->name = name != nullptr ? name : "";
 	m_d->max_thread_count = max_thread_count >= 1 ? max_thread_count : 1;
 	m_d->flags = flags;
+	m_d->thread_init_fn = std::move(thread_init_fn);
+	m_d->thread_term_fn = std::move(thread_term_fn);
 
 	if ((m_d->flags & auto_register_flag) && !m_d->name.empty()) {
 		ks_apartment::__register_public_apartment(m_d->name.c_str(), this);
@@ -116,8 +123,14 @@ uint64_t ks_thread_pool_apartment_imp::schedule(std::function<void()>&& fn, int 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	_try_start_locked(lock);
-	if (m_d->state_v != _STATE::RUNNING && m_d->state_v != _STATE::STOPPING) {
-		ASSERT(false);
+	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
+
+	if (!(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING)) {
+		fn = {};
+		return 0;
+	}
+	if (priority < 0 && m_d->state_v != _STATE::RUNNING) {
+		fn = {};
 		return 0;
 	}
 
@@ -140,8 +153,10 @@ uint64_t ks_thread_pool_apartment_imp::schedule_delayed(std::function<void()>&& 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
 	_try_start_locked(lock);
-	if (m_d->state_v != _STATE::RUNNING) {
-		ASSERT(false);
+	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
+
+	if (!(m_d->state_v == _STATE::RUNNING)) {
+		fn = {};
 		return 0;
 	}
 
@@ -205,15 +220,21 @@ void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& 
 		if (!m_d->thread_pool.empty()) {
 			m_d->state_v = _STATE::STOPPING;
 			m_d->any_fn_queue_cv.notify_all(); //trigger threads
+			m_d->now_fn_queue_idle.clear(); //cleanup idles at once
+			m_d->delaying_fn_queue.clear(); //cleanup delayings at once
 		}
 		else {
 			m_d->state_v = _STATE::STOPPED;
 			m_d->stopped_state_cv.notify_all();
+			m_d->thread_init_fn = nullptr; //final cleanup
+			m_d->thread_term_fn = nullptr; //final cleanup
 		}
 	}
 	else if (m_d->state_v == _STATE::NOT_START) {
 		m_d->state_v = _STATE::STOPPED;
 		m_d->stopped_state_cv.notify_all();
+		m_d->thread_init_fn = nullptr; //final cleanup
+		m_d->thread_term_fn = nullptr; //final cleanup
 	}
 }
 
@@ -254,6 +275,10 @@ void ks_thread_pool_apartment_imp::_work_thread_proc(ks_thread_pool_apartment_im
 		std::stringstream thread_name_ss;
 		thread_name_ss << d->name << "'s work-thread [" << thread_index << "/" << d->max_thread_count << "]";
 		ks_apartment::__set_current_thread_name(thread_name_ss.str().c_str());
+	}
+
+	if (d->thread_init_fn) {
+		d->thread_init_fn();
 	}
 
 	ASSERT(tls_current_thread_pump_loop_depth == 0);
@@ -368,7 +393,13 @@ void ks_thread_pool_apartment_imp::_work_thread_proc(ks_thread_pool_apartment_im
 		if (d->state_v == _STATE::STOPPING && d->living_thread_count == 0) {
 			d->state_v = _STATE::STOPPED;
 			d->stopped_state_cv.notify_all();
+			d->thread_init_fn = nullptr; //final cleanup
+			d->thread_term_fn = nullptr; //final cleanup
 		}
+	}
+
+	if (d->thread_term_fn) {
+		d->thread_term_fn();
 	}
 
 	ASSERT(ks_apartment::current_thread_apartment() == self);
@@ -417,9 +448,9 @@ void ks_thread_pool_apartment_imp::_do_put_fn_item_into_delaying_list_locked(con
 
 #ifdef _DEBUG
 bool ks_thread_pool_apartment_imp::_check_fn_id_exists_when_debug_locked(const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, uint64_t fn_id, std::unique_lock<ks_mutex>& lock) {
-	auto do_check_fn_exists = [](std::deque<std::shared_ptr<_FN_ITEM>>* fn_queue, uint64_t fn_id) -> bool {
+	auto do_check_fn_exists = [](std::deque<std::shared_ptr<_FN_ITEM>>* fn_queue, uint64_t a_fn_id) -> bool {
 		return std::find_if(fn_queue->cbegin(), fn_queue->cend(),
-			[fn_id](const auto& item) {return item->fn_id == fn_id; }) != fn_queue->cend();
+			[a_fn_id](const auto& item) {return item->fn_id == a_fn_id; }) != fn_queue->cend();
 	};
 
 	return do_check_fn_exists(&d->now_fn_queue_prior, fn_id)
@@ -500,6 +531,7 @@ bool ks_thread_pool_apartment_imp::__run_nested_pump_loop_for_extern_waiting(voi
 
 	ASSERT(tls_current_thread_index_plus != 0);
 	const size_t thread_index = tls_current_thread_index_plus - 1;
+	_UNUSED(thread_index);
 
 	ASSERT(tls_current_thread_pump_loop_depth >= 1);
 	++tls_current_thread_pump_loop_depth;

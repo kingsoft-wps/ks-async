@@ -1,4 +1,4 @@
-/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
+﻿/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ TEST(test_future_util_suite, test_repeat) {
     std::atomic<int> sn = { 0 };
 
     auto fn = [p_sn = &sn]() -> ks_result<void> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
             return nothing;
         }
         else {
@@ -45,8 +45,8 @@ TEST(test_future_util_suite, test_repeat) {
     work_latch.add(1);
 
     auto fn2 = [p_sn = &sn]() -> ks_future<void> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
             return ks_future<void>::resolved();
         }
         else {
@@ -73,8 +73,8 @@ TEST(test_future_util_suite, test_repeat_periodic) {
     std::atomic<int> sn = { 0 };
 
     auto fn = [p_sn = &sn]() -> ks_result<void> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
             return nothing;
         }
         else {
@@ -97,8 +97,8 @@ TEST(test_future_util_suite, test_repeat_periodic) {
     work_latch.add(1);
 
     auto fn2 = [p_sn = &sn]() -> ks_future<void> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
             return ks_future<void>::resolved();
         }
         else {
@@ -126,9 +126,9 @@ TEST(test_future_util_suite, test_repeat_productive) {
     std::atomic<int> cn = { 0 };
 
     auto produce_fn = [p_sn = &sn]() -> ks_result<int> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
-            return sn;
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
+            return sn_val;
         }
         else {
             return ks_error::eof_error();
@@ -136,25 +136,25 @@ TEST(test_future_util_suite, test_repeat_productive) {
     };
 
     auto produce_fn2 = [p_sn = &sn]() -> ks_future<int> {
-        int sn = ++(*p_sn);
-        if (sn <= 5) {
-            return ks_future<int>::resolved(sn);
+        int sn_val = ++(*p_sn);
+        if (sn_val <= 5) {
+            return ks_future<int>::resolved(sn_val);
         }
         else {
             return ks_future<int>::rejected(ks_error::eof_error());
         }
     };
 
-    auto consume_fn = [p_cn=&cn](const int& sn) -> void {
+    auto consume_fn = [p_cn=&cn](const int& sn_val) -> void {
         ++(*p_cn);
     };
 
-    auto consume_fn2 = [p_cn=&cn](const int& sn) -> ks_result<void> {
+    auto consume_fn2 = [p_cn=&cn](const int& sn_val) -> ks_result<void> {
         ++(*p_cn);
         return ks_result<void>(nothing);
     };
 
-    auto consume_fn3 = [p_cn=&cn](const int& sn) -> ks_future<void> {
+    auto consume_fn3 = [p_cn=&cn](const int& sn_val) -> ks_future<void> {
         ++(*p_cn);
         return ks_future<void>::resolved();
     };

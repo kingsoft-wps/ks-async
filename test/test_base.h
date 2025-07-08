@@ -1,4 +1,4 @@
-/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
+﻿/* Copyright 2024 The Kingsoft's ks-async Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,24 +15,17 @@ limitations under the License.
 
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include "../ks_future.h"
 #include "../ks_promise.h"
 #include "../ks_future_util.h"
 #include "../ks_async_flow.h"
 #include "../ks_notification_center.h"
 
-#define GFLAGS_IS_A_DLL 0  
-#include <gflags/gflags.h>
-#include <gtest/gtest.h>
-
 #include <iostream>
 #include <sstream>
 #include <string>
-
-
-//command line parameters
-DECLARE_int32(parallel_num);
-DECLARE_int32(future_num);
 
 
 //test helper

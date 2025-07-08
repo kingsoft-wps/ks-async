@@ -332,9 +332,9 @@ ks_future<void> ks_future_util::repeat_periodic(
 		//注：支持在final_future上调用try_cancel
 		[data_weak = std::weak_ptr<__periodic_data_t>(data)](const ks_error& error) {
 			if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
-				auto data = data_weak.lock();
-				if (data != nullptr)
-					data->controller.try_cancel();
+				auto data_held = data_weak.lock();
+				if (data_held != nullptr)
+					data_held->controller.try_cancel();
 			}
 		},
 		make_async_context().set_priority(0x10000), apartment);
@@ -370,9 +370,9 @@ ks_future<void> ks_future_util::repeat_productive(
 		//注：支持在final_future上调用try_cancel
 		[data_weak = std::weak_ptr<__repetitive_data_t<V>>(data)](const ks_error& error) {
 			if (error.get_code() == ks_error::CANCELLED_ERROR_CODE) {
-				auto data = data_weak.lock();
-				if (data != nullptr)
-					data->controller.try_cancel();
+				auto data_held = data_weak.lock();
+				if (data_held != nullptr)
+					data_held->controller.try_cancel();
 			}
 		}, 
 		make_async_context().set_priority(0x10000), produce_apartment);
@@ -398,8 +398,8 @@ void ks_future_util::__schedule_periodic_once(const std::shared_ptr<__periodic_d
 					data->rounds++;
 					const std::chrono::steady_clock::time_point now_time = std::chrono::steady_clock::now();
 					const std::chrono::steady_clock::time_point next_time = data->create_time + std::chrono::milliseconds((long long)(data->delay + data->interval * data->rounds));
-					const int64_t next_delay = std::chrono::duration_cast<std::chrono::milliseconds>(next_time - now_time).count();
-					__schedule_periodic_once(data, next_delay);
+					const int64_t next_delay_2 = std::chrono::duration_cast<std::chrono::milliseconds>(next_time - now_time).count();
+					__schedule_periodic_once(data, next_delay_2);
 				}
 				else {
 					ks_error error = result.to_error();

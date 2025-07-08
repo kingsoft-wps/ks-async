@@ -25,10 +25,10 @@ limitations under the License.
 template <class T>
 class ks_promise final {
 public:
-	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
-	static ks_promise<T> __create() { return ks_promise<T>(std::create_inst); }
-
 	ks_promise(nullptr_t) : m_raw_promise(nullptr) {}
+
+	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
+	static ks_promise<T> create() { return ks_promise<T>(std::create_inst); }
 
 	ks_promise(const ks_promise&) = default;
 	ks_promise(ks_promise&&) noexcept = default;
@@ -45,31 +45,40 @@ public:
 	using this_promise_type = ks_promise<T>;
 
 public:
+	bool is_null() const {
+		return m_raw_promise == nullptr;
+	}
 	bool is_valid() const {
+		return m_raw_promise != nullptr;
+	}
+	bool operator==(nullptr_t) const {
+		return m_raw_promise == nullptr;
+	}
+	bool operator!=(nullptr_t) const {
 		return m_raw_promise != nullptr;
 	}
 
 	ks_future<T> get_future() const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		return ks_future<T>::__from_raw(m_raw_promise->get_future());
 	}
 
 	void resolve(const T& value) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_promise->resolve(ks_raw_value::of<T>(value));
 	}
 	void resolve(T&& value) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_promise->resolve(ks_raw_value::of<T>(std::move(value)));
 	}
 
 	void reject(const ks_error& error) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_promise->reject(error);
 	}
 
 	void try_settle(const ks_result<T>& result) const {
-		ASSERT(this->is_valid());
+		ASSERT(!this->is_null());
 		m_raw_promise->try_settle(result.__get_raw());
 	}
 
