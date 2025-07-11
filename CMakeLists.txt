@@ -106,6 +106,7 @@ set(MY_KTL_SOURCE_FILES
 
 	#ktl/ks_concurrency/* (internal)
 	ktl/ks_concurrency/ks_atomic.h
+	ktl/ks_concurrency/ks_refcount.h
 	ktl/ks_concurrency/ks_spinlock.h
 	ktl/ks_concurrency/ks_mutex.h
 	ktl/ks_concurrency/ks_condition_variable.h
@@ -193,6 +194,7 @@ set(PUBLIC_KTL_HEADER_FILES
 set(PUBLIC_KTL_CONCURRENCY_HEADER_FILES
 	#ktl/ks_concurrency/* (internal)
 	ktl/ks_concurrency/ks_atomic.h
+	ktl/ks_concurrency/ks_refcount.h
 	ktl/ks_concurrency/ks_spinlock.h
 	ktl/ks_concurrency/ks_mutex.h
 	ktl/ks_concurrency/ks_condition_variable.h
