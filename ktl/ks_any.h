@@ -98,7 +98,8 @@ return *this;
 
 	void reset() noexcept {
 		if (m_data_p != nullptr && m_data_p != (void*)(-1)) {
-			if (m_data_p->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+			if (m_data_p->ref_count.fetch_sub(1, std::memory_order_release) == 1) {
+				(void)m_data_p->ref_count.load(std::memory_order_acquire);
 				m_data_p->x_dtor(m_data_p->x_addr());
 				m_data_p->~_DATA_HEADER();
 				delete[](unsigned char*)m_data_p;

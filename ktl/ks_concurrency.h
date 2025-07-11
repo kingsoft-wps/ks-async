@@ -18,6 +18,7 @@ limitations under the License.
 #include "ks_cxxbase.h"
 
 #include "ks_concurrency/ks_atomic.h"
+#include "ks_concurrency/ks_refcount.h"
 #include "ks_concurrency/ks_spinlock.h"
 
 #include "ks_concurrency/ks_mutex.h"

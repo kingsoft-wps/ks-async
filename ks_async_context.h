@@ -36,7 +36,7 @@ public:
 		m_fat_data_p = r.m_fat_data_p;
 		m_priority = r.m_priority;
 		if (m_fat_data_p != nullptr)
-			m_fat_data_p->ref_count.fetch_add(1, std::memory_order_relaxed);
+			m_fat_data_p->ref_count.add();
 	}
 
 	KS_ASYNC_INLINE_API ks_async_context(ks_async_context&& r) noexcept {
@@ -51,7 +51,7 @@ public:
 			m_fat_data_p = r.m_fat_data_p;
 			m_priority = r.m_priority;
 			if (m_fat_data_p != nullptr)
-				m_fat_data_p->ref_count.fetch_add(1, std::memory_order_relaxed);
+				m_fat_data_p->ref_count.add();
 		}
 		return *this;
 	}
@@ -242,13 +242,13 @@ private:
 private:
 	static void __do_addref_fat_data(_FAT_DATA* fata_data_p) noexcept {
 		if (fata_data_p != nullptr) {
-			fata_data_p->ref_count.fetch_add(1, std::memory_order_relaxed);
+			fata_data_p->ref_count.add();
 		}
 	}
 
 	static void __do_release_fat_data(_FAT_DATA* fata_data_p) noexcept {
 		if (fata_data_p != nullptr) {
-			if (fata_data_p->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+			if (fata_data_p->ref_count.sub_for_release() == 0) {
 				__do_release_fat_data(fata_data_p->parent_fat_data_p);
 				fata_data_p->parent_fat_data_p = nullptr;
 				delete fata_data_p;
@@ -260,7 +260,7 @@ private:
 		if (m_fat_data_p == nullptr) {
 			m_fat_data_p = new _FAT_DATA();
 		}
-		else if (m_fat_data_p->ref_count.load(std::memory_order_acquire) >= 2) {
+		else if (m_fat_data_p->ref_count.peek_value(false) != 1) { //纯粹的COW判定，无需acquire
 			_FAT_DATA* fatDataOrig = m_fat_data_p;
 			_FAT_DATA* fatDataCopy = new _FAT_DATA();
 			fatDataCopy->owner_ptr = fatDataOrig->owner_ptr;
@@ -298,7 +298,7 @@ private:
 #endif
 
 		//引用计数
-		std::atomic<int> ref_count = { 1 };
+		ks_refcount ref_count = { 1 };
 	};
 
 private:
