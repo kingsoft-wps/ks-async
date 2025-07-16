@@ -141,7 +141,7 @@ private:
 		do_prepare_fat_data_cow();
 
 		_FAT_DATA* fatData = m_fat_data_p;
-		fatData->owner_ptr = ks_any::of<SMART_PTR>(std::forward<SMART_PTR>(owner_ptr));
+		fatData->owner_ptr = ks_any::of<SMART_PTR>(owner_ptr); //后面还要用owner_ptr，这里不要forward！
 		fatData->owner_ptr_is_weak = true;
 
 		fatData->owner_pointer_check_expired_fn = [owner_ptr]() {
@@ -165,6 +165,8 @@ private:
 				locker.reset();
 			}
 		};
+
+		std::__try_prune_if_mutable_rvalue_reference<SMART_PTR>(owner_ptr);
 	}
 
 	template <class SMART_PTR>
