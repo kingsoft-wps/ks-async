@@ -89,7 +89,7 @@ bool ks_thread_pool_apartment_imp::start() {
 
 void ks_thread_pool_apartment_imp::async_stop() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	return _try_stop_locked(lock);
+	return _try_stop_locked(lock, false);
 }
 
 //注：目前的wait实现暂不支持并发重入
@@ -97,7 +97,7 @@ void ks_thread_pool_apartment_imp::wait() {
 	ASSERT(this != ks_apartment::current_thread_apartment());
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	this->_try_stop_locked(lock); //ensure stop
+	this->_try_stop_locked(lock, true); //ensure stop
 
 	ASSERT(m_d->state_v == _STATE::STOPPING || m_d->state_v == _STATE::STOPPED);
 	while (m_d->state_v == _STATE::STOPPING) {
@@ -215,26 +215,44 @@ void ks_thread_pool_apartment_imp::_try_start_locked(std::unique_lock<ks_mutex>&
 	}
 }
 
-void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& lock) {
+void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& lock, bool must_keep_locked) {
+	ASSERT(lock.owns_lock());
+	//must_keep_locked may be false.
+
+	std::deque<std::shared_ptr<_FN_ITEM>> t_now_fn_queue_idle;
+	std::deque<std::shared_ptr<_FN_ITEM>> t_delaying_fn_queue;
+	std::function<void()> t_thread_init_fn;
+	std::function<void()> t_thread_term_fn;
+
 	if (m_d->state_v == _STATE::RUNNING) {
 		if (!m_d->thread_pool.empty()) {
 			m_d->state_v = _STATE::STOPPING;
 			m_d->any_fn_queue_cv.notify_all(); //trigger threads
-			m_d->now_fn_queue_idle.clear(); //cleanup idles at once
-			m_d->delaying_fn_queue.clear(); //cleanup delayings at once
+			m_d->now_fn_queue_idle.swap(t_now_fn_queue_idle); //cleanup idles at once
+			m_d->delaying_fn_queue.swap(t_delaying_fn_queue); //cleanup delayings at once
 		}
 		else {
 			m_d->state_v = _STATE::STOPPED;
 			m_d->stopped_state_cv.notify_all();
-			m_d->thread_init_fn = nullptr; //final cleanup
-			m_d->thread_term_fn = nullptr; //final cleanup
+			m_d->thread_init_fn.swap(t_thread_init_fn); //final cleanup
+			m_d->thread_term_fn.swap(t_thread_term_fn); //final cleanup
 		}
 	}
 	else if (m_d->state_v == _STATE::NOT_START) {
 		m_d->state_v = _STATE::STOPPED;
 		m_d->stopped_state_cv.notify_all();
-		m_d->thread_init_fn = nullptr; //final cleanup
-		m_d->thread_term_fn = nullptr; //final cleanup
+		m_d->thread_init_fn.swap(t_thread_init_fn); //final cleanup
+		m_d->thread_term_fn.swap(t_thread_term_fn); //final cleanup
+	}
+
+	if (!t_now_fn_queue_idle.empty() || !t_delaying_fn_queue.empty() || t_thread_init_fn || t_thread_term_fn) {
+		lock.unlock();
+		t_now_fn_queue_idle.clear();
+		t_delaying_fn_queue.clear();
+		t_thread_init_fn = nullptr;
+		t_thread_term_fn = nullptr;
+		if (must_keep_locked)
+			lock.lock();
 	}
 }
 
@@ -384,24 +402,27 @@ void ks_thread_pool_apartment_imp::_work_thread_proc(ks_thread_pool_apartment_im
 	--tls_current_thread_pump_loop_depth;
 	ASSERT(tls_current_thread_pump_loop_depth == 0);
 
+	std::function<void()> t_thread_init_fn;
+	std::function<void()> t_thread_term_fn;
 	if (true) {
 		std::unique_lock<ks_mutex> lock(d->mutex);
-
 		ASSERT(d->living_thread_count > 0);
 		d->living_thread_count--;
-
 		if (d->state_v == _STATE::STOPPING && d->living_thread_count == 0) {
 			d->state_v = _STATE::STOPPED;
 			d->stopped_state_cv.notify_all();
-			d->thread_init_fn = nullptr; //final cleanup
-			d->thread_term_fn = nullptr; //final cleanup
+			d->thread_init_fn.swap(t_thread_init_fn); //final cleanup
+			d->thread_term_fn.swap(t_thread_term_fn); //final cleanup
 		}
 	}
 
-	if (d->thread_term_fn) {
+	if (t_thread_term_fn)
+		t_thread_term_fn();
+	if (d->thread_term_fn)
 		d->thread_term_fn();
-	}
 
+	t_thread_init_fn = nullptr;
+	t_thread_term_fn = nullptr;
 	ASSERT(ks_apartment::current_thread_apartment() == self);
 	ASSERT(tls_current_thread_index_plus == thread_index + 1);
 }

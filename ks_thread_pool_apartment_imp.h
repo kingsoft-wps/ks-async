@@ -65,7 +65,7 @@ private:
 	struct _THREAD_POOL_APARTMENT_DATA;
 
 	void _try_start_locked(std::unique_lock<ks_mutex>& lock);
-	void _try_stop_locked(std::unique_lock<ks_mutex>& lock);
+	void _try_stop_locked(std::unique_lock<ks_mutex>& lock, bool must_keep_locked);
 
 	static void _prepare_work_thread_locked(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, std::unique_lock<ks_mutex>& lock);
 	static void _work_thread_proc(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, size_t thread_index);

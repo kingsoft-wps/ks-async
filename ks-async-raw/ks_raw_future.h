@@ -78,7 +78,7 @@ protected:
 	virtual void do_add_next_multi(const std::vector<ks_raw_future_ptr>& next_futures) = 0;
 
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) = 0;
-	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal) = 0;
+	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal, bool from_destructor) = 0;
 
 	virtual void do_set_timeout(int64_t timeout, const ks_error& error, bool backtrack) = 0;
 

@@ -138,7 +138,7 @@ protected:
 			spec_apartment = ks_apartment::default_mta();
 
 		ASSERT(__get_intermediate_data_ptr(lock) == nullptr);
-		this->do_complete_locked(completed_result, spec_apartment, true, lock, must_keep_locked);
+		this->do_complete_locked(completed_result, spec_apartment, true, false, lock, must_keep_locked);
 	}
 
 	~ks_raw_future_baseimp() {
@@ -265,7 +265,7 @@ protected:
 				//又因wait结束，那么也只好将当前future标记为失败了，因为后续此future理所当然会被认为是completed状态了，
 				//但实际上我们期望不要发生此情形，即在有future在wait时不期望进行进程fork，因此这里ASSERT(false)。
 				ASSERT(false);
-				this->do_complete_locked(ks_error::interrupted_error(), cur_apartment, false, lock, false);
+				this->do_complete_locked(ks_error::interrupted_error(), cur_apartment, false, false, lock, false);
 				return false;
 			}
 
@@ -296,9 +296,9 @@ protected:
 		}
 	}
 
-	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal) override final {
+	virtual void do_complete(const ks_raw_result& result, ks_apartment* prefer_apartment, bool from_internal, bool from_destructor) override final {
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
-		return this->do_complete_locked(result, prefer_apartment, from_internal, lock, false);
+		return this->do_complete_locked(result, prefer_apartment, from_internal, from_destructor, lock, false);
 	}
 
 	virtual void do_add_next_locked(const ks_raw_future_ptr& next_future, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
@@ -325,7 +325,7 @@ protected:
 
 			if (act_schedule_id == 0) {
 				lock.unlock();
-				next_future->do_complete(ks_error::terminated_error(), prefer_completed_apartment, false);
+				next_future->do_complete(ks_error::terminated_error(), prefer_completed_apartment, false, false);
 				if (must_keep_locked)
 					lock.lock();
 			}
@@ -361,7 +361,7 @@ protected:
 				if (act_schedule_id == 0) {
 					lock.unlock();
 					for (auto& next_future : next_futures)
-						next_future->do_complete(ks_error::terminated_error(), prefer_completed_apartment, false);
+						next_future->do_complete(ks_error::terminated_error(), prefer_completed_apartment, false, false);
 					if (must_keep_locked)
 						lock.lock();
 				}
@@ -369,7 +369,7 @@ protected:
 		}
 	}
 
-	__REAL_IMP void do_complete_locked(const ks_raw_result& completed_result, ks_apartment* hint_apartment, bool from_internal, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
+	__REAL_IMP void do_complete_locked(const ks_raw_result& completed_result, ks_apartment* hint_apartment, bool from_internal, bool from_destructor, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
 		ASSERT(lock.owns_lock() && !must_keep_locked);
 		ASSERT(completed_result.is_completed());
 
@@ -398,7 +398,8 @@ protected:
 		if (intermediate_data_ptr != nullptr) {
 			if (intermediate_data_ptr->m_timeout_schedule_id != 0) {
 				ASSERT(intermediate_data_ptr->m_timeout_apartment != nullptr);
-				intermediate_data_ptr->m_timeout_apartment->try_unschedule(intermediate_data_ptr->m_timeout_schedule_id);
+				if (!from_destructor)
+					intermediate_data_ptr->m_timeout_apartment->try_unschedule(intermediate_data_ptr->m_timeout_schedule_id);
 				intermediate_data_ptr->m_timeout_schedule_id = 0;
 			}
 
@@ -421,7 +422,7 @@ protected:
 
 			//完毕，自此刻起，本future进入completed稳态，可清除intermediate-data了
 			intermediate_data_ptr->m_living_context = {};
-			__clear_intermediate_data_ptr(intermediate_data_ptr, lock);
+			__clear_intermediate_data_ptr(intermediate_data_ptr, from_destructor, lock);
 			intermediate_data_ptr = nullptr;
 		}
 
@@ -597,7 +598,7 @@ protected:
 
 	//virtual std::shared_ptr<__INTERMEDIATE_DATA> __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) = 0;
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) = 0;
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) = 0; //completed后被清除
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) = 0; //completed后被清除
 
 	friend class ks_raw_future;
 };
@@ -642,7 +643,7 @@ private:
 	virtual bool __is_using_pseudo_mutex() override { return true; }
 
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return nullptr; }
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override { ASSERT(false); }
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override { ASSERT(false); }
 };
 
 
@@ -678,7 +679,7 @@ protected:
 	virtual void do_try_cancel(const ks_error& error, bool backtrack) override {
 		//promise-future立即reject即可
 		ASSERT(error.has_code());
-		this->do_complete(error, nullptr, false);
+		this->do_complete(error, nullptr, false, false);
 	}
 
 private:
@@ -703,7 +704,7 @@ private:
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
 	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -721,7 +722,8 @@ private:
 			if (m_promise_future != nullptr && !m_promise_future->m_completed_result.is_completed()) {
 				//若最终未被settle过，则自动reject，以确保future最终completed
 				ASSERT(false);
-				m_promise_future->do_complete(ks_error::unexpected_error(), nullptr, false);
+				ks_raw_future_unique_lock lock(m_promise_future->__get_mutex(), true); //just pseudo locking only
+				m_promise_future->do_complete_locked(ks_error::unexpected_error(), nullptr, false, false, lock, false);
 			}
 		}
 
@@ -731,17 +733,17 @@ private:
 		}
 
 		virtual void resolve(const ks_raw_value & value) override {
-			m_promise_future->do_complete(value, nullptr, false);
+			m_promise_future->do_complete(value, nullptr, false, false);
 		}
 
 		virtual void reject(const ks_error & error) override {
-			m_promise_future->do_complete(error, nullptr, false);
+			m_promise_future->do_complete(error, nullptr, false, false);
 		}
 
 		virtual void try_settle(const ks_raw_result & result) override {
 			ASSERT(result.is_completed());
 			if (result.is_completed())
-				m_promise_future->do_complete(result, nullptr, false);
+				m_promise_future->do_complete(result, nullptr, false, false);
 		}
 
 	private:
@@ -767,11 +769,11 @@ public:
 	~ks_raw_task_future() {
 		if (!m_completed_result.is_completed()) {
 			//若最终未被invoke，则自动reject，以确保future最终completed
-			ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+			ks_raw_future_unique_lock lock(__get_mutex(), true); //just pseudo locking only
 			if (!m_completed_result.is_completed()) {
 				ASSERT(__get_intermediate_data_ex_ptr(lock) != nullptr);
 				ASSERT(m_task_mode == ks_raw_future_mode::TASK_DELAYED || __get_intermediate_data_ex_ptr(lock)->m_living_context.__get_priority() < 0);
-				this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, lock, false);
+				this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, lock, false);
 			}
 		}
 	}
@@ -825,7 +827,7 @@ private:
 				result = error;
 			}
 
-			this->do_complete_locked(result, prefer_apartment, true, lock2, false);
+			this->do_complete_locked(result, prefer_apartment, true, false, lock2, false);
 		};
 
 		if (could_run_locally) {
@@ -841,7 +843,7 @@ private:
 				: intermediate_data_ex_ptr->m_pending_aparrment->schedule_delayed(std::move(pending_schedule_fn), priority, intermediate_data_ex_ptr->m_delay);
 			if (intermediate_data_ex_ptr->m_pending_schedule_id == 0) {
 				//schedule失败，则立即将this标记为错误即可
-				return this->do_complete_locked(ks_error::terminated_error(), nullptr, false, lock, false);
+				return this->do_complete_locked(ks_error::terminated_error(), nullptr, false, false, lock, false);
 			}
 		}
 	}
@@ -870,7 +872,7 @@ protected:
 
 		//若为未到期的延时task-future，则立即do_complete
 		if (m_task_mode == ks_raw_future_mode::TASK_DELAYED && intermediate_data_ex_ptr->m_create_time + std::chrono::milliseconds(intermediate_data_ex_ptr->m_delay) > std::chrono::steady_clock::now()) {
-			this->do_complete_locked(error, nullptr, false, lock, false);
+			this->do_complete_locked(error, nullptr, false, false, lock, false);
 		}
 	}
 
@@ -902,13 +904,14 @@ private:
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
 	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
 		if (m_intermediate_data_ex.m_pending_schedule_id != 0) {
 			ASSERT(m_intermediate_data_ex.m_pending_aparrment != nullptr);
-			m_intermediate_data_ex.m_pending_aparrment->try_unschedule(m_intermediate_data_ex.m_pending_schedule_id);
+			if (!from_destructor) 
+				m_intermediate_data_ex.m_pending_aparrment->try_unschedule(m_intermediate_data_ex.m_pending_schedule_id);
 			m_intermediate_data_ex.m_pending_schedule_id = 0;
 		}
 
@@ -994,7 +997,7 @@ protected:
 		if (could_skip_run) {
 			//可直接skip-run，则立即将this进行settle即可
 			ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
-			this->do_complete_locked(prev_result, prefer_apartment, true, lock, false);
+			this->do_complete_locked(prev_result, prefer_apartment, true, false, lock, false);
 			return;
 		}
 
@@ -1029,7 +1032,7 @@ protected:
 				result = error;
 			}
 
-			this->do_complete_locked(result, prefer_apartment, true, lock2, false);
+			this->do_complete_locked(result, prefer_apartment, true, false, lock2, false);
 		};
 
 		if (could_run_locally) {
@@ -1041,7 +1044,7 @@ protected:
 		uint64_t act_schedule_id = prefer_apartment->schedule(std::move(run_fn), priority);
 		if (act_schedule_id == 0) {
 			//schedule失败，则立即将this标记为错误即可
-			return this->do_complete_locked(ks_error::terminated_error(), prefer_apartment, true, lock, false);
+			return this->do_complete_locked(ks_error::terminated_error(), prefer_apartment, true, false, lock, false);
 		}
 	}
 
@@ -1124,7 +1127,7 @@ private:
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
 	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -1205,7 +1208,7 @@ protected:
 		if (could_skip_run) {
 			//可直接skip-run，则立即将this进行settle即可
 			ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
-			this->do_complete_locked(prev_result, prefer_apartment, true, lock, false);
+			this->do_complete_locked(prev_result, prefer_apartment, true, false, lock, false);
 			return;
 		}
 
@@ -1248,7 +1251,7 @@ protected:
 			if (extern_future == nullptr) {
 				//立即失败
 				ASSERT(immediate_error.has_code());
-				this->do_complete_locked(immediate_error, prefer_apartment, false, lock2, false);
+				this->do_complete_locked(immediate_error, prefer_apartment, false, false, lock2, false);
 			}
 			else {
 				//extern_future出现
@@ -1262,7 +1265,7 @@ protected:
 					ASSERT(!intermediate_data_ex_ptr->m_extern_future_completed_flag);
 					intermediate_data_ex_ptr->m_extern_future_completed_flag = true;
 
-					this->do_complete_locked(extern_result, prefer_apartment, false, lock3, false);
+					this->do_complete_locked(extern_result, prefer_apartment, false, false, lock3, false);
 				}, make_async_context().set_priority(0x10000), prefer_apartment);
 			}
 		};
@@ -1276,7 +1279,7 @@ protected:
 		uint64_t act_schedule_id = prefer_apartment->schedule(std::move(run_fn), priority);
 		if (act_schedule_id == 0) {
 			//schedule失败，则立即将this标记为错误即可
-			return this->do_complete_locked(ks_error::terminated_error(), prefer_apartment, true, lock, false);
+			return this->do_complete_locked(ks_error::terminated_error(), prefer_apartment, true, false, lock, false);
 		}
 	}
 
@@ -1337,7 +1340,7 @@ private:
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
 	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
@@ -1499,7 +1502,7 @@ private:
 				//前序任务出现失败
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_error prev_error_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_rejected_index].to_error();
-				this->do_complete_locked(prev_error_first, prefer_apartment, true, lock, must_keep_locked);
+				this->do_complete_locked(prev_error_first, prefer_apartment, true, false, lock, must_keep_locked);
 				return;
 			}
 			else if (intermediate_data_ex_ptr->m_prev_completed_count == intermediate_data_ex_ptr->m_prev_total_count) {
@@ -1509,7 +1512,7 @@ private:
 				prev_value_seq.reserve(intermediate_data_ex_ptr->m_prev_result_seq_cache.size());
 				for (auto& prev_result_cached : intermediate_data_ex_ptr->m_prev_result_seq_cache)
 					prev_value_seq.push_back(prev_result_cached.to_value());
-				this->do_complete_locked(ks_raw_value::of<std::vector<ks_raw_value>>(std::move(prev_value_seq)), prefer_apartment, true, lock, must_keep_locked);
+				this->do_complete_locked(ks_raw_value::of<std::vector<ks_raw_value>>(std::move(prev_value_seq)), prefer_apartment, true, false, lock, must_keep_locked);
 				return;
 			}
 			else {
@@ -1521,7 +1524,7 @@ private:
 				//前序任务全部完成（无论成功/失败）
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				std::vector<ks_raw_result> prev_result_seq = intermediate_data_ex_ptr->m_prev_result_seq_cache;
-				this->do_complete_locked(ks_raw_value::of<std::vector<ks_raw_result>>(std::move(prev_result_seq)), prefer_apartment, true, lock, must_keep_locked);
+				this->do_complete_locked(ks_raw_value::of<std::vector<ks_raw_result>>(std::move(prev_result_seq)), prefer_apartment, true, false, lock, must_keep_locked);
 				return;
 			}
 			else {
@@ -1533,7 +1536,7 @@ private:
 				//前序任务出现成功
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_raw_value prev_value_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_resolved_index].to_value();
-				this->do_complete_locked(prev_value_first, prefer_apartment, true, lock, must_keep_locked);
+				this->do_complete_locked(prev_value_first, prefer_apartment, true, false, lock, must_keep_locked);
 				return;
 			}
 			else if (intermediate_data_ex_ptr->m_prev_completed_count == intermediate_data_ex_ptr->m_prev_total_count) {
@@ -1541,7 +1544,7 @@ private:
 				ASSERT(intermediate_data_ex_ptr->m_prev_first_rejected_index != size_t(-1));
 				ks_apartment* prefer_apartment = do_determine_prefer_apartment_2(intermediate_data_ex_ptr->m_spec_apartment, prev_advice_apartment);
 				ks_error prev_error_first = intermediate_data_ex_ptr->m_prev_result_seq_cache[intermediate_data_ex_ptr->m_prev_first_rejected_index].to_error();
-				this->do_complete_locked(prev_error_first, prefer_apartment, true, lock, must_keep_locked);
+				this->do_complete_locked(prev_error_first, prefer_apartment, true, false, lock, must_keep_locked);
 				return;
 			}
 			else {
@@ -1586,7 +1589,7 @@ private:
 	virtual __INTERMEDIATE_DATA* __get_intermediate_data_ptr(ks_raw_future_unique_lock& lock) override { return &m_intermediate_data_ex; }
 	inline  __INTERMEDIATE_DATA_EX* __get_intermediate_data_ex_ptr(ks_raw_future_unique_lock& lock) { return &m_intermediate_data_ex; }
 
-	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, ks_raw_future_unique_lock& lock) override {
+	virtual void __clear_intermediate_data_ptr(__INTERMEDIATE_DATA* intermediate_data_ptr, bool from_destructor, ks_raw_future_unique_lock& lock) override {
 		ASSERT(intermediate_data_ptr == &m_intermediate_data_ex);
 		//ASSERT(m_intermediate_data_ex_ptr != nullptr);
 
