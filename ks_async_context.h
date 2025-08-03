@@ -46,12 +46,14 @@ public:
 	}
 
 	KS_ASYNC_INLINE_API ks_async_context& operator=(const ks_async_context& r) {
-		if (this != &r && m_fat_data_p != r.m_fat_data_p) {
-			__do_release_fat_data(m_fat_data_p);
-			m_fat_data_p = r.m_fat_data_p;
+		if (this != &r) {
+			if (m_fat_data_p != r.m_fat_data_p) {
+				__do_release_fat_data(m_fat_data_p);
+				m_fat_data_p = r.m_fat_data_p;
+				if (m_fat_data_p != nullptr)
+					m_fat_data_p->ref_count.add();
+			}
 			m_priority = r.m_priority;
-			if (m_fat_data_p != nullptr)
-				m_fat_data_p->ref_count.add();
 		}
 		return *this;
 	}
