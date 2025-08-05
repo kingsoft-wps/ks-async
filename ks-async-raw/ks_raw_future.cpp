@@ -145,6 +145,14 @@ protected:
 		ASSERT(m_completed_result.is_completed());
 	}
 
+	void do_final_auto_reject() {
+		//若最终仍未被invoke，则自动reject，以确保future最终completed
+		if (!m_completed_result.is_completed()) {
+			ks_raw_future_unique_lock lock(__get_mutex(), true); //just pseudo locking only
+			this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, lock, false);
+		}
+	}
+
 public:
 	virtual ks_raw_future_ptr then(std::function<ks_raw_result(const ks_raw_value&)>&& fn, const ks_async_context& context, ks_apartment* apartment) override final;
 	virtual ks_raw_future_ptr trap(std::function<ks_raw_result(const ks_error&)>&& fn, const ks_async_context& context, ks_apartment* apartment) override final;
@@ -617,6 +625,10 @@ public:
 		do_init_with_result_locked(spec_apartment, completed_result, lock, false);
 	}
 
+	~ks_raw_dx_future() {
+		_NOOP();
+	}
+
 protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
 		//ks_raw_dx_future的此方法不应被调用，而是在init时就已立即do_complete
@@ -661,6 +673,11 @@ public:
 		do_init_base_locked(spec_apartment, ks_async_context{}, __get_intermediate_data_ex_ptr(lock), lock);
 	}
 
+	~ks_raw_promise_future() {
+		_NOOP();
+	}
+
+public:
 	ks_raw_promise_ptr create_promise_representative() {
 		return std::make_shared<ks_raw_promise_representative>(
 			std::static_pointer_cast<ks_raw_promise_future>(this->shared_from_this()));
@@ -721,9 +738,11 @@ private:
 		~ks_raw_promise_representative() {
 			if (m_promise_future != nullptr && !m_promise_future->m_completed_result.is_completed()) {
 				//若最终未被settle过，则自动reject，以确保future最终completed
-				ASSERT(false);
 				ks_raw_future_unique_lock lock(m_promise_future->__get_mutex(), true); //just pseudo locking only
-				m_promise_future->do_complete_locked(ks_error::unexpected_error(), nullptr, false, false, lock, false);
+				if (!m_promise_future->m_completed_result.is_completed()) {
+					ASSERT(m_promise_future->__get_intermediate_data_ex_ptr(lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(lock)->m_next_future_more.empty());
+					m_promise_future->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, lock, false);
+				}
 			}
 		}
 
@@ -767,15 +786,7 @@ public:
 	}
 
 	~ks_raw_task_future() {
-		if (!m_completed_result.is_completed()) {
-			//若最终未被invoke，则自动reject，以确保future最终completed
-			ks_raw_future_unique_lock lock(__get_mutex(), true); //just pseudo locking only
-			if (!m_completed_result.is_completed()) {
-				ASSERT(__get_intermediate_data_ex_ptr(lock) != nullptr);
-				ASSERT(m_task_mode == ks_raw_future_mode::TASK_DELAYED || __get_intermediate_data_ex_ptr(lock)->m_living_context.__get_priority() < 0);
-				this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, lock, false);
-			}
-		}
+		do_final_auto_reject();
 	}
 
 private:
@@ -940,6 +951,10 @@ public:
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_connect_locked(std::move(fn_ex), prev_future, &m_intermediate_data_ex, lock, false);
+	}
+
+	~ks_raw_pipe_future() {
+		do_final_auto_reject();
 	}
 
 private:
@@ -1155,6 +1170,10 @@ public:
 		do_connect_locked(std::move(afn_ex), prev_future, &m_intermediate_data_ex, lock, false);
 	}
 
+	~ks_raw_flatten_future() {
+		do_final_auto_reject();
+	}
+
 private:
 	struct __INTERMEDIATE_DATA_EX;
 	void do_connect_locked(std::function<ks_raw_future_ptr(const ks_raw_result&)>&& afn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
@@ -1367,6 +1386,10 @@ public:
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, ks_async_context{}, &m_intermediate_data_ex, lock);
 		do_connect_locked(prev_futures, &m_intermediate_data_ex, lock, false);
+	}
+
+	~ks_raw_aggr_future() {
+		_NOOP();
 	}
 
 private:
