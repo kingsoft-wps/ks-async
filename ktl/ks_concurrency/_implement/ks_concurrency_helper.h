@@ -191,4 +191,119 @@ limitations under the License.
 #endif
 
 
+//for atomic
+#include <thread>
+
+namespace _KSConcurrencyImpl {
+    namespace _helper {
+
+    #if __cplusplus < 202002L
+        template <class T>
+        inline bool __atomic_is_wait_efficient(const std::atomic<T>* object) noexcept {
+            static_assert(sizeof(T) == 4 || sizeof(T) == 8, "__atomic_is_wait_efficient only supports 32-bit or 64-bit atomic types");
+        #   if defined(_WIN32)
+                return (bool)(_KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWaitOnAddress);
+        #   elif defined(__APPLE__)
+                return (bool)(_KSConcurrencyImpl::_helper::getOSSyncApis()->wait_on_address);
+        #   elif defined(__linux__)
+                return true; //use futex
+        #   else
+                return false;
+        #   endif
+        }
+
+        template <class T>
+        inline void __atomic_wait_explicit(const std::atomic<T>* object, T old, std::memory_order order) {
+            static_assert(sizeof(T) == 4 || sizeof(T) == 8, "__atomic_wait_explicit only supports 32-bit or 64-bit atomic types");
+            while (object->load(order) == old) {
+        #       if defined(_WIN32)
+                if (_KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWaitOnAddress)
+                    _KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWaitOnAddress((void*)object, (void*)&old, sizeof(T), INFINITE);
+                else
+                    std::this_thread::yield();
+        #       elif defined(__APPLE__)
+                if (_KSConcurrencyImpl::_helper::getOSSyncApis()->wait_on_address)
+                    _KSConcurrencyImpl::_helper::getOSSyncApis()->wait_on_address((void*)object, (uint64_t)old, sizeof(T), _KSConcurrencyImpl::_helper::OSSYNC_WAIT_ON_ADDRESS_NONE);
+                else
+                    std::this_thread::yield();
+        #       elif defined(__linux__)
+                //即使T是64位，futex也只操作低32位的地址就够了
+                if (_KSConcurrencyImpl::_helper::linux_futex32_wait((uint32_t*)object, (uint32_t)old, nullptr) == _KSConcurrencyImpl::_helper::_LINUX_FUTEX32_NOT_SUPPORTED)
+                    std::this_thread::yield();
+        #       else
+                std::this_thread::yield();
+        #       endif
+            }
+        }
+
+        template <class T>
+        inline void __atomic_notify_one(const std::atomic<T>* object) {
+            static_assert(sizeof(T) == 4 || sizeof(T) == 8, "__atomic_notify_one only supports 32-bit or 64-bit atomic types");
+        #   if defined(_WIN32)
+            if (_KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWakeByAddressSingle)
+                _KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWakeByAddressSingle((void*)object);
+            else
+                (void)0; //noop
+        #   elif defined(__APPLE__)
+            if (_KSConcurrencyImpl::_helper::getOSSyncApis()->wake_by_address_any)
+                _KSConcurrencyImpl::_helper::getOSSyncApis()->wake_by_address_any((void*)object, sizeof(T), _KSConcurrencyImpl::_helper::OSSYNC_WAKE_BY_ADDRESS_NONE);
+            else
+                (void)0; //noop
+        #   elif defined(__linux__)
+            //即使T是64位，futex也只操作低32位的地址就够了
+            _KSConcurrencyImpl::_helper::linux_futex32_wake_one((uint32_t*)object);
+        #   else
+            (void)0; //noop
+        #   endif
+        }
+
+        template <class T>
+        inline void __atomic_notify_all(const std::atomic<T>* object) {
+            static_assert(sizeof(T) == 4 || sizeof(T) == 8, "__atomic_notify_all only supports 32-bit or 64-bit atomic types");
+        #   if defined(_WIN32)
+            if (_KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWakeByAddressAll)
+                _KSConcurrencyImpl::_helper::getWinSynchApis()->pfnWakeByAddressAll((void*)object);
+            else
+                (void)0; //noop
+        #   elif defined(__APPLE__)
+            if (_KSConcurrencyImpl::_helper::getOSSyncApis()->wake_by_address_all)
+                _KSConcurrencyImpl::_helper::getOSSyncApis()->wake_by_address_all((void*)object, sizeof(T), _KSConcurrencyImpl::_helper::OSSYNC_WAKE_BY_ADDRESS_NONE);
+            else
+                (void)0; //noop
+        #   elif defined(__linux__)
+            //即使T是64位，futex也只操作低32位的地址就够了
+            _KSConcurrencyImpl::_helper::linux_futex32_wake_all((uint32_t*)object);
+        #   else
+            (void)0; //noop
+        #   endif
+        }
+
+    #else //__cplusplus < 202002L
+
+        template <class T>
+        inline bool __atomic_is_wait_efficient(const std::atomic<T>* object) noexcept {
+            return true;
+        }
+
+        template <class T>
+        inline void __atomic_wait_explicit(const std::atomic<T>* object, T old, std::memory_order order) const {
+            object->wait(old, order);
+        }
+
+        template <class T>
+        inline void __atomic_notify_one(const std::atomic<T>* object) {
+            object->notify_one();
+        }
+
+        template <class T>
+        inline void __atomic_notify_all(const std::atomic<T>* object) {
+            object->notify_all();
+        }
+
+    #endif //__cplusplus < 202002L
+
+    } //namespace _helper
+} // namespace _KSConcurrencyImpl
+
+
 #endif // __KS_CONCURRENCY_HELPER_DEF
