@@ -18,35 +18,42 @@ limitations under the License.
 #ifndef __KS_REFCOUNT_DEF
 #define __KS_REFCOUNT_DEF
 
-#include "ks_atomic.h"
+#include <atomic>
 
-class ks_refcount {
+class ks_refcount : private std::atomic<ptrdiff_t> {
+    using __underlying_atomic_type = std::atomic<ptrdiff_t>;
+
 public:
-    ks_refcount(int init_value = 1) : m_atomic_value(init_value) {}
-    ~ks_refcount() { ASSERT(m_atomic_value.load(std::memory_order_relaxed) == 0); }
+    ks_refcount(ptrdiff_t desired) : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
+    ~ks_refcount() { ASSERT(this->peek_value() == 0); }
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
-    void add(int delta = 1) {
-        ASSERT(m_atomic_value.load(std::memory_order_relaxed) + delta >= 0);
-        (void)m_atomic_value.fetch_add(delta, std::memory_order_relaxed);
+    ptrdiff_t add(ptrdiff_t update = 1) {
+        ASSERT(update > 0);
+        return __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + 1;
     }
 
-    _NODISCARD int sub_for_release(int delta = 1) {
-        ASSERT(m_atomic_value.load(std::memory_order_relaxed) - delta >= 0);
-        int new_value = m_atomic_value.fetch_sub(delta, std::memory_order_release) - delta;
-        if (new_value <= 0) {
-            //(void)m_atomic_value.load(std::memory_order_acquire);
+    _NODISCARD ptrdiff_t count_down(ptrdiff_t update = 1) {
+        ASSERT(update > 0);
+        ptrdiff_t new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
+        ASSERT(new_value >= 0);
+        if (new_value == 0) {
             std::atomic_thread_fence(std::memory_order_acquire);
         }
         return new_value;
     }
 
-    _NODISCARD int peek_value(bool with_acquire_order = false) const {
-        return m_atomic_value.load(with_acquire_order ? std::memory_order_acquire : std::memory_order_relaxed);
-    }
+    ptrdiff_t operator++() { return this->add(1); }
+    ptrdiff_t operator++(int) { return this->add(1) - 1; }
+    ptrdiff_t operator+=(ptrdiff_t update) { return this->add(update); }
 
-private:
-    ks_atomic<int> m_atomic_value;
+    _NODISCARD ptrdiff_t operator--() { return this->count_down(1); }
+    _NODISCARD ptrdiff_t operator--(int) { return this->count_down(1) + 1; }
+    _NODISCARD ptrdiff_t operator-=(ptrdiff_t update) { return this->count_down(update); }
+
+    _NODISCARD ptrdiff_t peek_value() const {
+        return __underlying_atomic_type::load(std::memory_order_relaxed);
+    }
 };
 
 #endif // __KS_REFCOUNT_DEF

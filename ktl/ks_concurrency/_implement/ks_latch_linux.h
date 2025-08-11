@@ -26,21 +26,21 @@ namespace _KSConcurrencyImpl {
 
 class ks_latch_linux_futex {
 public:
-    explicit ks_latch_linux_futex(const ptrdiff_t expected) 
-        : m_counter(expected) {
-        ASSERT(expected >= 0);
+    explicit ks_latch_linux_futex(ptrdiff_t desired)
+        : m_counter(desired) {
+        ASSERT(desired >= 0);
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_linux_futex);
 
-    void add(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
         ASSERT(update > 0);
         m_counter.fetch_add(update, std::memory_order_relaxed);
     }
 
-    void count_down(const ptrdiff_t update = 1) {
+    void count_down(ptrdiff_t update = 1) {
 		ASSERT(update > 0);
-        const ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
+        ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
         ASSERT(current >= 0);
         if (current == 0) {
             //即使m_counter是64位，futex也只操作低32位的地址就够了
@@ -48,9 +48,9 @@ public:
         }
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
-            const ptrdiff_t current = m_counter.load(std::memory_order_acquire);
+            ptrdiff_t current = m_counter.load(std::memory_order_acquire);
             ASSERT(current >= 0);
             if (current == 0)
                 return;
@@ -63,7 +63,7 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         return m_counter.load(std::memory_order_acquire) == 0;
     }
 

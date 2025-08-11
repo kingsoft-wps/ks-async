@@ -26,9 +26,9 @@ namespace _KSConcurrencyImpl {
 
 class ks_latch_mac_ossync {
 public:
-    explicit ks_latch_mac_ossync(const ptrdiff_t expected)
-        : m_counter(expected) {
-        ASSERT(expected >= 0);
+    explicit ks_latch_mac_ossync(ptrdiff_t desired)
+        : m_counter(desired) {
+        ASSERT(desired >= 0);
         ASSERT(_helper::getOSSyncApis()->wait_on_address != nullptr &&
                _helper::getOSSyncApis()->wake_by_address_any != nullptr &&
                _helper::getOSSyncApis()->wake_by_address_all != nullptr);
@@ -36,21 +36,21 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_mac_ossync);
 
-    void add(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
         ASSERT(update > 0);
         m_counter.fetch_add(update, std::memory_order_release);
     }
 
-    void count_down(const ptrdiff_t update = 1) {
-		ASSERT(update >= 0);
-        const ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
+    void count_down(ptrdiff_t update = 1) {
+		ASSERT(update > 0);
+        ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
         ASSERT(current >= 0);
         if (current == 0) {
             _helper::getOSSyncApis()->wake_by_address_all(&m_counter, sizeof(ptrdiff_t), _helper::OSSYNC_WAKE_BY_ADDRESS_NONE);
         }
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
             ptrdiff_t current = m_counter.load(std::memory_order_acquire);
             ASSERT(current >= 0);
@@ -61,7 +61,7 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         return m_counter.load(std::memory_order_acquire) == 0;
     }
 
@@ -72,8 +72,8 @@ private:
 
 class ks_latch_mac_gdc {
 public:
-    explicit ks_latch_mac_gdc(const ptrdiff_t expected) {
-        ASSERT(expected >= 0);
+    explicit ks_latch_mac_gdc(ptrdiff_t desired) {
+        ASSERT(desired >= 0);
 
         m_dispatchGroup = dispatch_group_create();
         if (m_dispatchGroup == nullptr) {
@@ -81,7 +81,7 @@ public:
             throw std::runtime_error("Failed to create dispatch group");
         }
 
-        for (ptrdiff_t i = 0; i < expected; ++i) {
+        for (ptrdiff_t i = 0; i < desired; ++i) {
             dispatch_group_enter(m_dispatchGroup);
         }
     }
@@ -93,29 +93,29 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_mac_gdc);
 
-    void count_down(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
+        ASSERT(update >= 0);
+        for (ptrdiff_t i = 0; i < update; ++i) {
+            dispatch_group_enter(m_dispatchGroup);
+        }
+    }
+
+    void count_down(ptrdiff_t update = 1) {
         ASSERT(update >= 0);
         for (ptrdiff_t i = 0; i < update; ++i) {
  			dispatch_group_leave(m_dispatchGroup);
         }
     }
 
-    _NODISCARD bool try_wait() {
-        return dispatch_group_wait(m_dispatchGroup, DISPATCH_TIME_NOW) == 0;
-    }
-
-    void wait() {
+    void wait() const {
         if (dispatch_group_wait(m_dispatchGroup, DISPATCH_TIME_FOREVER) != 0) {
             ASSERT(false);
             throw std::runtime_error("Failed to wait on dispatch group");
         }
     }
 
-    void add(const ptrdiff_t update = 1) {
-        ASSERT(update >= 0);
-        for (ptrdiff_t i = 0; i < update; ++i) {
-            dispatch_group_enter(m_dispatchGroup);
-        }
+    _NODISCARD bool try_wait() const {
+        return dispatch_group_wait(m_dispatchGroup, DISPATCH_TIME_NOW) == 0;
     }
 
 private:
@@ -125,11 +125,11 @@ private:
 
 class ks_latch_mac {
 public:
-    explicit ks_latch_mac(const ptrdiff_t expected) {
+    explicit ks_latch_mac(ptrdiff_t desired) {
         if (m_use_ossync) {
-            new (&m_ossync_impl) ks_latch_mac_ossync(expected);
+            new (&m_ossync_impl) ks_latch_mac_ossync(desired);
         } else {
-            new (&m_gdc_impl) ks_latch_mac_gdc(expected);
+            new (&m_gdc_impl) ks_latch_mac_gdc(desired);
         }
     }
 
@@ -143,7 +143,16 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_mac);
 
-    void count_down(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
+        if (m_use_ossync) {
+            m_ossync_impl.add(update);
+        }
+        else {
+            m_gdc_impl.add(update);
+        }
+    }
+
+    void count_down(ptrdiff_t update = 1) {
         if (m_use_ossync) {
             m_ossync_impl.count_down(update);
         } else {
@@ -151,7 +160,7 @@ public:
         }
     }
 
-    void wait() {
+    void wait() const {
         if (m_use_ossync) {
             m_ossync_impl.wait();
         } else {
@@ -159,19 +168,11 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         if (m_use_ossync) {
             return m_ossync_impl.try_wait();
         } else {
             return m_gdc_impl.try_wait();
-        }
-    }
-
-    void add(const ptrdiff_t update = 1) {
-        if (m_use_ossync) {
-            m_ossync_impl.add(update);
-        } else {
-            m_gdc_impl.add(update);
         }
     }
 

@@ -30,7 +30,7 @@ limitations under the License.
 
 class ks_semaphore {
 public:
-    explicit ks_semaphore(const ptrdiff_t desired) : m_impl(desired) {}
+    explicit ks_semaphore(ptrdiff_t desired) : m_impl(desired) {}
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore);
 
     void release(ptrdiff_t update = 1) { m_impl.release(update); }

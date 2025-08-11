@@ -31,11 +31,11 @@ limitations under the License.
 
 class ks_latch {
 public:
-    explicit ks_latch(const ptrdiff_t expected) : m_impl(expected) {}
+    explicit ks_latch(ptrdiff_t expected) : m_impl(expected) {}
     _DISABLE_COPY_CONSTRUCTOR(ks_latch);
 
-    void add(const ptrdiff_t update = 1) { m_impl.add(update); }
-    void count_down(const ptrdiff_t update = 1) { m_impl.count_down(update); }
+    void add(ptrdiff_t update = 1) { m_impl.add(update); }
+    void count_down(ptrdiff_t update = 1) { m_impl.count_down(update); }
     void wait() { m_impl.wait(); }
 
     _NODISCARD bool try_wait() { return m_impl.try_wait(); }

@@ -26,7 +26,7 @@ namespace _KSConcurrencyImpl {
 
 class ks_semaphore_win_synch {
 public:
-    explicit ks_semaphore_win_synch(const ptrdiff_t desired) {
+    explicit ks_semaphore_win_synch(ptrdiff_t desired) {
         ASSERT(desired >= 0 && (LONG)desired >= 0);
         m_semaphoreHandle = ::CreateSemaphoreW(NULL, (LONG)desired, LONG_MAX, NULL);
         if (m_semaphoreHandle == NULL) {
@@ -43,7 +43,7 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_win_synch);
 
     void release(ptrdiff_t update = 1) {
-        ASSERT(update > 0 && (LONG)update > 0);
+        ASSERT(update > 0 && (ptrdiff_t)(LONG)update == update);
         ::ReleaseSemaphore(m_semaphoreHandle, (LONG)update, NULL);
     }
 

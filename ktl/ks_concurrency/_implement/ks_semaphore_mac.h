@@ -26,7 +26,7 @@ namespace _KSConcurrencyImpl {
 
 class ks_semaphore_mac_gdc {
 public:
-    explicit ks_semaphore_mac_gdc(const ptrdiff_t desired) {
+    explicit ks_semaphore_mac_gdc(ptrdiff_t desired) {
         ASSERT(desired >= 0);
 
         m_dispatchSemaphore = dispatch_semaphore_create(0);

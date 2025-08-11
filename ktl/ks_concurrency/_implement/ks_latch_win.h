@@ -26,9 +26,9 @@ namespace _KSConcurrencyImpl {
 
 class ks_latch_win_synch {
 public:
-    explicit ks_latch_win_synch(const ptrdiff_t expected)
-        : m_counter(expected) {
-        ASSERT(expected >= 0);
+    explicit ks_latch_win_synch(ptrdiff_t desired)
+        : m_counter(desired) {
+        ASSERT(desired >= 0);
         ASSERT(_helper::getWinSynchApis()->pfnWaitOnAddress != nullptr &&
                _helper::getWinSynchApis()->pfnWakeByAddressSingle != nullptr &&
                _helper::getWinSynchApis()->pfnWakeByAddressAll != nullptr);
@@ -36,32 +36,32 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_win_synch);
 
-    void add(const ptrdiff_t update = 1) {
-        ASSERT(update >= 0);
+    void add(ptrdiff_t update = 1) {
+        ASSERT(update > 0);
         m_counter.fetch_add(update, std::memory_order_relaxed);
     }
 
-    void count_down(const ptrdiff_t update = 1) {
-		ASSERT(update >= 0);
-        const ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
+    void count_down(ptrdiff_t update = 1) {
+		ASSERT(update > 0);
+        ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
         ASSERT(current >= 0);
         if (current == 0) {
             _helper::getWinSynchApis()->pfnWakeByAddressAll(&m_counter);
         }
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
             ptrdiff_t current = m_counter.load(std::memory_order_acquire);
             ASSERT(current >= 0);
             if (current == 0) 
                 return;
 
-            _helper::getWinSynchApis()->pfnWaitOnAddress(&m_counter, &current, sizeof(ptrdiff_t), INFINITE);
+            _helper::getWinSynchApis()->pfnWaitOnAddress((void*)&m_counter, &current, sizeof(ptrdiff_t), INFINITE);
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         return m_counter.load(std::memory_order_acquire) == 0;
     }
 
@@ -72,10 +72,10 @@ private:
 
 class ks_latch_win_ev {
 public:
-    explicit ks_latch_win_ev(const ptrdiff_t expected)
-        : m_counter(expected) {
-        ASSERT(expected >= 0);
-        m_eventHandle = ::CreateEventW(NULL, TRUE, expected > 0, NULL);
+    explicit ks_latch_win_ev(ptrdiff_t desired)
+        : m_counter(desired) {
+        ASSERT(desired >= 0);
+        m_eventHandle = ::CreateEventW(NULL, TRUE, desired > 0, NULL);
         if (m_eventHandle == NULL) {
             ASSERT(false);
             throw std::runtime_error("Failed to create event handle");
@@ -89,7 +89,7 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_win_ev);
 
-    void add(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
         ASSERT(update >= 0);
         ptrdiff_t old_value = m_counter.fetch_add(update, std::memory_order_relaxed);
         ASSERT(old_value + update >= 0);
@@ -98,7 +98,7 @@ public:
         }
     }
 
-    void count_down(const ptrdiff_t update = 1) {
+    void count_down(ptrdiff_t update = 1) {
         ASSERT(update >= 0);
         ptrdiff_t old_value = m_counter.fetch_sub(update, std::memory_order_release);
         ASSERT(old_value - update >= 0);
@@ -107,7 +107,7 @@ public:
         }
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
             ptrdiff_t current = m_counter.load(std::memory_order_acquire);
             ASSERT(current >= 0);
@@ -124,7 +124,7 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         return m_counter.load(std::memory_order_acquire) == 0;
     }
 
@@ -136,11 +136,11 @@ private:
 
 class ks_latch_win {
 public:
-    explicit ks_latch_win(const ptrdiff_t expected) {
+    explicit ks_latch_win(ptrdiff_t desired) {
         if (m_use_synch)
-            new (&m_synch_impl) ks_latch_win_synch(expected);
+            new (&m_synch_impl) ks_latch_win_synch(desired);
         else
-            new (&m_ev_impl) ks_latch_win_ev(expected);
+            new (&m_ev_impl) ks_latch_win_ev(desired);
     }
 
     ~ks_latch_win() {
@@ -152,32 +152,32 @@ public:
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_win);
 
-    void count_down(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
+        if (m_use_synch)
+            m_synch_impl.add(update);
+        else
+            m_ev_impl.add(update);
+    }
+
+    void count_down(ptrdiff_t update = 1) {
         if (m_use_synch)
             m_synch_impl.count_down(update);
         else
             m_ev_impl.count_down(update);
     }
 
-    void wait() {
+    void wait() const {
         if (m_use_synch)
             m_synch_impl.wait();
         else
             m_ev_impl.wait();
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         if (m_use_synch)
             return m_synch_impl.try_wait();
         else
             return m_ev_impl.try_wait();
-    }
-
-    void add(const ptrdiff_t update = 1) {
-        if (m_use_synch)
-            m_synch_impl.add(update);
-        else
-            m_ev_impl.add(update);
     }
 
 private:

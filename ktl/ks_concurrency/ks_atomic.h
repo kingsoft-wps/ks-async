@@ -28,8 +28,6 @@ limitations under the License.
 #include "_implement/ks_atomic_floating.h"
 #include "_implement/ks_atomic_pointer.h"
 
-#include "_implement/ks_atomic_flag.h"
-
 
 template <class T>
 using ks_atomic =
@@ -42,7 +40,42 @@ using ks_atomic =
     std::conditional_t<std::is_pointer<T>::value, _KSConcurrencyImpl::ks_atomic_pointer<T>,
     _KSConcurrencyImpl::ks_atomic_storage<T>>>>>>>>;
 
-using ks_atomic_flag = _KSConcurrencyImpl::ks_atomic_flag;
+
+class ks_atomic_flag : private ks_atomic<int> {
+    using __underlying_atomic_type = ks_atomic<int>;
+
+public:
+    ks_atomic_flag() noexcept : __underlying_atomic_type(0) {} //与std不同，我们默认初始化为false（即0）
+    ks_atomic_flag(bool desired) noexcept : __underlying_atomic_type(desired ? 1 : 0) {} //与std不同，我们还提供指定初值构造
+    _DISABLE_COPY_CONSTRUCTOR(ks_atomic_flag);
+
+    void clear(std::memory_order order = std::memory_order_seq_cst) {
+        __underlying_atomic_type::store(0, order);
+    }
+
+    bool test(std::memory_order order = std::memory_order_seq_cst) const {
+        return __underlying_atomic_type::load(order) != 0;
+    }
+
+    bool test_and_set(std::memory_order order = std::memory_order_seq_cst) {
+        return __underlying_atomic_type::exchange(1, order) != 0;
+    }
+
+    using __underlying_atomic_type::is_lock_free;
+    using __underlying_atomic_type::__is_wait_efficient;
+
+    void __wait(bool old, std::memory_order order = std::memory_order_seq_cst) const {
+        return __underlying_atomic_type::__wait(old ? 1 : 0, order);
+    }
+
+    void __notify_one() {
+        return __underlying_atomic_type::__notify_one();
+    }
+
+    void __notify_all() {
+        return __underlying_atomic_type::__notify_all();
+    }
+};
 
 
 #endif // __KS_ATOMIC_DEF

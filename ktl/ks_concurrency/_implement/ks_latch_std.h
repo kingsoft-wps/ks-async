@@ -27,43 +27,44 @@ namespace _KSConcurrencyImpl {
 
 class ks_latch_std {
 public:
-    explicit ks_latch_std(const ptrdiff_t expected)
-        : m_counter(expected) {
-        ASSERT(expected >= 0);
+    explicit ks_latch_std(ptrdiff_t desired)
+        : m_counter(desired) {
+        ASSERT(desired >= 0);
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_latch_std);
 
-    void add(const ptrdiff_t update = 1) {
+    void add(ptrdiff_t update = 1) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        ASSERT(update >= 0);
+        ASSERT(update > 0);
         m_counter += update;
     }
 
-    void count_down(const ptrdiff_t update = 1) {
+    void count_down(ptrdiff_t update = 1) {
         std::unique_lock<std::mutex> lock(m_mutex);
-		ASSERT(update >= 0 && update <= m_counter);
+        ASSERT(update > 0);
         m_counter -= update;
+        ASSERT(m_counter >= 0);
         if (m_counter == 0) {
             m_cv.notify_all();
         }
     }
 
-    void wait() {
+    void wait() const {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_counter != 0) {
             m_cv.wait(lock);
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
 		std::unique_lock<std::mutex> lock(m_mutex);
 		return (m_counter == 0);
     }
 
 private:
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
+    mutable std::mutex m_mutex;
+    mutable std::condition_variable m_cv;
     ptrdiff_t m_counter;
 };
 

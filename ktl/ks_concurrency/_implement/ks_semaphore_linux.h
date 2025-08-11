@@ -27,7 +27,7 @@ namespace _KSConcurrencyImpl {
 
 class ks_semaphore_linux_posix {
 public:
-    explicit ks_semaphore_linux_posix(const ptrdiff_t desired) {
+    explicit ks_semaphore_linux_posix(ptrdiff_t desired) {
         ASSERT(desired >= 0);
         if (sem_init(&m_sem, 0, desired) != 0) {
             ASSERT(false);

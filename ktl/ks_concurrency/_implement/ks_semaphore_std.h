@@ -27,7 +27,7 @@ namespace _KSConcurrencyImpl {
 
 class ks_semaphore_std {
 public:
-    explicit ks_semaphore_std(const ptrdiff_t desired)
+    explicit ks_semaphore_std(ptrdiff_t desired)
         : m_counter(desired) {
 		ASSERT(desired >= 0);
     }
@@ -36,6 +36,7 @@ public:
 
     void release(ptrdiff_t update = 1) {
         std::unique_lock<std::mutex> lock(m_mutex);
+        ASSERT(update > 0);
         m_counter += update;
 
         if (update == 1) {

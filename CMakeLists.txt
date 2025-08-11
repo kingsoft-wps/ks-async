@@ -122,7 +122,6 @@ set(MY_KTL_SOURCE_FILES
 	ktl/ks_concurrency/_implement/ks_atomic_bool.h
 	ktl/ks_concurrency/_implement/ks_atomic_floating.h
 	ktl/ks_concurrency/_implement/ks_atomic_pointer.h
-	ktl/ks_concurrency/_implement/ks_atomic_flag.h
 	ktl/ks_concurrency/_implement/ks_spinlock_std.h
 	ktl/ks_concurrency/_implement/ks_spinlock_win.h
 	ktl/ks_concurrency/_implement/ks_spinlock_mac.h
@@ -222,7 +221,6 @@ set(PUBLIC_KTL_CONCURRENCY_IMPLEMENT_HEADER_FILES
 	ktl/ks_concurrency/_implement/ks_atomic_bool.h
 	ktl/ks_concurrency/_implement/ks_atomic_floating.h
 	ktl/ks_concurrency/_implement/ks_atomic_pointer.h
-	ktl/ks_concurrency/_implement/ks_atomic_flag.h
 	ktl/ks_concurrency/_implement/ks_spinlock_std.h
 	ktl/ks_concurrency/_implement/ks_spinlock_win.h
 	ktl/ks_concurrency/_implement/ks_spinlock_mac.h
