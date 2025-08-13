@@ -126,10 +126,12 @@ uint64_t ks_thread_pool_apartment_imp::schedule(std::function<void()>&& fn, int 
 	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
 
 	if (!(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING)) {
+		lock.unlock();
 		fn = {};
 		return 0;
 	}
 	if (priority < 0 && m_d->state_v != _STATE::RUNNING) {
+		lock.unlock();
 		fn = {};
 		return 0;
 	}
@@ -156,6 +158,7 @@ uint64_t ks_thread_pool_apartment_imp::schedule_delayed(std::function<void()>&& 
 	ASSERT(m_d->state_v == _STATE::RUNNING || m_d->state_v == _STATE::STOPPING);
 
 	if (!(m_d->state_v == _STATE::RUNNING)) {
+		lock.unlock();
 		fn = {};
 		return 0;
 	}
@@ -184,28 +187,30 @@ void ks_thread_pool_apartment_imp::try_unschedule(uint64_t id) {
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
 
-	auto do_erase_fn_from = [](std::deque<std::shared_ptr<_FN_ITEM>>*fn_queue, uint64_t fn_id) -> bool {
+	auto do_erase_fn_from = [](std::deque<std::shared_ptr<_FN_ITEM>>*fn_queue, uint64_t fn_id) -> std::shared_ptr<_FN_ITEM> {
 		auto it = std::find_if(fn_queue->begin(), fn_queue->end(),
 			[fn_id](const auto& item) {return item->fn_id == fn_id; });
-		if (it != fn_queue->end()) {
-			(*it)->fn = {};
-			fn_queue->erase(it);
-			return true;
-		}
-		else {
-			return false;
-		}
+		if (it == fn_queue->end())
+			return nullptr;
+
+		std::shared_ptr<_FN_ITEM> found_fn = std::move(*it);
+		fn_queue->erase(it);
+		return found_fn;
 	};
 
 	//检查延时任务队列
-	if (do_erase_fn_from(&m_d->delaying_fn_queue, id))
-		return;
+	std::shared_ptr<_FN_ITEM> found_fn = do_erase_fn_from(&m_d->delaying_fn_queue, id);
 	//检查idle任务队列
-	if (do_erase_fn_from(&m_d->now_fn_queue_idle, id))
-		return;
-
+	if (found_fn == nullptr)
+		found_fn = do_erase_fn_from(&m_d->now_fn_queue_idle, id);
 	//对于其他任务队列（normal和prior），没有检查的必要和意义
-	return;
+
+	//release fn
+	lock.unlock();
+	if (found_fn != nullptr) {
+		found_fn->fn = {};
+		found_fn = nullptr;
+	}
 }
 
 

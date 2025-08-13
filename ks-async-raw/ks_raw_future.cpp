@@ -442,7 +442,7 @@ protected:
 			lock.unlock();
 
 			//feed next-futures
-			if (has_some_next_futures) {
+			if (has_some_next_futures && !from_destructor) {
 				if (from_internal) {
 					if (t_next_future_1st != nullptr)
 						t_next_future_1st->on_feeded_by_prev(my_completed_result, this, my_completed_apartment);
@@ -675,6 +675,7 @@ public:
 
 	~ks_raw_promise_future() {
 		_NOOP();
+		ASSERT(m_completed_result.is_completed()); //auto reject by representative
 	}
 
 public:
@@ -1389,7 +1390,7 @@ public:
 	}
 
 	~ks_raw_aggr_future() {
-		_NOOP();
+		do_final_auto_reject();
 	}
 
 private:
