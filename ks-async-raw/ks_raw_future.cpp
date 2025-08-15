@@ -149,7 +149,7 @@ protected:
 		//若最终仍未被invoke，则自动reject，以确保future最终completed
 		if (!m_completed_result.is_completed()) {
 			ks_raw_future_unique_lock pseudo_lock(__get_mutex(), true); //just pseudo locking only
-			this->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, pseudo_lock, false);
+			this->do_complete_locked(ks_error::terminated_error(), nullptr, false, true, pseudo_lock, false);
 		}
 	}
 
@@ -744,7 +744,8 @@ private:
 				ks_raw_future_unique_lock pseudo_lock(m_promise_future->__get_mutex(), true); //just pseudo locking only
 				if (!m_promise_future->m_completed_result.is_completed()) {
 					ASSERT(m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_more.empty());
-					m_promise_future->do_complete_locked(ks_error::unexpected_error(), nullptr, false, true, pseudo_lock, false);
+					//m_promise_future->do_final_auto_reject();
+					m_promise_future->do_complete_locked(ks_error::terminated_error(), nullptr, false, true, pseudo_lock, false);
 				}
 			}
 		}
