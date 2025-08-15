@@ -85,6 +85,8 @@ public:
 public:
 	//注：设定default-mta最大线程数，请在首次调用default_mta()方法前调用。
 	KS_ASYNC_API static void __set_default_mta_max_thread_count(size_t max_thread_count);
+	KS_ASYNC_API static void __set_unified_raw_thread_init_fn(void(*raw_thread_init_fn)());
+	KS_ASYNC_API static void __set_unified_raw_thread_term_fn(void(*raw_thread_term_fn)());
 
 protected:
 	//注：ui_sta和master_sta由APP框架提供。

@@ -405,10 +405,9 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 		}
 	}
 
-	if (t_thread_term_fn) 
+	if (t_thread_term_fn) {
 		t_thread_term_fn();
-	else if (d->thread_term_fn) 
-		d->thread_term_fn();
+	}
 
 	t_thread_init_fn = nullptr;
 	t_thread_term_fn = nullptr;
