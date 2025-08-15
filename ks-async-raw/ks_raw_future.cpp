@@ -824,16 +824,19 @@ private:
 
 			ks_raw_result result;
 			try {
+				ks_error cancelled_error;
 				if (this->do_check_cancelled_locked(lock2))
-					result = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
-				else {
-					std::function<ks_raw_result()> t_task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
-					lock2.unlock();
-					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+					cancelled_error = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
+
+				std::function<ks_raw_result()> t_task_fn = std::move(intermediate_data_ex_ptr->m_task_fn);
+				lock2.unlock();
+				ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+				if (cancelled_error.has_code())
+					result = cancelled_error;
+				else
 					result = t_task_fn().require_completed_or_error();
-					t_task_fn = {};
-					defer_relock2.apply();
-				}
+				t_task_fn = {};
+				defer_relock2.apply();
 			}
 			catch (ks_error error) {
 				result = error;
@@ -1033,16 +1036,16 @@ protected:
 
 			ks_raw_result result;
 			try {
-				if (this->do_check_cancelled_locked(lock2))
-					result = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
-				else {
-					std::function<ks_raw_result(const ks_raw_result&)> fn_ex = std::move(intermediate_data_ex_ptr->m_fn_ex);
-					lock2.unlock();
-					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
-					result = fn_ex(prev_result).require_completed_or_error();
-					fn_ex = {};
-					defer_relock2.apply();
-				}
+				ks_raw_result prev_result_alt = prev_result;
+				if (prev_result.is_value() && this->do_check_cancelled_locked(lock2))
+					prev_result_alt = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
+
+				std::function<ks_raw_result(const ks_raw_result&)> fn_ex = std::move(intermediate_data_ex_ptr->m_fn_ex);
+				lock2.unlock();
+				ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+				result = fn_ex(prev_result_alt).require_completed_or_error();
+				fn_ex = {};
+				defer_relock2.apply();
 			}
 			catch (ks_error error) {
 				result = error;
@@ -1249,20 +1252,20 @@ protected:
 			ks_raw_future_ptr extern_future;
 			ks_error immediate_error;
 			try {
-				if (this->do_check_cancelled_locked(lock2))
-					immediate_error = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
-				else {
-					std::function<ks_raw_future_ptr(const ks_raw_result&)> afn_ex = std::move(intermediate_data_ex_ptr->m_afn_ex);
-					lock2.unlock();
-					ks_defer defer_relock2([&lock2]() { lock2.lock(); });
-					extern_future = afn_ex(prev_result);
-					if (extern_future == nullptr) {
-						ASSERT(false);
-						immediate_error = ks_error::unexpected_error();
-					}
-					afn_ex = {};
-					defer_relock2.apply();
+				ks_raw_result prev_result_alt = prev_result;
+				if (prev_result.is_value() && this->do_check_cancelled_locked(lock2))
+					prev_result_alt = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock2);
+
+				std::function<ks_raw_future_ptr(const ks_raw_result&)> afn_ex = std::move(intermediate_data_ex_ptr->m_afn_ex);
+				lock2.unlock();
+				ks_defer defer_relock2([&lock2]() { lock2.lock(); });
+				extern_future = afn_ex(prev_result_alt);
+				if (extern_future == nullptr) {
+					ASSERT(false);
+					immediate_error = ks_error::unexpected_error();
 				}
+				afn_ex = {};
+				defer_relock2.apply();
 			}
 			catch (ks_error error) {
 				immediate_error = error;
