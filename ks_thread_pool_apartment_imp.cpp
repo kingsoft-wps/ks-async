@@ -51,7 +51,8 @@ ks_thread_pool_apartment_imp::ks_thread_pool_apartment_imp(const char* name, siz
 ks_thread_pool_apartment_imp::~ks_thread_pool_apartment_imp() {
 	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
 	if (m_d->state_v != _STATE::STOPPED) {
-		this->async_stop();
+		std::unique_lock<std::mutex> lock(m_d->mutex);
+		this->_try_stop_locked(true, lock, false);
 		//this->wait();  //这里不等了，因为在进程退出时导致自动析构的话，可能时机就太晚，work线程已经被杀了
 	}
 
@@ -89,7 +90,7 @@ bool ks_thread_pool_apartment_imp::start() {
 
 void ks_thread_pool_apartment_imp::async_stop() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	return _try_stop_locked(lock, false);
+	return _try_stop_locked(false, lock, false);
 }
 
 //注：目前的wait实现暂不支持并发重入
@@ -97,7 +98,7 @@ void ks_thread_pool_apartment_imp::wait() {
 	ASSERT(this != ks_apartment::current_thread_apartment());
 
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	this->_try_stop_locked(lock, true); //ensure stop
+	this->_try_stop_locked(true, lock, true); //ensure stop
 
 	ASSERT(m_d->state_v == _STATE::STOPPING || m_d->state_v == _STATE::STOPPED);
 	while (m_d->state_v == _STATE::STOPPING) {
@@ -220,7 +221,7 @@ void ks_thread_pool_apartment_imp::_try_start_locked(std::unique_lock<ks_mutex>&
 	}
 }
 
-void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& lock, bool must_keep_locked) {
+void ks_thread_pool_apartment_imp::_try_stop_locked(bool mark_waiting, std::unique_lock<ks_mutex>& lock, bool must_keep_locked) {
 	ASSERT(lock.owns_lock());
 	//must_keep_locked may be false.
 
@@ -248,6 +249,11 @@ void ks_thread_pool_apartment_imp::_try_stop_locked(std::unique_lock<ks_mutex>& 
 		m_d->stopped_state_cv.notify_all();
 		m_d->thread_init_fn.swap(t_thread_init_fn); //final cleanup
 		m_d->thread_term_fn.swap(t_thread_term_fn); //final cleanup
+	}
+
+	if (mark_waiting && !m_d->waiting_v) {
+		m_d->waiting_v = true;
+		m_d->any_fn_queue_cv.notify_all();
 	}
 
 	if (!t_now_fn_queue_idle.empty() || !t_delaying_fn_queue.empty() || t_thread_init_fn || t_thread_term_fn) {
@@ -388,7 +394,7 @@ void ks_thread_pool_apartment_imp::_work_thread_proc(ks_thread_pool_apartment_im
 		}
 
 		//pump-idle
-		if (d->state_v != _STATE::RUNNING) {
+		if (d->state_v == _STATE::STOPPING && d->waiting_v) {
 			break; //end
 		}
 
