@@ -110,7 +110,6 @@ void ks_single_thread_apartment_imp::async_stop() {
 	return _try_stop_locked(false, lock, false);
 }
 
-//注：目前的wait实现暂不支持并发重入
 void ks_single_thread_apartment_imp::wait() {
 	ASSERT(this != ks_apartment::current_thread_apartment());
 
@@ -118,15 +117,20 @@ void ks_single_thread_apartment_imp::wait() {
 	this->_try_stop_locked(true, lock, true); //ensure stop
 
 	ASSERT(m_d->state_v == _STATE::STOPPING || m_d->state_v == _STATE::STOPPED);
-	while (m_d->state_v == _STATE::STOPPING) {
+	while (m_d->state_v != _STATE::STOPPED) {
 		m_d->stopped_state_cv.wait(lock);
 	}
 
-	ASSERT(m_d->state_v == _STATE::STOPPED);
 	ASSERT(m_d->now_fn_queue_prior.empty() && m_d->now_fn_queue_normal.empty());
 }
 
 bool ks_single_thread_apartment_imp::is_stopped() {
+	if (!m_d->waiting_v && m_d->state_v == _STATE::STOPPING) {
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
+		m_d->waiting_v = true;
+		m_d->any_fn_queue_cv.notify_all();
+	}
+
 	_STATE state = m_d->state_v;
 	return state == _STATE::STOPPED;
 }
