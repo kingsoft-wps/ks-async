@@ -21,39 +21,44 @@ limitations under the License.
 
 class ks_source_location {
 public:
-    explicit ks_source_location(nullptr_t) 
-        : m_file_name(nullptr), m_line(0), m_function_name(nullptr) {
+    constexpr explicit ks_source_location(nullptr_t)
+        : m_file_name(nullptr), m_line(0), m_function_name(nullptr), m_custom_desc(nullptr) {
     }
 
-    explicit ks_source_location(const char* file_name, unsigned int line, const char* function_name) 
-        : m_file_name(file_name), m_line(line), m_function_name(function_name) {
+    constexpr explicit ks_source_location(
+        const char* file_name, unsigned int line, const char* function_name, const char* custom_desc = nullptr)
+        : m_file_name(file_name), m_line(line), m_function_name(function_name), m_custom_desc(custom_desc) {
         ASSERT((m_file_name == nullptr && m_line == 0 && m_function_name == nullptr)
             || (m_file_name != nullptr && m_line != 0 && m_function_name != nullptr));
     }
 
-    ks_source_location(const ks_source_location&) = default;
-    ks_source_location(ks_source_location&&) noexcept = default;
+    constexpr ks_source_location(const ks_source_location&) = default;
+    constexpr ks_source_location(ks_source_location&&) noexcept = default;
 
-    ks_source_location& operator=(const ks_source_location&) = default;
-    ks_source_location& operator=(ks_source_location&&) noexcept = default;
+    constexpr ks_source_location& operator=(const ks_source_location&) = default;
+    constexpr ks_source_location& operator=(ks_source_location&&) noexcept = default;
 
 public:
-    bool is_empty() const { return this->m_file_name == nullptr; }
+    constexpr bool is_empty() const { return this->m_file_name == nullptr; }
 
-    const char*  file_name() const { return m_file_name; }
-    unsigned int line() const { return m_line; }
-    const char*  function_name() const { return m_function_name; }
+    constexpr const char*  file_name() const { return m_file_name; }
+    constexpr unsigned int line() const { return m_line; }
+    constexpr const char*  function_name() const { return m_function_name; }
+    constexpr const char* custom_desc() const { return m_custom_desc; }
+
+public:
+    static constexpr const char* __custom_desc_of() { return nullptr; }
+    static constexpr const char* __custom_desc_of(const char* custom_desc) { return custom_desc; }
 
 private:
     const char*  m_file_name;
     unsigned int m_line;
     const char*  m_function_name;
-
-    friend ks_source_location __make_source_location(const char* file_name, unsigned int line, const char* function_name);
+    const char*  m_custom_desc;
 };
 
 
-#define current_source_location()  (ks_source_location(__FILE__, __LINE__, __FUNCTION__))
+#define current_source_location(...)  (ks_source_location(__FILE__, __LINE__, __FUNCTION__, ks_source_location::__custom_desc_of(__VA_ARGS__)))
 
 
 #endif //__KS_SOURCE_LOCATION

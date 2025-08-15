@@ -311,4 +311,4 @@ private:
 };
 
 
-#define make_async_context()  (ks_async_context().__bind_from_source_location(current_source_location()))
+#define make_async_context(...)  (ks_async_context().__bind_from_source_location(current_source_location(__VA_ARGS__)))
