@@ -403,6 +403,7 @@ protected:
 		ks_raw_future_ptr t_next_future_1st = nullptr;
 		std::vector<ks_raw_future_ptr> t_next_future_more{};
 		std::vector<ks_apartment*> t_waiting_for_me_apartments{};
+		ks_async_context t_living_context = {};
 		if (intermediate_data_ptr != nullptr) {
 			if (intermediate_data_ptr->m_timeout_schedule_id != 0) {
 				ASSERT(intermediate_data_ptr->m_timeout_apartment != nullptr);
@@ -429,20 +430,23 @@ protected:
 			intermediate_data_ptr->m_waiting_for_me_apartments.shrink_to_fit();
 
 			//完毕，自此刻起，本future进入completed稳态，可清除intermediate-data了
+			t_living_context = std::move(intermediate_data_ptr->m_living_context);
 			intermediate_data_ptr->m_living_context = {};
+
 			__clear_intermediate_data_ptr(intermediate_data_ptr, from_destructor, lock);
 			intermediate_data_ptr = nullptr;
 		}
 
 		//触发流水线后续事项
-		const bool has_some_next_futures = t_next_future_1st != nullptr || !t_next_future_more.empty();
-		const bool has_some_waiting_apartments = !t_waiting_for_me_apartments.empty();
-		if (has_some_next_futures || has_some_waiting_apartments) {
+		if (true) {
 			//注：按说from_internal流程无需解锁（除非外部不合理乱用0x10000优先级），但我们这里无差别处理，没啥损失且更安全
 			lock.unlock();
 
+			//release living-context
+			t_living_context = {};
+
 			//feed next-futures
-			if (has_some_next_futures && !from_destructor) {
+			if ((t_next_future_1st != nullptr || !t_next_future_more.empty()) && !from_destructor) {
 				if (from_internal) {
 					if (t_next_future_1st != nullptr)
 						t_next_future_1st->on_feeded_by_prev(my_completed_result, this, my_completed_apartment);
@@ -470,10 +474,8 @@ protected:
 			}
 
 			//awaken waiting-apartments
-			if (has_some_waiting_apartments) {
-				for (ks_apartment* waiting_apartment : t_waiting_for_me_apartments)
-					waiting_apartment->__awaken_nested_pump_loop_for_extern_waiting_once(this);
-			}
+			for (ks_apartment* waiting_apartment : t_waiting_for_me_apartments)
+				waiting_apartment->__awaken_nested_pump_loop_for_extern_waiting_once(this);
 
 			if (must_keep_locked)
 				lock.lock();
@@ -802,11 +804,7 @@ private:
 		intermediate_data_ex_ptr->m_delay = delay;
 
 		ks_apartment* prefer_apartment = this->do_determine_prefer_apartment(intermediate_data_ex_ptr->m_spec_apartment);
-		int priority = intermediate_data_ex_ptr->m_living_context.__get_priority();
-		bool could_run_locally = (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 
-		//pending_schedule_fn不对context进行捕获。
-		//这样做的意图是：对于delayed任务，当try_cancel时，即使apartment::try_unschedule失败，也不影响context的及时释放。
 		std::function<void()> pending_schedule_fn = [this, this_shared = this->shared_from_this(), intermediate_data_ex_ptr, prefer_apartment, context = intermediate_data_ex_ptr->m_living_context]() mutable -> void {
 			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
@@ -845,9 +843,12 @@ private:
 			this->do_complete_locked(result, prefer_apartment, true, false, lock2, false);
 		};
 
+		int priority = intermediate_data_ex_ptr->m_living_context.__get_priority();
+		bool could_run_locally = (m_task_mode == ks_raw_future_mode::TASK) && (priority >= 0x10000) && (intermediate_data_ex_ptr->m_spec_apartment == nullptr || intermediate_data_ex_ptr->m_spec_apartment == prefer_apartment);
 		if (could_run_locally) {
 			lock.unlock();
 			pending_schedule_fn(); //超高优先级、且spec_partment为nullptr，则立即执行，省掉schedule过程
+			pending_schedule_fn = {};
 			if (must_keep_locked)
 				lock.lock();
 		}
@@ -1057,6 +1058,7 @@ protected:
 		if (could_run_locally) {
 			lock.unlock();
 			run_fn(); //超高优先级、且spec_partment为nullptr，则立即执行，省掉schedule过程
+			run_fn = {};
 			return;
 		}
 
@@ -1296,6 +1298,7 @@ protected:
 		if (could_run_locally) {
 			lock.unlock();
 			run_fn(); //超高优先级、且spec_partment为nullptr，则立即执行，省掉schedule过程
+			run_fn = {};
 			return;
 		}
 
