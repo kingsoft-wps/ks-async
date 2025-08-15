@@ -80,6 +80,43 @@ static ks_spinlock g_public_apartment_mutex {};
 static std::map<std::string, ks_apartment*> g_public_apartment_map {};
 
 static std::atomic<size_t> g_default_mta_max_thread_count = { 0 };
+static std::atomic<void(*)()> g_unified_raw_thread_init_fn = { nullptr };
+static std::atomic<void(*)()> g_unified_raw_thread_term_fn = { nullptr };
+
+
+namespace {
+	static size_t __determine_default_mta_max_thread_count() {
+		ptrdiff_t max_thread_count = (ptrdiff_t)g_default_mta_max_thread_count.load(std::memory_order_relaxed);
+		if (max_thread_count <= 0) {
+			constexpr ptrdiff_t _CPU_COUNT_RESERVED = 2;   //留出2颗核给其他线程
+			constexpr ptrdiff_t _CPU_COUNT_MIN = 2;        //至少2个线程
+			constexpr ptrdiff_t _CPU_COUNT_THRESHOLD = 10; //线程数10个以上按对数增长
+			max_thread_count = (ptrdiff_t)std::thread::hardware_concurrency() - _CPU_COUNT_RESERVED;
+			if (max_thread_count < _CPU_COUNT_MIN)
+				max_thread_count = _CPU_COUNT_MIN;
+			else if (max_thread_count > _CPU_COUNT_THRESHOLD)
+				max_thread_count = (ptrdiff_t)(_CPU_COUNT_THRESHOLD + log2(max_thread_count - _CPU_COUNT_THRESHOLD));
+		}
+
+		return max_thread_count;
+	}
+
+	static std::function<void()> __determine_unified_thread_init_fn() {
+		auto* raw_thread_init_fn = g_unified_raw_thread_init_fn.load(std::memory_order_relaxed);
+		if (raw_thread_init_fn != nullptr)
+			return [raw_thread_init_fn]() { raw_thread_init_fn(); };
+		else
+			return std::function<void()>();
+	}
+
+	static std::function<void()> __determine_unified_thread_term_fn() {
+		auto* raw_thread_term_fn = g_unified_raw_thread_term_fn.load(std::memory_order_relaxed);
+		if (raw_thread_term_fn != nullptr)
+			return [raw_thread_term_fn]() { raw_thread_term_fn(); };
+		else
+			return std::function<void()>();
+	}
+}
 
 
 ks_apartment* ks_apartment::ui_sta() {
@@ -93,33 +130,17 @@ ks_apartment* ks_apartment::master_sta() {
 ks_apartment* ks_apartment::background_sta() {
 	static ks_single_thread_apartment_imp g_background_sta(
 		"background_sta", 
-		ks_single_thread_apartment_imp::auto_register_flag | ks_single_thread_apartment_imp::endless_instance_flag);
+		ks_single_thread_apartment_imp::auto_register_flag | ks_single_thread_apartment_imp::endless_instance_flag,
+		__determine_unified_thread_init_fn(), __determine_unified_thread_term_fn());
 	return &g_background_sta;
 }
 
 ks_apartment* ks_apartment::default_mta() {
-	struct _default_mta_options {
-		static size_t max_thread_count() {
-			ptrdiff_t max_thread_count = (ptrdiff_t)g_default_mta_max_thread_count.load(std::memory_order_relaxed);
-			if (max_thread_count <= 0) {
-				constexpr ptrdiff_t _CPU_COUNT_RESERVED = 2;   //留出2颗核给其他线程
-				constexpr ptrdiff_t _CPU_COUNT_MIN = 2;        //至少2个线程
-				constexpr ptrdiff_t _CPU_COUNT_THRESHOLD = 10; //线程数10个以上按对数增长
-				max_thread_count = (ptrdiff_t)std::thread::hardware_concurrency() - _CPU_COUNT_RESERVED; 
-				if (max_thread_count < _CPU_COUNT_MIN)
-					max_thread_count = _CPU_COUNT_MIN;  
-				else if (max_thread_count > _CPU_COUNT_THRESHOLD)
-					max_thread_count = (ptrdiff_t)(_CPU_COUNT_THRESHOLD + log2(max_thread_count - _CPU_COUNT_THRESHOLD));
-			}
-
-			return max_thread_count;
-		}
-	};
-
 	static ks_thread_pool_apartment_imp g_default_mta(
 		"default_mta", 
-		_default_mta_options::max_thread_count(), 
-		ks_thread_pool_apartment_imp::auto_register_flag | ks_thread_pool_apartment_imp::endless_instance_flag);
+		__determine_default_mta_max_thread_count(),
+		ks_thread_pool_apartment_imp::auto_register_flag | ks_thread_pool_apartment_imp::endless_instance_flag,
+		__determine_unified_thread_init_fn(), __determine_unified_thread_term_fn());
 	return &g_default_mta;
 }
 
@@ -171,6 +192,17 @@ ks_apartment* ks_apartment::find_public_apartment(const char* name) {
 void ks_apartment::__set_default_mta_max_thread_count(size_t max_thread_count) {
 	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
 	g_default_mta_max_thread_count.store(max_thread_count, std::memory_order_relaxed);
+}
+
+void ks_apartment::__set_unified_raw_thread_init_fn(void(*raw_thread_init_fn)()) {
+	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
+	ASSERT(ks_apartment::find_public_apartment("background_sta") == nullptr);
+	g_unified_raw_thread_init_fn.store(raw_thread_init_fn, std::memory_order_relaxed);
+}
+void ks_apartment::__set_unified_raw_thread_term_fn(void(*raw_thread_term_fn)()) {
+	ASSERT(ks_apartment::find_public_apartment("default_mta") == nullptr);
+	ASSERT(ks_apartment::find_public_apartment("background_sta") == nullptr);
+	g_unified_raw_thread_term_fn.store(raw_thread_term_fn, std::memory_order_relaxed);
 }
 
 
