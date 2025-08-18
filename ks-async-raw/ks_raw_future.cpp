@@ -628,7 +628,7 @@ public:
 	}
 
 	~ks_raw_dx_future() {
-		_NOOP();
+		ASSERT(m_completed_result.is_completed());
 	}
 
 protected:
@@ -676,8 +676,7 @@ public:
 	}
 
 	~ks_raw_promise_future() {
-		_NOOP();
-		ASSERT(m_completed_result.is_completed()); //auto reject by representative
+		do_final_auto_reject();
 	}
 
 public:
@@ -739,15 +738,14 @@ private:
 		_DISABLE_COPY_CONSTRUCTOR(ks_raw_promise_representative);
 
 		~ks_raw_promise_representative() {
-			if (m_promise_future != nullptr && !m_promise_future->m_completed_result.is_completed()) {
+		#ifdef _DEBUG
+			if (!m_promise_future->m_completed_result.is_completed()) {
 				//若最终未被settle过，则自动reject，以确保future最终completed
-				ks_raw_future_unique_lock pseudo_lock(m_promise_future->__get_mutex(), true); //just pseudo locking only
-				if (!m_promise_future->m_completed_result.is_completed()) {
-					ASSERT(m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_more.empty());
-					//m_promise_future->do_final_auto_reject();
-					m_promise_future->do_complete_locked(ks_error::terminated_error(), nullptr, false, true, pseudo_lock, false);
-				}
+				ks_raw_future_unique_lock pseudo_lock(m_promise_future->__get_mutex(), m_promise_future->__is_using_pseudo_mutex());
+				ASSERT((m_promise_future->m_completed_result.is_completed())
+					|| (m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_more.empty()));
 			}
+		#endif
 		}
 
 	public: //override ks_raw_promise's methods
