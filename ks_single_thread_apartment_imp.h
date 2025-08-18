@@ -117,7 +117,7 @@ private:
 		volatile _STATE state_v = _STATE::NOT_START;
 		ks_condition_variable stopped_state_cv{};
 
-		volatile bool waiting_v = false;
+		volatile bool waiting_v = false; //额外的waiting标记，在waiting前线程不退出（特别地，is_stopped相当于try_wait）
 
 #if __KS_APARTMENT_ATFORK_ENABLED
 		volatile bool working_flag_v = false;
