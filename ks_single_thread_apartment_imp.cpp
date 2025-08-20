@@ -125,13 +125,15 @@ void ks_single_thread_apartment_imp::wait() {
 }
 
 bool ks_single_thread_apartment_imp::is_stopped() {
-	if (!m_d->waiting_v && m_d->state_v == _STATE::STOPPING) {
+	_STATE state = m_d->state_v;
+	if (state == _STATE::STOPPING && !m_d->waiting_v) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
 		m_d->waiting_v = true;
 		m_d->any_fn_queue_cv.notify_all();
+		lock.unlock();
+		state = m_d->state_v;
 	}
 
-	_STATE state = m_d->state_v;
 	return state == _STATE::STOPPED;
 }
 
@@ -293,8 +295,9 @@ void ks_single_thread_apartment_imp::_prepare_work_thread_locked(ks_single_threa
 		return;
 
 	bool need_thread_flag = false;
-	if (d->state_v == _STATE::RUNNING)
+	if (d->state_v == _STATE::RUNNING || !d->waiting_v) {
 		need_thread_flag = true;
+	}
 
 	if (need_thread_flag && d->isolated_thread_opt == nullptr) {
 		d->isolated_thread_opt = std::make_shared<_THREAD_ITEM>();

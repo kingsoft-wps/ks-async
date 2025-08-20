@@ -108,13 +108,15 @@ void ks_thread_pool_apartment_imp::wait() {
 }
 
 bool ks_thread_pool_apartment_imp::is_stopped() {
-	if (!m_d->waiting_v && m_d->state_v == _STATE::STOPPING) {
+	_STATE state = m_d->state_v;
+	if (state == _STATE::STOPPING && !m_d->waiting_v) {
 		std::unique_lock<ks_mutex> lock(m_d->mutex);
 		m_d->waiting_v = true;
 		m_d->any_fn_queue_cv.notify_all();
+		lock.unlock();
+		state = m_d->state_v;
 	}
 
-	_STATE state = m_d->state_v;
 	return state == _STATE::STOPPED;
 }
 
@@ -277,16 +279,16 @@ void ks_thread_pool_apartment_imp::_prepare_work_thread_locked(ks_thread_pool_ap
 		return;
 
 	size_t needed_thread_count = 0;
-	if (d->state_v == _STATE::RUNNING) 
-		needed_thread_count = d->busy_thread_count + d->now_fn_queue_prior.size() + d->now_fn_queue_normal.size() + d->now_fn_queue_idle.size();
-	else if (d->state_v == _STATE::STOPPING) 
+	if (d->state_v == _STATE::RUNNING || !d->waiting_v) {
 		needed_thread_count = d->busy_thread_count + d->now_fn_queue_prior.size() + d->now_fn_queue_normal.size();
+		if (d->state_v == _STATE::RUNNING)
+			needed_thread_count += d->now_fn_queue_idle.size() + (d->delaying_fn_queue.empty() ? 0 : 1);
 
-	if (needed_thread_count > d->max_thread_count)
-		needed_thread_count = d->max_thread_count;
-
-	if (needed_thread_count == 0 && d->state_v == _STATE::RUNNING)
-		needed_thread_count = 1;
+		if (needed_thread_count == 0)
+			needed_thread_count = 1;
+		else if (needed_thread_count > d->max_thread_count)
+			needed_thread_count = d->max_thread_count;
+	}
 
 	for (size_t i = d->thread_pool.size(); i < needed_thread_count; ++i) {
 		d->thread_pool.push_back(std::make_shared<_THREAD_ITEM>());
