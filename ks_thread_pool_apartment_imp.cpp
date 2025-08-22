@@ -90,7 +90,8 @@ bool ks_thread_pool_apartment_imp::start() {
 
 void ks_thread_pool_apartment_imp::async_stop() {
 	std::unique_lock<ks_mutex> lock(m_d->mutex);
-	return _try_stop_locked(false, lock, false);
+	bool mark_waiting = ks_apartment::current_thread_apartment() == this;
+	return _try_stop_locked(mark_waiting, lock, false);
 }
 
 void ks_thread_pool_apartment_imp::wait() {

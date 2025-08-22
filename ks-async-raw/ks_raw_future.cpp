@@ -141,18 +141,6 @@ protected:
 		this->do_complete_locked(completed_result, spec_apartment, true, false, lock, must_keep_locked);
 	}
 
-	~ks_raw_future_baseimp() {
-		ASSERT(m_completed_result.is_completed());
-	}
-
-	void do_final_auto_reject() {
-		//若最终仍未被invoke，则自动reject，以确保future最终completed
-		if (!m_completed_result.is_completed()) {
-			ks_raw_future_unique_lock pseudo_lock(__get_mutex(), true); //just pseudo locking only
-			this->do_complete_locked(ks_error::terminated_error(), nullptr, false, true, pseudo_lock, false);
-		}
-	}
-
 public:
 	virtual ks_raw_future_ptr then(std::function<ks_raw_result(const ks_raw_value&)>&& fn, const ks_async_context& context, ks_apartment* apartment) override final;
 	virtual ks_raw_future_ptr trap(std::function<ks_raw_result(const ks_error&)>&& fn, const ks_async_context& context, ks_apartment* apartment) override final;
@@ -627,10 +615,6 @@ public:
 		do_init_with_result_locked(spec_apartment, completed_result, lock, false);
 	}
 
-	~ks_raw_dx_future() {
-		ASSERT(m_completed_result.is_completed());
-	}
-
 protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
 		//ks_raw_dx_future的此方法不应被调用，而是在init时就已立即do_complete
@@ -673,10 +657,6 @@ public:
 	void init(ks_apartment* spec_apartment) {
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, ks_async_context{}, __get_intermediate_data_ex_ptr(lock), lock);
-	}
-
-	~ks_raw_promise_future() {
-		do_final_auto_reject();
 	}
 
 public:
@@ -785,10 +765,6 @@ public:
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_submit_locked(std::move(task_fn), delay, &m_intermediate_data_ex, lock, false);
-	}
-
-	~ks_raw_task_future() {
-		do_final_auto_reject();
 	}
 
 private:
@@ -955,10 +931,6 @@ public:
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, living_context, &m_intermediate_data_ex, lock);
 		do_connect_locked(std::move(fn_ex), prev_future, &m_intermediate_data_ex, lock, false);
-	}
-
-	~ks_raw_pipe_future() {
-		do_final_auto_reject();
 	}
 
 private:
@@ -1175,10 +1147,6 @@ public:
 		do_connect_locked(std::move(afn_ex), prev_future, &m_intermediate_data_ex, lock, false);
 	}
 
-	~ks_raw_flatten_future() {
-		do_final_auto_reject();
-	}
-
 private:
 	struct __INTERMEDIATE_DATA_EX;
 	void do_connect_locked(std::function<ks_raw_future_ptr(const ks_raw_result&)>&& afn_ex, const ks_raw_future_ptr& prev_future, __INTERMEDIATE_DATA_EX* intermediate_data_ex_ptr, ks_raw_future_unique_lock& lock, bool must_keep_locked) {
@@ -1392,10 +1360,6 @@ public:
 		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 		do_init_base_locked(spec_apartment, ks_async_context{}, &m_intermediate_data_ex, lock);
 		do_connect_locked(prev_futures, &m_intermediate_data_ex, lock, false);
-	}
-
-	~ks_raw_aggr_future() {
-		do_final_auto_reject();
 	}
 
 private:
