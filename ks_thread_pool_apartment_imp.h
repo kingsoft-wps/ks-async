@@ -65,7 +65,7 @@ private:
 	struct _THREAD_POOL_APARTMENT_DATA;
 
 	void _try_start_locked(std::unique_lock<ks_mutex>& lock);
-	void _try_stop_locked(bool mark_waiting, std::unique_lock<ks_mutex>& lock, bool must_keep_locked);
+	void _try_stop_locked(bool should_thread_exit, std::unique_lock<ks_mutex>& lock, bool must_keep_locked);
 
 	static void _prepare_work_thread_locked(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, std::unique_lock<ks_mutex>& lock);
 	static void _work_thread_proc(ks_thread_pool_apartment_imp* self, const std::shared_ptr<_THREAD_POOL_APARTMENT_DATA>& d, size_t thread_index);
@@ -118,7 +118,7 @@ private:
 		volatile _STATE state_v = _STATE::NOT_START;
 		ks_condition_variable stopped_state_cv{};
 
-		volatile bool waiting_v = false; //额外的waiting标记，在waiting前线程不退出（特别地，is_stopped相当于try_wait）
+		volatile bool should_thread_exit_v = false; //额外的exit标记，在waiting前线程不退出（特别地，is_stopped相当于try_wait）
 
 #if __KS_APARTMENT_ATFORK_ENABLED
 		volatile int working_rc_v = 0;

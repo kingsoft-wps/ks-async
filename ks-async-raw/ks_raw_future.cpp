@@ -721,9 +721,9 @@ private:
 		#ifdef _DEBUG
 			if (!m_promise_future->m_completed_result.is_completed()) {
 				//若最终未被settle过，则自动reject，以确保future最终completed
-				ks_raw_future_unique_lock pseudo_lock(m_promise_future->__get_mutex(), m_promise_future->__is_using_pseudo_mutex());
+				ks_raw_future_unique_lock lock(m_promise_future->__get_mutex(), m_promise_future->__is_using_pseudo_mutex());
 				ASSERT((m_promise_future->m_completed_result.is_completed())
-					|| (m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(pseudo_lock)->m_next_future_more.empty()));
+					|| (m_promise_future->__get_intermediate_data_ex_ptr(lock)->m_next_future_1st == nullptr && m_promise_future->__get_intermediate_data_ex_ptr(lock)->m_next_future_more.empty()));
 			}
 		#endif
 		}

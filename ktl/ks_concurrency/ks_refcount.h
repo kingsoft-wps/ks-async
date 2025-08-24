@@ -30,10 +30,12 @@ public:
 
     ptrdiff_t add(ptrdiff_t update = 1) {
         ASSERT(update > 0);
-        return __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + 1;
+        ptrdiff_t new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
+        ASSERT(new_value > 0);
+        return new_value;
     }
 
-    _NODISCARD ptrdiff_t count_down(ptrdiff_t update = 1) {
+    _NODISCARD ptrdiff_t sub(ptrdiff_t update = 1) {
         ASSERT(update > 0);
         ptrdiff_t new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
         ASSERT(new_value >= 0);
@@ -47,9 +49,9 @@ public:
     ptrdiff_t operator++(int) { return this->add(1) - 1; }
     ptrdiff_t operator+=(ptrdiff_t update) { return this->add(update); }
 
-    _NODISCARD ptrdiff_t operator--() { return this->count_down(1); }
-    _NODISCARD ptrdiff_t operator--(int) { return this->count_down(1) + 1; }
-    _NODISCARD ptrdiff_t operator-=(ptrdiff_t update) { return this->count_down(update); }
+    _NODISCARD ptrdiff_t operator--() { return this->sub(1); }
+    _NODISCARD ptrdiff_t operator--(int) { return this->sub(1) + 1; }
+    _NODISCARD ptrdiff_t operator-=(ptrdiff_t update) { return this->sub(update); }
 
     _NODISCARD ptrdiff_t peek_value() const {
         return __underlying_atomic_type::load(std::memory_order_relaxed);
