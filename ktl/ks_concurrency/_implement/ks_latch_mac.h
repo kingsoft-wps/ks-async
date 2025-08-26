@@ -57,7 +57,7 @@ public:
             if (current == 0) 
                 return;
 
-            _helper::getOSSyncApis()->wait_on_address(&m_counter, current, sizeof(ptrdiff_t), _helper::OSSYNC_WAIT_ON_ADDRESS_NONE);
+            _helper::getOSSyncApis()->wait_on_address((void*)&m_counter, current, sizeof(ptrdiff_t), _helper::OSSYNC_WAIT_ON_ADDRESS_NONE);
         }
     }
 

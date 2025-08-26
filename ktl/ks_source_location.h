@@ -28,8 +28,6 @@ public:
     constexpr explicit ks_source_location(
         const char* file_name, unsigned int line, const char* function_name, const char* custom_desc = nullptr)
         : m_file_name(file_name), m_line(line), m_function_name(function_name), m_custom_desc(custom_desc) {
-        ASSERT((m_file_name == nullptr && m_line == 0 && m_function_name == nullptr)
-            || (m_file_name != nullptr && m_line != 0 && m_function_name != nullptr));
     }
 
     constexpr ks_source_location(const ks_source_location&) = default;
