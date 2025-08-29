@@ -23,7 +23,7 @@ limitations under the License.
 
 
 TEST(test_refcount_suite, test_refcount) {
-    ks_refcount refcount(0);
+    ks_refcount<ptrdiff_t> refcount(0);
     ptrdiff_t tval;
 
     tval = refcount.add();

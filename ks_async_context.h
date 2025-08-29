@@ -302,7 +302,7 @@ private:
 #endif
 
 		//引用计数
-		ks_refcount ref_count = { 1 };
+		ks_refcount<int> ref_count = { 1 };
 	};
 
 private:

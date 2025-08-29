@@ -20,40 +20,42 @@ limitations under the License.
 
 #include <atomic>
 
-class ks_refcount : private std::atomic<ptrdiff_t> {
-    using __underlying_atomic_type = std::atomic<ptrdiff_t>;
+template <class T>
+class ks_refcount : private std::atomic<T> {
+    static_assert(std::is_integral<T>::value, "ks_refcount<T>: T must be an integral type");
+    using __underlying_atomic_type = std::atomic<T>;
 
 public:
-    ks_refcount(ptrdiff_t desired) : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
+    ks_refcount(T desired) : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
     ~ks_refcount() { ASSERT(this->peek_value() == 0); }
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
-    ptrdiff_t add(ptrdiff_t update = 1) {
-        ASSERT(update > 0);
-        ptrdiff_t new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
-        ASSERT(new_value > 0);
+    T add(T update = 1) {
+        ASSERT(update >= 0);
+        T new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
+        ASSERT(new_value > 0 && new_value >= new_value - update);
         return new_value;
     }
 
-    _NODISCARD ptrdiff_t sub(ptrdiff_t update = 1) {
-        ASSERT(update > 0);
-        ptrdiff_t new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
-        ASSERT(new_value >= 0);
+    _NODISCARD T sub(T update = 1) {
+        ASSERT(update >= 0);
+        T new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
+        ASSERT(new_value >= 0 && new_value <= new_value + update);
         if (new_value == 0) {
             std::atomic_thread_fence(std::memory_order_acquire);
         }
         return new_value;
     }
 
-    ptrdiff_t operator++() { return this->add(1); }
-    ptrdiff_t operator++(int) { return this->add(1) - 1; }
-    ptrdiff_t operator+=(ptrdiff_t update) { return this->add(update); }
+    T operator++() { return this->add(1); }
+    T operator++(int) { return this->add(1) - 1; }
+    T operator+=(T update) { return this->add(update); }
 
-    _NODISCARD ptrdiff_t operator--() { return this->sub(1); }
-    _NODISCARD ptrdiff_t operator--(int) { return this->sub(1) + 1; }
-    _NODISCARD ptrdiff_t operator-=(ptrdiff_t update) { return this->sub(update); }
+    _NODISCARD T operator--() { return this->sub(1); }
+    _NODISCARD T operator--(int) { return this->sub(1) + 1; }
+    _NODISCARD T operator-=(T update) { return this->sub(update); }
 
-    _NODISCARD ptrdiff_t peek_value() const {
+    _NODISCARD T peek_value() const {
         return __underlying_atomic_type::load(std::memory_order_relaxed);
     }
 };
