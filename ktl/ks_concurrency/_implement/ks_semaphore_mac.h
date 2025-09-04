@@ -41,7 +41,9 @@ public:
     }
 
     ~ks_semaphore_mac_gdc() {
+#if !__has_feature(objc_arc)
         dispatch_release(m_dispatchSemaphore);
+#endif
         m_dispatchSemaphore = nullptr;
     }
 

@@ -87,7 +87,9 @@ public:
     }
 
     ~ks_latch_mac_gdc() {
+#if !__has_feature(objc_arc)
         dispatch_release(m_dispatchGroup);
+#endif
         m_dispatchGroup = nullptr;
     }
 
