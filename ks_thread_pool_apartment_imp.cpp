@@ -335,7 +335,7 @@ void ks_thread_pool_apartment_imp::_work_thread_proc(ks_thread_pool_apartment_im
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
-			if (now_fn_queue_sel->empty() && !d->now_fn_queue_idle.empty() && d->busy_thread_count_for_idle + 1 < d->thread_pool.size() && d->state_v == _STATE::RUNNING)
+			if (now_fn_queue_sel->empty() && !d->now_fn_queue_idle.empty() && d->thread_pool.size() > 1 && d->busy_thread_count_for_idle + 1 < d->thread_pool.size() && d->state_v == _STATE::RUNNING)
 				now_fn_queue_sel = &d->now_fn_queue_idle; //保留1个线程不去执行idle任务（除非是单线程套间）
 
 			if (!now_fn_queue_sel->empty()) {
@@ -612,7 +612,7 @@ bool ks_thread_pool_apartment_imp::__run_nested_pump_loop_for_extern_waiting(voi
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
-			if (now_fn_queue_sel->empty() && !d->now_fn_queue_idle.empty() && d->busy_thread_count_for_idle + 1 < d->thread_pool.size() && d->state_v == _STATE::RUNNING)
+			if (now_fn_queue_sel->empty() && !d->now_fn_queue_idle.empty() && d->thread_pool.size() > 1 && d->busy_thread_count_for_idle + 1 < d->thread_pool.size() && d->state_v == _STATE::RUNNING)
 				now_fn_queue_sel = &d->now_fn_queue_idle; //保留1个线程不去执行idle任务（除非是单线程套间）
 
 			if (!now_fn_queue_sel->empty()) {
