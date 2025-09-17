@@ -27,11 +27,19 @@ public:
 	}
 
 	KS_ASYNC_INLINE_API ~ks_async_controller() {
-		ASSERT(this->is_all_completed());
+		ASSERT(!m_controller_data_ptr->is_bound_with_aproc ? this->is_all_completed() : true);
 		this->try_cancel();  //析构时自动try_cancel
 	}
 
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
+
+public:
+	void __mark_bound_with_aproc(bool bound_with_aproc) {
+		ASSERT(bound_with_aproc);
+		ASSERT(!m_controller_data_ptr->is_bound_with_aproc);
+		ASSERT(m_controller_data_ptr->pending_count == 0);
+		const_cast<bool&>(m_controller_data_ptr->is_bound_with_aproc) = bound_with_aproc;
+	}
 
 public:
 	KS_ASYNC_INLINE_API void try_cancel() {
@@ -53,6 +61,7 @@ public:
 private:
 	struct _CONTROLLER_DATA {
 		volatile bool cancel_ctrl_v = false;
+		const bool is_bound_with_aproc = false; //const-like
 		std::atomic<int> pending_count{ 0 };
 	};
 

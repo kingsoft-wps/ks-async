@@ -324,6 +324,7 @@ ks_future<void> ks_future_util::repeat_periodic(
 	data->fn = __wrap_async_fn_0<void>(std::forward<FN>(fn));
 	data->delay = delay;
 	data->interval = interval;
+	data->controller.__mark_bound_with_aproc(true);
 	data->context = make_async_context().bind_controller(&data->controller).set_parent(context, true);
 	data->create_time = std::chrono::steady_clock::now();
 	data->raw_final_promise_void = ks_raw_promise::create(apartment);
@@ -362,6 +363,7 @@ ks_future<void> ks_future_util::repeat_productive(
 	data->consume_apartment = consume_apartment;
 	data->produce_fn = __wrap_async_fn_0<V>(std::forward<PRODUCE_FN>(produce_fn));
 	data->consume_fn = __wrap_async_fn_1<void, V>(std::forward<CONSUME_FN>(consume_fn));
+	data->controller.__mark_bound_with_aproc(true);
 	data->context = make_async_context().bind_controller(&data->controller).set_parent(context, true);
 	data->create_time = std::chrono::steady_clock::now();
 	data->raw_final_promise_void = ks_raw_promise::create(consume_apartment);

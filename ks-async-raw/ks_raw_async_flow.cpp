@@ -122,6 +122,7 @@ static void __do_pattern_to_regex(const char* pattern, std::regex* re) {
 //////////////////////////////////////////////////////////
 
 ks_raw_async_flow::ks_raw_async_flow(__raw_ctor) {
+	m_flow_controller.__mark_bound_with_aproc(true);
 }
 
 ks_raw_async_flow::~ks_raw_async_flow() {

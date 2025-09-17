@@ -57,7 +57,7 @@ ks_single_thread_apartment_imp::ks_single_thread_apartment_imp(const char* name,
 ks_single_thread_apartment_imp::~ks_single_thread_apartment_imp() {
 	ASSERT(m_d->state_v == _STATE::NOT_START || m_d->state_v == _STATE::STOPPED);
 	if (m_d->state_v != _STATE::STOPPED) {
-		std::unique_lock<std::mutex> lock(m_d->mutex);
+		std::unique_lock<ks_mutex> lock(m_d->mutex);
 		this->_try_stop_locked(true, lock, false);
 		//this->wait();  //这里不等了，因为在进程退出时导致自动析构的话，可能时机就太晚，work线程已经被杀了
 	}
