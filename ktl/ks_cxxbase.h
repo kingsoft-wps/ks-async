@@ -16,6 +16,9 @@ limitations under the License.
 //文件说明：ks_cxxbase.h是最基础的头文件，所有其他ktl头文件都应先include此文件
 #pragma once
 
+#ifndef __KS_CXXBASE_DEF
+#define __KS_CXXBASE_DEF
+
 
 //基本数据类型定义
 #include <cstddef>
@@ -38,14 +41,14 @@ using nullptr_t = decltype(nullptr);
 
 #ifndef _NOTHING_DEFINED
 #define _NOTHING_DEFINED
-	struct nothing_t { explicit nothing_t() = default; };
+	struct nothing_t {};
 	constexpr nothing_t nothing = nothing_t{};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
 #endif //__NOTHING_DEF
 
 #ifndef _CREATE_INST_DEFINED
 #define _CREATE_INST_DEFINED
 namespace std {
-	struct create_inst_t { explicit create_inst_t() = default; };
+	struct create_inst_t {};
 	constexpr create_inst_t create_inst = create_inst_t{};  //这类似于KComObjectPtr构造函数的create_instance参数，是通用版本，用于明确指示实例化
 }
 #endif //_CREATE_INST_DEFINED
@@ -54,6 +57,11 @@ namespace std {
 //宏_ABSTRACT定义
 #ifndef _ABSTRACT
 #	define _ABSTRACT
+#endif
+
+//宏_INTERFACE_LIKE定义
+#ifndef _INTERFACE_LIKE
+#	define _INTERFACE_LIKE
 #endif
 
 //宏_NAMESPACE_LIKE定义
@@ -76,7 +84,7 @@ namespace std {
 #	elif defined(__GNUC__)
 #		define _DECL_EXPORT __attribute__((visibility("default")))
 #	else
-#		error how to decl-export?
+#		error how to define _DECL_EXPORT?
 #	endif
 #endif
 
@@ -87,18 +95,18 @@ namespace std {
 #	elif defined(__GNUC__)
 #		define _DECL_IMPORT __attribute__((visibility("default")))
 #	else
-#		error how to decl-import?
+#		error how to define _DECL_IMPORT?
 #	endif
 #endif
 
-//宏_DECL_DEPRECATED定义
-#ifndef _DECL_DEPRECATED
+//宏_DEPRECATED定义
+#ifndef _DEPRECATED
 #	if defined(_MSC_VER)
-#		define _DECL_DEPRECATED __declspec(deprecated)
+#		define _DEPRECATED __declspec(deprecated)
 #	elif defined(__GNUC__)
-#		define _DECL_DEPRECATED __attribute__((__deprecated__))
+#		define _DEPRECATED __attribute__((__deprecated__))
 #	else
-#		error how to decl-deprecated?
+#		error how to define _DEPRECATED?
 #	endif
 #endif
 
@@ -109,7 +117,30 @@ namespace std {
 #	elif defined(__GNUC__)
 #		define _NODISCARD __attribute__((warn_unused_result))
 #	else
-#		error how to decl-nodiscard?
+#		error how to define _NODISCARD?
+#	endif
+#endif
+
+
+//宏_NOINLINE定义
+#ifndef _NOINLINE
+#	if defined(_MSC_VER)
+#		define _NOINLINE __declspec(noinline)
+#	elif defined(__GNUC__)
+#		define _NOINLINE __attribute__((noinline))
+#	else
+#		error how to define _NOINLINE?
+#	endif
+#endif
+
+//宏_ALWAYS_INLINE定义
+#ifndef _ALWAYS_INLINE
+#	if defined(_MSC_VER)
+#		define _ALWAYS_INLINE __forceinline
+#	elif defined(__GNUC__)
+#		define _ALWAYS_INLINE __attribute__((always_inline))
+#	else
+#		error how to define _ALWAYS_INLINE?
 #	endif
 #endif
 
@@ -150,3 +181,6 @@ namespace std {
 #ifndef ASSERT
 #	define ASSERT(x)  _ASSERT(x)
 #endif
+
+
+#endif //__KS_CXXBASE_DEF

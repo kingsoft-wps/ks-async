@@ -22,9 +22,24 @@ __KS_ASYNC_RAW_BEGIN
 
 
 class ks_raw_promise;
-using ks_raw_promise_ptr = std::shared_ptr<ks_raw_promise>;
 
-_ABSTRACT class ks_raw_promise {
+//using ks_raw_promise_ptr = std::shared_ptr<ks_raw_promise>;
+struct ks_raw_promise_ptr : std::shared_ptr<ks_raw_promise> {
+	ks_raw_promise_ptr() noexcept = default;
+	ks_raw_promise_ptr(const ks_raw_promise_ptr&) noexcept = default;
+	ks_raw_promise_ptr(ks_raw_promise_ptr&&) noexcept = default;
+	_NOINLINE ks_raw_promise_ptr& operator=(const ks_raw_promise_ptr&) noexcept = default;
+	_NOINLINE ks_raw_promise_ptr& operator=(ks_raw_promise_ptr&&) noexcept = default;
+	_NOINLINE ~ks_raw_promise_ptr() noexcept = default;
+
+	ks_raw_promise_ptr(std::shared_ptr<ks_raw_promise> r) noexcept : shared_ptr(std::move(r)) {}
+	ks_raw_promise_ptr(nullptr_t) noexcept : shared_ptr(nullptr) {}
+
+	void swap(ks_raw_promise_ptr& r) noexcept { shared_ptr::swap(r); }
+};
+
+
+_INTERFACE_LIKE class ks_raw_promise {
 protected:
 	ks_raw_promise() = default;
 	~ks_raw_promise() = default;  //protected
@@ -43,3 +58,10 @@ public:
 
 
 __KS_ASYNC_RAW_END
+
+
+namespace std {
+	inline void swap(__ks_async_raw::ks_raw_promise_ptr& l, __ks_async_raw::ks_raw_promise_ptr& r) noexcept {
+		l.swap(r);
+	}
+}

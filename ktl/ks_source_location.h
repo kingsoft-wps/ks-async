@@ -14,39 +14,41 @@ limitations under the License.
 ==============================================================================*/
 
 #pragma once
-#include "ks_cxxbase.h"
 
 #ifndef __KS_SOURCE_LOCATION
 #define __KS_SOURCE_LOCATION
 
+#include "ks_cxxbase.h"
+
+
 class ks_source_location {
 public:
-    constexpr explicit ks_source_location(nullptr_t)
+    constexpr explicit ks_source_location(nullptr_t) noexcept
         : m_file_name(nullptr), m_line(0), m_function_name(nullptr), m_custom_desc(nullptr) {
     }
 
     constexpr explicit ks_source_location(
-        const char* file_name, unsigned int line, const char* function_name, const char* custom_desc = nullptr)
+        const char* file_name, unsigned int line, const char* function_name, const char* custom_desc = nullptr) noexcept
         : m_file_name(file_name), m_line(line), m_function_name(function_name), m_custom_desc(custom_desc) {
     }
 
-    constexpr ks_source_location(const ks_source_location&) = default;
+    constexpr ks_source_location(const ks_source_location&) noexcept = default;
     constexpr ks_source_location(ks_source_location&&) noexcept = default;
 
-    constexpr ks_source_location& operator=(const ks_source_location&) = default;
+    constexpr ks_source_location& operator=(const ks_source_location&) noexcept = default;
     constexpr ks_source_location& operator=(ks_source_location&&) noexcept = default;
 
 public:
-    constexpr bool is_empty() const { return this->m_file_name == nullptr; }
+    constexpr bool is_empty() const noexcept { return this->m_file_name == nullptr; }
 
-    constexpr const char*  file_name() const { return m_file_name; }
-    constexpr unsigned int line() const { return m_line; }
-    constexpr const char*  function_name() const { return m_function_name; }
-    constexpr const char* custom_desc() const { return m_custom_desc; }
+    constexpr const char*  file_name() const noexcept { return m_file_name; }
+    constexpr unsigned int line() const noexcept { return m_line; }
+    constexpr const char*  function_name() const noexcept { return m_function_name; }
+    constexpr const char* custom_desc() const noexcept { return m_custom_desc; }
 
 public:
-    static constexpr const char* __custom_desc_of() { return nullptr; }
-    static constexpr const char* __custom_desc_of(const char* custom_desc) { return custom_desc; }
+    static constexpr const char* __custom_desc_of() noexcept { return nullptr; }
+    static constexpr const char* __custom_desc_of(const char* custom_desc) noexcept { return custom_desc; }
 
 private:
     const char*  m_file_name;

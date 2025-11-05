@@ -18,6 +18,9 @@ extern void __forcelink_to_ks_raw_future_cpp();
 extern void __forcelink_to_ks_raw_promise_cpp();
 extern void __forcelink_to_ks_future_util_cpp();
 extern void __forcelink_to_ks_raw_flow_cpp();
+extern void __forcelink_to_ks_raw_result_cpp();
+extern void __forcelink_to_ks_raw_value_cpp();
+extern void __forcelink_to_ks_error_cpp();
 extern void __forcelink_to_ks_apartment_cpp();
 extern void __forcelink_to_ks_async_context_cpp();
 extern void __forcelink_to_ks_async_controller_cpp();
@@ -26,12 +29,16 @@ extern void __forcelink_to_ks_cancel_inspector_cpp();
 extern void __forcelink_to_ks_single_thread_apartment_imp_cpp();
 extern void __forcelink_to_ks_thread_pool_apartment_imp_cpp();
 extern void __forcelink_to_ks_notification_center_cpp();
+extern void __forcelink_to_ks_notification_cpp();
 
 void __ks_async_forcelinks() {
     __forcelink_to_ks_raw_future_cpp();
     __forcelink_to_ks_raw_promise_cpp();
     __forcelink_to_ks_future_util_cpp();
     __forcelink_to_ks_raw_flow_cpp();
+    __forcelink_to_ks_raw_result_cpp();
+    __forcelink_to_ks_raw_value_cpp();
+    __forcelink_to_ks_error_cpp();
     __forcelink_to_ks_apartment_cpp();
     __forcelink_to_ks_async_context_cpp();
     __forcelink_to_ks_async_controller_cpp();
@@ -40,4 +47,5 @@ void __ks_async_forcelinks() {
     __forcelink_to_ks_single_thread_apartment_imp_cpp();
     __forcelink_to_ks_thread_pool_apartment_imp_cpp();
     __forcelink_to_ks_notification_center_cpp();
+    __forcelink_to_ks_notification_cpp();
 }

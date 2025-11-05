@@ -13,22 +13,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#pragma once
+#include "ks_notification.h"
 
-#include "ks_async_base.h"
-#include "ks_error.h"
+void __forcelink_to_ks_notification_cpp() {}
 
-_INTERFACE_LIKE class ks_cancel_inspector {
-public:
-	virtual bool check_cancelled() = 0;
+ks_notification& ks_notification::operator=(const ks_notification&) noexcept = default;
+ks_notification& ks_notification::operator=(ks_notification&&) noexcept = default;
 
-protected:
-	ks_cancel_inspector() noexcept = default;
-	~ks_cancel_inspector() noexcept = default;  //protected
-	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector);
+ks_notification::~ks_notification() noexcept = default;
 
-private:
-	__KS_ASYNC_PRIVATE_API static ks_cancel_inspector* __for_future() noexcept;
-	template <class T2> friend class ks_future;
-	friend class ks_future_util;
-};
+
+ks_notification ks_notification_builder::build() {
+	ASSERT(m_data.sender != nullptr);
+	ASSERT(!m_data.name.empty());
+	return ks_notification(std::make_shared<__NOTIFICATION_DATA>(std::move(m_data)));
+}

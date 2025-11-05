@@ -15,6 +15,9 @@ limitations under the License.
 
 #pragma once
 
+#ifndef __KS_FUNCTIONAL_TYPE_TRAITS_DEF
+#define __KS_FUNCTIONAL_TYPE_TRAITS_DEF
+
 #include "ks_cxxbase.h"
 #include <functional>
 
@@ -26,9 +29,6 @@ limitations under the License.
 
 
 //functional type-traits ...
-#ifndef __KS_FUNCTIONAL_TYPE_TRAITS_DEF
-#define __KS_FUNCTIONAL_TYPE_TRAITS_DEF
-
 #if defined(_MSVC_LANG) ? _MSVC_LANG < 201703L : __cplusplus < 201703L
 namespace std {
 	//is_invocable (like c++17)

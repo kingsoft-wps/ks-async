@@ -47,7 +47,7 @@ public:
 	}
 
 public:
-	uint64_t add_flow_running_observer(
+	_NOINLINE uint64_t add_flow_running_observer(
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)> fn, const ks_async_context& context = {}) const {
 		ASSERT(!this->is_null());
 		return m_raw_flow->add_flow_running_observer(
@@ -55,7 +55,7 @@ public:
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow) { fn(ks_async_flow::__from_raw(flow)); },
 			context);
 	}
-	uint64_t add_flow_completed_observer(
+	_NOINLINE uint64_t add_flow_completed_observer(
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const ks_error& error)> fn, const ks_async_context& context = {}) const {
 		ASSERT(!this->is_null());
 		return m_raw_flow->add_flow_completed_observer(
@@ -64,7 +64,7 @@ public:
 			context);
 	}
 
-	uint64_t add_task_running_observer(
+	_NOINLINE uint64_t add_task_running_observer(
 		const char* task_name_pattern, 
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name)> fn, const ks_async_context& context = {}) const {
 		ASSERT(!this->is_null());
@@ -73,7 +73,7 @@ public:
 			[fn = std::move(fn)](const ks_raw_async_flow_ptr& flow, const char* task_name) { fn(ks_async_flow::__from_raw(flow), task_name); },
 			context);
 	}
-	uint64_t add_task_completed_observer(
+	_NOINLINE uint64_t add_task_completed_observer(
 		const char* task_name_pattern, 
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow, const char* task_name, const ks_error& error)> fn, const ks_async_context& context = {}) const {
 		ASSERT(!this->is_null());
@@ -182,7 +182,7 @@ public:
 
 private:
 	template <class T, class FN>
-	bool __choose_add_task(
+	inline bool __choose_add_task(
 		const char* name_and_dependencies,
 		ks_apartment* apartment, FN&& fn, const ks_async_context& context) const {
 
@@ -201,7 +201,7 @@ private:
 	}
 
 	template <class T>
-	bool __choose_add_task_by_ret(
+	_NOINLINE bool __choose_add_task_by_ret(
 		std::integral_constant<int, -1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<void(const ks_async_flow& flow)> fn, const ks_async_context& context,
@@ -215,7 +215,7 @@ private:
 	}
 
 	template <class T>
-	bool __choose_add_task_by_ret(
+	_NOINLINE bool __choose_add_task_by_ret(
 		std::integral_constant<int, 1>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<T(const ks_async_flow& flow)> fn, const ks_async_context& context,
@@ -228,7 +228,7 @@ private:
 	}
 
 	template <class T>
-	bool __choose_add_task_by_ret(
+	_NOINLINE bool __choose_add_task_by_ret(
 		std::integral_constant<int, 2>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_result<T>(const ks_async_flow& flow)> fn, const ks_async_context& context,
@@ -241,7 +241,7 @@ private:
 	}
 
 	template <class T>
-	bool __choose_add_task_by_ret(
+	_NOINLINE bool __choose_add_task_by_ret(
 		std::integral_constant<int, 3>,
 		const char* name_and_dependencies,
 		ks_apartment* apartment, std::function<ks_future<T>(const ks_async_flow& flow)> fn, const ks_async_context& context,
@@ -271,14 +271,14 @@ private:
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
-	explicit ks_async_flow(const ks_raw_async_flow_ptr& raw_flow, int) : m_raw_flow(raw_flow) {}
-	explicit ks_async_flow(ks_raw_async_flow_ptr&& raw_flow, int) : m_raw_flow(std::move(raw_flow)) {}
+	explicit ks_async_flow(const ks_raw_async_flow_ptr& raw_flow, int) noexcept : m_raw_flow(raw_flow) {}
+	explicit ks_async_flow(ks_raw_async_flow_ptr&& raw_flow, int) noexcept : m_raw_flow(std::move(raw_flow)) {}
 
-	static ks_async_flow __from_raw(const ks_raw_async_flow_ptr& raw_flow) { return ks_async_flow(raw_flow, 0); }
-	static ks_async_flow __from_raw(ks_raw_async_flow_ptr&& raw_flow) { return ks_async_flow(std::move(raw_flow), 0); }
-	const ks_raw_async_flow_ptr& __get_raw() const { return m_raw_flow; }
+	static ks_async_flow __from_raw(const ks_raw_async_flow_ptr& raw_flow) noexcept { return ks_async_flow(raw_flow, 0); }
+	static ks_async_flow __from_raw(ks_raw_async_flow_ptr&& raw_flow) noexcept { return ks_async_flow(std::move(raw_flow), 0); }
+	const ks_raw_async_flow_ptr& __get_raw() const noexcept { return m_raw_flow; }
 
-	static ks_future<ks_async_flow> __wrap_raw_flow_future(const ks_raw_future_ptr& raw_flow_future_this_wrapped) {
+	static ks_future<ks_async_flow> __wrap_raw_flow_future(const ks_raw_future_ptr& raw_flow_future_this_wrapped) noexcept {
 		return ks_future<ks_async_flow>::__from_raw(raw_flow_future_this_wrapped);
 	}
 

@@ -25,40 +25,40 @@ limitations under the License.
 template <class T>
 class ks_promise final {
 public:
-	ks_promise(nullptr_t) : m_raw_promise(nullptr) {}
+	ks_promise(nullptr_t) noexcept : m_raw_promise(nullptr) {}
 
 	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
 	static ks_promise<T> create() { return ks_promise<T>(std::create_inst); }
 
-	ks_promise(const ks_promise&) = default;
+	ks_promise(const ks_promise&) noexcept = default;
 	ks_promise(ks_promise&&) noexcept = default;
 
-	ks_promise& operator=(const ks_promise&) = default;
+	ks_promise& operator=(const ks_promise&) noexcept = default;
 	ks_promise& operator=(ks_promise&&) noexcept = default;
 
 	//让ks_promise看起来像一个智能指针
-	ks_promise* operator->() { return this; }
-	const ks_promise* operator->() const { return this; }
+	ks_promise* operator->() noexcept { return this; }
+	const ks_promise* operator->() const noexcept { return this; }
 
 	using arg_type = T;
 	using value_type = T;
 	using this_promise_type = ks_promise<T>;
 
 public:
-	bool is_null() const {
+	bool is_null() const noexcept {
 		return m_raw_promise == nullptr;
 	}
-	bool is_valid() const {
+	bool is_valid() const noexcept {
 		return m_raw_promise != nullptr;
 	}
-	bool operator==(nullptr_t) const {
+	bool operator==(nullptr_t) const noexcept {
 		return m_raw_promise == nullptr;
 	}
-	bool operator!=(nullptr_t) const {
+	bool operator!=(nullptr_t) const noexcept {
 		return m_raw_promise != nullptr;
 	}
 
-	ks_future<T> get_future() const {
+	ks_future<T> get_future() const noexcept {
 		ASSERT(!this->is_null());
 		return ks_future<T>::__from_raw(m_raw_promise->get_future());
 	}
@@ -90,12 +90,12 @@ private:
 	using ks_raw_result = __ks_async_raw::ks_raw_result;
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
-	explicit ks_promise(const ks_raw_promise_ptr& raw_promise, int) : m_raw_promise(raw_promise) {}
-	explicit ks_promise(ks_raw_promise_ptr&& raw_promise, int) : m_raw_promise(std::move(raw_promise)) {}
+	explicit ks_promise(const ks_raw_promise_ptr& raw_promise, int) noexcept : m_raw_promise(raw_promise) {}
+	explicit ks_promise(ks_raw_promise_ptr&& raw_promise, int) noexcept : m_raw_promise(std::move(raw_promise)) {}
 
-	static ks_promise<T> __from_raw(const ks_raw_promise_ptr& raw_promise) { return ks_promise<T>(raw_promise, 0); }
-	static ks_promise<T> __from_raw(ks_raw_promise_ptr&& raw_promise) { return ks_promise<T>(std::move(raw_promise), 0); }
-	const ks_raw_promise_ptr& __get_raw() const { return m_raw_promise; }
+	static ks_promise<T> __from_raw(const ks_raw_promise_ptr& raw_promise) noexcept { return ks_promise<T>(raw_promise, 0); }
+	static ks_promise<T> __from_raw(ks_raw_promise_ptr&& raw_promise) noexcept { return ks_promise<T>(std::move(raw_promise), 0); }
+	const ks_raw_promise_ptr& __get_raw() const noexcept { return m_raw_promise; }
 
 	static ks_raw_promise_ptr __do_create_raw_promise() {
 		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
