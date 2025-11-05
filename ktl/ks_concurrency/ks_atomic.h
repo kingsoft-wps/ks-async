@@ -49,30 +49,30 @@ public:
     ks_atomic_flag(bool desired) noexcept : __underlying_atomic_type(desired ? 1 : 0) {} //与std不同，我们还提供指定初值构造
     _DISABLE_COPY_CONSTRUCTOR(ks_atomic_flag);
 
-    void clear(std::memory_order order = std::memory_order_seq_cst) {
+    void clear(std::memory_order order = std::memory_order_seq_cst) noexcept {
         __underlying_atomic_type::store(0, order);
     }
 
-    bool test(std::memory_order order = std::memory_order_seq_cst) const {
+    bool test(std::memory_order order = std::memory_order_seq_cst) const noexcept {
         return __underlying_atomic_type::load(order) != 0;
     }
 
-    bool test_and_set(std::memory_order order = std::memory_order_seq_cst) {
+    bool test_and_set(std::memory_order order = std::memory_order_seq_cst) noexcept {
         return __underlying_atomic_type::exchange(1, order) != 0;
     }
 
     using __underlying_atomic_type::is_lock_free;
     using __underlying_atomic_type::__is_wait_efficient;
 
-    void __wait(bool old, std::memory_order order = std::memory_order_seq_cst) const {
+    void __wait(bool old, std::memory_order order = std::memory_order_seq_cst) const noexcept {
         return __underlying_atomic_type::__wait(old ? 1 : 0, order);
     }
 
-    void __notify_one() {
+    void __notify_one() noexcept {
         return __underlying_atomic_type::__notify_one();
     }
 
-    void __notify_all() {
+    void __notify_all() noexcept {
         return __underlying_atomic_type::__notify_all();
     }
 };

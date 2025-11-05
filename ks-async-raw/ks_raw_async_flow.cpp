@@ -25,7 +25,6 @@ void __forcelink_to_ks_raw_flow_cpp() {}
 
 __KS_ASYNC_RAW_BEGIN
 
-
 static bool __do_check_name_legal(const char* name, bool allow_wild) {
 	if (name == nullptr || name[0] == 0)
 		return false;
@@ -121,11 +120,11 @@ static void __do_pattern_to_regex(const char* pattern, std::regex* re) {
 //////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
 
-ks_raw_async_flow::ks_raw_async_flow(__raw_ctor) {
+ks_raw_async_flow::ks_raw_async_flow(__raw_ctor) noexcept {
 	m_flow_controller.__mark_bound_with_aproc(true);
 }
 
-ks_raw_async_flow::~ks_raw_async_flow() {
+ks_raw_async_flow::~ks_raw_async_flow() noexcept {
 	ASSERT(m_flow_status_v != status_t::running);
 }
 
@@ -535,7 +534,7 @@ ks_raw_future_ptr ks_raw_async_flow::get_flow_future_void() {
 		m_flow_promise_void_opt = ks_raw_promise::create(ks_apartment::default_mta());
 		if (m_flow_status_v == status_t::succeeded || m_flow_status_v == status_t::failed) {
 			if (m_flow_status_v == status_t::succeeded) {
-				m_flow_promise_void_opt->resolve(ks_raw_value::of_nothing());
+				m_flow_promise_void_opt->resolve(ks_raw_value::of<nothing_t>(nothing));
 			}
 			else {
 				ASSERT(m_last_error.has_code());
@@ -693,7 +692,7 @@ void ks_raw_async_flow::do_make_flow_running_locked(std::unique_lock<ks_flow_mut
 			const std::shared_ptr<_TASK_ITEM>& task_item = entry.second;
 			ASSERT(task_item->task_status == status_t::not_start);
 			if (task_item->task_waiting_for_dependencies.empty()) {
-				do_make_task_queuing_locked(task_item, ks_raw_value::of_nothing(), lock);
+				do_make_task_queuing_locked(task_item, ks_raw_value::of<nothing_t>(nothing), lock);
 			}
 		}
 
@@ -714,7 +713,7 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	//settle flow-promise (void)
 	if (m_flow_promise_void_opt != nullptr) {
 		if (m_flow_status_v == status_t::succeeded) {
-			m_flow_promise_this_wrapped_keepper_until_completed->resolve(ks_raw_value::of_nothing());
+			m_flow_promise_this_wrapped_keepper_until_completed->resolve(ks_raw_value::of<nothing_t>(nothing));
 		}
 		else {
 			ASSERT(flow_error.has_code());
@@ -852,7 +851,7 @@ void ks_raw_async_flow::do_make_task_completed_locked(const std::shared_ptr<_TAS
 
 			ks_raw_result arg_void;
 			if (task_result.is_value())
-				arg_void = ks_raw_value::of_nothing();
+				arg_void = ks_raw_value::of<nothing_t>(nothing);
 			else
 				arg_void = task_result.to_error();
 

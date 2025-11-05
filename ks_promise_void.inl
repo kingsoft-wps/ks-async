@@ -18,40 +18,40 @@ limitations under the License.
 template <>
 class ks_promise<void> final {
 public:
-	ks_promise(nullptr_t) : m_nothing_promise(nullptr) {}
+	ks_promise(nullptr_t) noexcept : m_nothing_promise(nullptr) {}
 
 	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
 	static ks_promise<void> create() { return ks_promise<void>(std::create_inst); }
 
-	ks_promise(const ks_promise&) = default;
+	ks_promise(const ks_promise&) noexcept = default;
 	ks_promise(ks_promise&&) noexcept = default;
 
-	ks_promise& operator=(const ks_promise&) = default;
+	ks_promise& operator=(const ks_promise&) noexcept = default;
 	ks_promise& operator=(ks_promise&&) noexcept = default;
 
 	//让ks_promise看起来像一个智能指针
-	ks_promise* operator->() { return this; }
-	const ks_promise* operator->() const { return this; }
+	ks_promise* operator->() noexcept { return this; }
+	const ks_promise* operator->() const noexcept { return this; }
 
 	using arg_type = void;
 	using value_type = void;
 	using this_promise_type = ks_promise<void>;
 
 public:
-	bool is_null() const {
+	bool is_null() const noexcept {
 		return m_nothing_promise.is_null();
 	}
-	bool is_valid() const {
+	bool is_valid() const noexcept {
 		return m_nothing_promise.is_valid();
 	}
-	bool operator==(nullptr_t) const {
+	bool operator==(nullptr_t) const noexcept {
 		return m_nothing_promise == nullptr;
 	}
-	bool operator!=(nullptr_t) const {
+	bool operator!=(nullptr_t) const noexcept {
 		return m_nothing_promise != nullptr;
 	}
 
-	ks_future<void> get_future() const {
+	ks_future<void> get_future() const noexcept {
 		return m_nothing_promise.get_future().cast<void>();
 	}
 
@@ -83,9 +83,9 @@ private:
 
 	ks_promise(ks_promise<nothing_t>&& nothing_promise) noexcept : m_nothing_promise(std::move(nothing_promise)) {}
 
-	static ks_promise<void> __from_raw(const ks_raw_promise_ptr& raw_promise) { return ks_promise<nothing_t>::__from_raw(raw_promise); }
-	static ks_promise<void> __from_raw(ks_raw_promise_ptr&& raw_promise) { return ks_promise<nothing_t>::__from_raw(std::move(raw_promise)); }
-	const ks_raw_promise_ptr& __get_raw() const { return m_nothing_promise.__get_raw(); }
+	static ks_promise<void> __from_raw(const ks_raw_promise_ptr& raw_promise) noexcept { return ks_promise<nothing_t>::__from_raw(raw_promise); }
+	static ks_promise<void> __from_raw(ks_raw_promise_ptr&& raw_promise) noexcept { return ks_promise<nothing_t>::__from_raw(std::move(raw_promise)); }
+	const ks_raw_promise_ptr& __get_raw() const noexcept { return m_nothing_promise.__get_raw(); }
 
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;

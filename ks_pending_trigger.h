@@ -27,7 +27,7 @@ public:
 
 public:
 	KS_ASYNC_INLINE_API void start() {
-		return m_trigger_promise->resolve(ks_raw_value::of_nothing());
+		return m_trigger_promise->resolve(ks_raw_value::of<nothing_t>(nothing));
 	}
 
 	KS_ASYNC_INLINE_API void cancel() {
@@ -43,11 +43,11 @@ private:
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
 private:
-	KS_ASYNC_INLINE_API ks_raw_future_ptr __get_raw_trigger_future() const {
+	KS_ASYNC_INLINE_API ks_raw_future_ptr __get_raw_trigger_future() const noexcept {
 		return m_trigger_promise->get_future();
 	}
 
-	KS_ASYNC_INLINE_API bool __was_triggered() const {
+	KS_ASYNC_INLINE_API bool __was_triggered() const noexcept {
 		return m_trigger_promise->get_future()->peek_result().is_completed();
 	}
 

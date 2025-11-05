@@ -84,7 +84,7 @@ public:
 
 		m_cur_context = cur_context;
 		m_cur_context_owner_locker = m_cur_context.__lock_owner_ptr();
-		m_cur_context.__increment_pending_count();
+		//m_cur_context.__increment_pending_count();
 	}
 
 	void try_unapply() {
@@ -92,7 +92,7 @@ public:
 			return;
 
 		m_cur_context.__unlock_owner_ptr(m_cur_context_owner_locker);
-		m_cur_context.__decrement_pending_count();
+		//m_cur_context.__decrement_pending_count();
 
 		m_applied_flag = false;
 		m_cur_context = {};

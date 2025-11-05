@@ -35,7 +35,7 @@ private:
 };
 
 
-ks_cancel_inspector* ks_cancel_inspector::__for_future() {
+ks_cancel_inspector* ks_cancel_inspector::__for_future() noexcept {
 	static ks_cancel_inspector_for_future g_cancel_inspector_for_future;
 	return &g_cancel_inspector_for_future;
 }

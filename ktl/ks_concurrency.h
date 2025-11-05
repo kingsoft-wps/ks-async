@@ -15,6 +15,9 @@ limitations under the License.
 
 #pragma once
 
+#ifndef __KS_CONCURRENCY_DEF
+#define __KS_CONCURRENCY_DEF
+
 #include "ks_cxxbase.h"
 
 #include "ks_concurrency/ks_atomic.h"
@@ -27,3 +30,5 @@ limitations under the License.
 #include "ks_concurrency/ks_semaphore.h"
 #include "ks_concurrency/ks_latch.h"
 #include "ks_concurrency/ks_event.h"
+
+#endif //__KS_CONCURRENCY_DEF

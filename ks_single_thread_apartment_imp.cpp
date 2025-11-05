@@ -298,7 +298,7 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 	ASSERT(ks_apartment::current_thread_apartment() == nullptr);
 	ks_apartment::__set_current_thread_apartment(self);
 
-	if (true) {
+	if ((d->flags & no_isolated_thread_flag) == 0) {
 		std::stringstream thread_name_ss;
 		thread_name_ss << d->name << "'s work-thread";
 		ks_apartment::__set_current_thread_name(thread_name_ss.str().c_str());
@@ -339,6 +339,22 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 		});
 #endif
 
+		//try next delaying_fn
+		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
+			size_t moved_fn_count = 0;
+			const auto now = std::chrono::steady_clock::now();
+			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
+				//直接将到期的delaying项移入idle队列（忽略priority）
+				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
+				d->delaying_fn_queue.pop_front();
+				++moved_fn_count;
+			}
+
+			if (moved_fn_count != 0) {
+				continue;
+			}
+		}
+
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
@@ -365,22 +381,6 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 				now_fn_item.reset();
 
 				lock.lock(); //for working_rc and busy_thread_count
-				continue;
-			}
-		}
-
-		//try next delaying_fn
-		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
-			size_t moved_fn_count = 0;
-			const auto now = std::chrono::steady_clock::now();
-			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
-				//直接将到期的delaying项移入idle队列（忽略priority）
-				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
-				d->delaying_fn_queue.pop_front();
-				++moved_fn_count;
-			}
-
-			if (moved_fn_count != 0) {
 				continue;
 			}
 		}
@@ -441,37 +441,62 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 
 void ks_single_thread_apartment_imp::_do_put_fn_item_into_now_list_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, std::shared_ptr<_FN_ITEM>&& fn_item, std::unique_lock<ks_mutex>& lock) {
 	auto* now_fn_queue_sel = 
-		fn_item->is_delaying_fn ? &d->now_fn_queue_idle :
+		(fn_item->is_delaying_fn && (d->flags & delayed_always_low_prior_flag)) ? &d->now_fn_queue_idle :  //延时任务强制为低优先级?
 		fn_item->priority == 0 ? &d->now_fn_queue_normal :  //priority=0为普通优先级
 		fn_item->priority > 0 ? &d->now_fn_queue_prior :    //priority>0为高优先级
-		&d->now_fn_queue_idle;                             //priority<0为低优先级，简单地加入到idle队列
-	now_fn_queue_sel->push_back(std::move(fn_item));
+		&d->now_fn_queue_idle;                              //priority<0为低优先级，简单地加入到idle队列
+
+	if (now_fn_queue_sel == &d->now_fn_queue_normal) {
+		//normal队列（priority===0）直入
+		now_fn_queue_sel->push_back(std::move(fn_item));
+	}
+	else if (now_fn_queue_sel->empty()) {
+		//空队列直入
+		now_fn_queue_sel->push_back(std::move(fn_item));
+	}
+	else if (fn_item->priority <= now_fn_queue_sel->back()->priority) {
+		//最小优先级：接在队尾
+		now_fn_queue_sel->push_back(std::move(fn_item));
+	}
+	else if (fn_item->priority > now_fn_queue_sel->front()->priority) {
+		//最大优先级：插在队头
+		now_fn_queue_sel->push_front(std::move(fn_item));
+	}
+	else {
+		//根据优先级插队
+		auto where_it = std::upper_bound(
+			now_fn_queue_sel->begin(), now_fn_queue_sel->end(), fn_item,
+			[](const std::shared_ptr<_FN_ITEM>& a, const std::shared_ptr<_FN_ITEM>& b) { return a->priority > b->priority; });
+		now_fn_queue_sel->insert(where_it, std::move(fn_item));
+	}
+
 	d->any_fn_queue_cv.notify_one();
 }
 
 void ks_single_thread_apartment_imp::_do_put_fn_item_into_delaying_list_locked(const std::shared_ptr<_SINGLE_THREAD_APARTMENT_DATA>& d, std::shared_ptr<_FN_ITEM>&& fn_item, std::unique_lock<ks_mutex>& lock) {
-	auto where_it = d->delaying_fn_queue.end();
-	if (!d->delaying_fn_queue.empty()) {
-		if (fn_item->until_time >= d->delaying_fn_queue.back()->until_time) {
-			//最大延时项：插在队尾
-			where_it = d->delaying_fn_queue.end();
-		}
-		else if (fn_item->until_time < d->delaying_fn_queue.front()->until_time) {
-			//最小延时项：插在队头
-			where_it = d->delaying_fn_queue.begin();
-		}
-		else {
-			//新项的目标时点落在当前队列的时段区间内。。。
-			//忽略priority
-			where_it = std::upper_bound(d->delaying_fn_queue.begin(), d->delaying_fn_queue.end(), fn_item,
-				[](const auto& a, const auto& b) { return a->until_time < b->until_time; });
-		}
-	}
-
-	bool should_notify = 
+	bool should_notify =
 		(d->delaying_fn_queue.empty() || fn_item->until_time < d->delaying_fn_queue.front()->until_time) &&
 		(d->now_fn_queue_prior.empty() && d->now_fn_queue_normal.empty() && d->now_fn_queue_idle.empty());
-	d->delaying_fn_queue.insert(where_it, std::move(fn_item));
+
+	//（忽略priority）
+	if (d->delaying_fn_queue.empty()) {
+		//空队列直入
+		d->delaying_fn_queue.push_back(std::move(fn_item));
+	}
+	else if (fn_item->until_time >= d->delaying_fn_queue.back()->until_time) {
+		//最大延时项：插在队尾
+		d->delaying_fn_queue.push_back(std::move(fn_item));
+	}
+	else if (fn_item->until_time < d->delaying_fn_queue.front()->until_time) {
+		//最小延时项：插在队头
+		d->delaying_fn_queue.push_front(std::move(fn_item));
+	}
+	else {
+		//新项的目标时点落在当前队列的时段区间内：插队
+		auto where_it = std::upper_bound(d->delaying_fn_queue.begin(), d->delaying_fn_queue.end(), fn_item,
+			[](const std::shared_ptr<_FN_ITEM>& a, const std::shared_ptr<_FN_ITEM>& b) { return a->until_time < b->until_time; });
+		d->delaying_fn_queue.insert(where_it, std::move(fn_item));
+	}
 
 	if (should_notify) {
 		//只需notify_one即可，即使有多项。
@@ -589,6 +614,22 @@ bool ks_single_thread_apartment_imp::__run_nested_pump_loop_for_extern_waiting(v
 		ASSERT(d->working_flag_v);
 #endif
 
+		//try next delaying_fn
+		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
+			size_t moved_fn_count = 0;
+			const auto now = std::chrono::steady_clock::now();
+			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
+				//直接将到期的delaying项移入idle队列（忽略priority）
+				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
+				d->delaying_fn_queue.pop_front();
+				++moved_fn_count;
+			}
+
+			if (moved_fn_count != 0) {
+				continue;
+			}
+		}
+
 		//try next now_fn
 		if (true) {
 			auto* now_fn_queue_sel = !d->now_fn_queue_prior.empty() ? &d->now_fn_queue_prior : &d->now_fn_queue_normal;
@@ -606,22 +647,6 @@ bool ks_single_thread_apartment_imp::__run_nested_pump_loop_for_extern_waiting(v
 				now_fn_item.reset();
 
 				lock.lock(); //for working_rc and busy_thread_count
-				continue;
-			}
-		}
-
-		//try next delaying_fn
-		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
-			size_t moved_fn_count = 0;
-			const auto now = std::chrono::steady_clock::now();
-			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
-				//直接将到期的delaying项移入idle队列（忽略priority）
-				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
-				d->delaying_fn_queue.pop_front();
-				++moved_fn_count;
-			}
-
-			if (moved_fn_count != 0) {
 				continue;
 			}
 		}

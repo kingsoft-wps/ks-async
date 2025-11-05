@@ -24,9 +24,10 @@ limitations under the License.
 class ks_thread_pool_apartment_imp final : public ks_apartment {
 public:
 	enum { //flag consts
-		no_flag                  = 0,
-		auto_register_flag       = 0x00010000,
-		endless_instance_flag    = 0x01000000,
+		no_flag                       = 0,
+		auto_register_flag            = 0x00010000,
+		endless_instance_flag         = 0x01000000,
+		delayed_always_low_prior_flag = 0x04000000,
 	};
 
 	KS_ASYNC_API explicit ks_thread_pool_apartment_imp(const char* name, size_t max_thread_count, uint flags = 0);

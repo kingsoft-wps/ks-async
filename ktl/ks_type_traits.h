@@ -15,6 +15,9 @@ limitations under the License.
 
 #pragma once
 
+#ifndef __KS_TYPE_TRAITS_DEF
+#define __KS_TYPE_TRAITS_DEF
+
 #include "ks_cxxbase.h"
 #include <type_traits>
 #include <memory>
@@ -83,8 +86,14 @@ namespace std {
 	struct disjunction<_Arg, _Args...> : conditional_t<bool(_Arg::value), _Arg, disjunction<_Args...>> {};
 	template <typename... _Bn>
 	constexpr bool disjunction_v = disjunction<_Bn...>::value;
+
+	template<class B>
+	struct negation : std::bool_constant<!bool(B::value)> {};
+	template<class B>
+	constexpr bool negation_v = negation<B>::value;
 }
 #endif
+
 
 #if __cplusplus < 202002L
 namespace std {
@@ -105,9 +114,6 @@ namespace std {
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-
-#ifndef __KS_TYPE_TRAITS_DEF
-#define __KS_TYPE_TRAITS_DEF
 
 namespace std {
 	//is_nothing
@@ -184,41 +190,32 @@ namespace std {
 	template <class... Ts>
 	constexpr bool is_all_same_v = is_all_same<Ts...>::value;
 
-	//shared_pointer_traits
-	template <class T>
-	struct shared_pointer_traits {
-		static constexpr bool is_shared_pointer_v = false;
-	};
-	template <class X>
-	struct shared_pointer_traits<std::shared_ptr<X>> {
-		static constexpr bool is_shared_pointer_v = true;
-	};
-
-	//weak_pointer_traits
-	template <class T>
-	struct weak_pointer_traits {
-		static constexpr bool is_weak_pointer_v = false;
-	};
-	template <class X>
-	struct weak_pointer_traits<std::weak_ptr<X>> {
-		static constexpr bool is_weak_pointer_v = true;
-		using locker_type = std::shared_ptr<X>;
-		static std::shared_ptr<X> try_lock_weak_pointer(const std::weak_ptr<X>& pointer) { return pointer.lock(); }
-		static void unlock_weak_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) { locker.reset(); }
-		static bool check_weak_pointer_expired(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
-	};
-
 	//is_shared_pointer
 	template <class T>
-	struct is_shared_pointer : std::bool_constant<shared_pointer_traits<T>::is_shared_pointer_v> {};
+	struct is_shared_pointer : std::false_type {};
+	template <class X>
+	struct is_shared_pointer<std::shared_ptr<X>> : std::true_type {}; //特化
 	template <class T>
 	constexpr bool is_shared_pointer_v = is_shared_pointer<T>::value;
 
 	//is_weak_pointer
 	template <class T>
-	struct is_weak_pointer : std::bool_constant<weak_pointer_traits<T>::is_weak_pointer_v> {};
+	struct is_weak_pointer : std::false_type {};
+	template <class X>
+	struct is_weak_pointer<std::weak_ptr<X>> : std::true_type {}; //特化
 	template <class T>
 	constexpr bool is_weak_pointer_v = is_weak_pointer<T>::value;
+
+	//weak_pointer_traits
+	template <class T>
+	struct weak_pointer_traits {};
+	template <class X>
+	struct weak_pointer_traits<std::weak_ptr<X>> { //特化
+		using locker_type = std::shared_ptr<X>;
+		static std::shared_ptr<X> try_lock_weak_pointer(const std::weak_ptr<X>& pointer) noexcept(noexcept(pointer.lock())) { return pointer.lock(); }
+		static void unlock_weak_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) noexcept(noexcept(locker.reset())) { locker.reset(); }
+		static bool check_weak_pointer_expired(const std::weak_ptr<X>& pointer) noexcept(noexcept(pointer.expired())) { return pointer.expired(); }
+	};
 
 }
 
@@ -236,16 +233,6 @@ namespace std { //helper funcs
 		return std::forward<T>(arg);
 	}
 
-	template <class T>
-	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>& arg) noexcept {
-		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
-			(void)std::remove_cvref_t<T>(std::move(arg));
-	}
-	template <class T>
-	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>&& arg) noexcept {
-		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
-			(void)std::remove_cvref_t<T>(std::move(arg));
-	}
 }
 
 

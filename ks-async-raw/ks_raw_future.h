@@ -24,12 +24,27 @@ __KS_ASYNC_RAW_BEGIN
 
 
 class ks_raw_future;
-using ks_raw_future_ptr = std::shared_ptr<ks_raw_future>;
 
-_ABSTRACT class ks_raw_future {
+//using ks_raw_future_ptr = std::shared_ptr<ks_raw_future>;
+struct ks_raw_future_ptr : std::shared_ptr<ks_raw_future> {
+	ks_raw_future_ptr() noexcept = default;
+	ks_raw_future_ptr(const ks_raw_future_ptr&) noexcept = default;
+	ks_raw_future_ptr(ks_raw_future_ptr&&) noexcept = default;
+	_NOINLINE ks_raw_future_ptr& operator=(const ks_raw_future_ptr&) noexcept = default;
+	_NOINLINE ks_raw_future_ptr& operator=(ks_raw_future_ptr&&) noexcept = default;
+	_NOINLINE ~ks_raw_future_ptr() noexcept = default;
+
+	ks_raw_future_ptr(std::shared_ptr<ks_raw_future> r) noexcept : shared_ptr(std::move(r)) {}
+	ks_raw_future_ptr(nullptr_t) noexcept : shared_ptr(nullptr) {}
+
+	void swap(ks_raw_future_ptr& r) noexcept { shared_ptr::swap(r); }
+};
+
+
+_INTERFACE_LIKE class ks_raw_future {
 protected:
-	ks_raw_future() = default;
-	~ks_raw_future() = default;  //protected
+	ks_raw_future() noexcept = default;
+	~ks_raw_future() noexcept = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_future);
 
 public:
@@ -67,8 +82,8 @@ public:
 
 	//不希望直接使用future.try_cancel，更应使用controller.try_cancel
 	virtual void __try_cancel(bool backtrack);
-	KS_ASYNC_API static bool __check_current_future_cancelled();
-	KS_ASYNC_API static ks_error __acquire_current_future_cancelled_error(const ks_error& def_error);
+	/*KS_ASYNC_API*/ static bool __check_current_future_cancelled();
+	/*KS_ASYNC_API*/ static ks_error __acquire_current_future_cancelled_error(const ks_error& def_error);
 
 	//慎用，使用不当可能会造成死锁或卡顿！
 	virtual void __wait();
@@ -101,3 +116,10 @@ protected:
 
 
 __KS_ASYNC_RAW_END
+
+
+namespace std {
+	inline void swap(__ks_async_raw::ks_raw_future_ptr& l, __ks_async_raw::ks_raw_future_ptr& r) noexcept {
+		l.swap(r);
+	}
+}

@@ -20,23 +20,23 @@ limitations under the License.
 #include "ktl/ks_concurrency.h"
 
 
-_ABSTRACT class ks_apartment {
+_INTERFACE_LIKE class ks_apartment {
 protected:
-	KS_ASYNC_INLINE_API ks_apartment() = default;
-	KS_ASYNC_INLINE_API ~ks_apartment() = default;
+	KS_ASYNC_INLINE_API ks_apartment() noexcept = default;
+	KS_ASYNC_INLINE_API ~ks_apartment() noexcept = default;  //protected
 	_DISABLE_COPY_CONSTRUCTOR(ks_apartment);
 	
 public:
-	KS_ASYNC_API static ks_apartment* ui_sta();         //UI[单线程]套间，需由APP框架提供（一般是主线程，也可以不是）
-	KS_ASYNC_API static ks_apartment* master_sta();     //主逻辑[单线程]套间，亦由APP框架提供（可以与ui-sta相同，但最好区别开）
-	KS_ASYNC_API static ks_apartment* background_sta(); //后台[单线程]套间
-	KS_ASYNC_API static ks_apartment* default_mta();    //默认[多线程]套间
+	KS_ASYNC_API static ks_apartment* ui_sta() noexcept;         //UI[单线程]套间，需由APP框架提供（一般是主线程，也可以不是）
+	KS_ASYNC_API static ks_apartment* master_sta() noexcept;     //主逻辑[单线程]套间，亦由APP框架提供（可以与ui-sta相同，但最好区别开）
+	KS_ASYNC_API static ks_apartment* background_sta() noexcept; //后台[单线程]套间
+	KS_ASYNC_API static ks_apartment* default_mta() noexcept;    //默认[多线程]套间
 
-	KS_ASYNC_API static ks_apartment* current_thread_apartment();
-	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta();
-	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment);
+	KS_ASYNC_API static ks_apartment* current_thread_apartment() noexcept;
+	KS_ASYNC_API static ks_apartment* current_thread_apartment_or_default_mta() noexcept;
+	KS_ASYNC_API static ks_apartment* current_thread_apartment_or(ks_apartment* or_apartment) noexcept;
 
-	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name);
+	KS_ASYNC_API static ks_apartment* find_public_apartment(const char* name) noexcept;
 
 public:
 	enum { //feature consts

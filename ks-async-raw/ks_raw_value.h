@@ -20,43 +20,51 @@ limitations under the License.
 
 __KS_ASYNC_RAW_BEGIN
 
-
-class ks_raw_value final {
+class ks_raw_value : private ks_any {
 public:
-	ks_raw_value() : m_any() {}
+	KS_ASYNC_INLINE_API ks_raw_value() noexcept = default;
+	KS_ASYNC_INLINE_API ks_raw_value(const ks_raw_value& v) noexcept = default;
+	KS_ASYNC_INLINE_API ks_raw_value& operator=(const ks_raw_value& v) noexcept = default;
+	KS_ASYNC_INLINE_API ks_raw_value(ks_raw_value&& v) noexcept = default;
+	KS_ASYNC_INLINE_API ks_raw_value& operator=(ks_raw_value&& v) noexcept = default;
 
-	ks_raw_value(const ks_raw_value&) = default;
-	ks_raw_value& operator=(const ks_raw_value&) = default;
-	ks_raw_value(ks_raw_value&&) noexcept = default;
-	ks_raw_value& operator=(ks_raw_value&&) noexcept = default;
+private:
+	__KS_ASYNC_PRIVATE_INLINE_API explicit ks_raw_value(ks_any&& r) noexcept : ks_any(std::move(r)) {}
 
 public:
 	template <class T, class X = T, class _ = std::enable_if_t<std::is_convertible_v<X, T>>>
-	static ks_raw_value of(X&& x) {
-		return ks_raw_value((T*)nullptr, std::forward<X>(x));
+	KS_ASYNC_INLINE_API static ks_raw_value of(X&& x) noexcept {
+		return ks_raw_value(ks_any::of<T>(std::forward<X>(x))); 
 	}
-	static ks_raw_value of_nothing() {
-		return ks_raw_value::of<nothing_t>(nothing);
-	}
-
-	template <class T>
-	static ks_raw_value __direct_of(T&& x) {
-		return ks_raw_value::of<std::remove_cvref_t<T>>(std::forward<T>(x));
-	}
-
-private:
-	template <class T, class X>
-	explicit ks_raw_value(T*, X&& x) : m_any(ks_any::of<T>(std::forward<X>(x))) {}
 
 public:
-	template <class T>
-	const T& get() const {
-		return m_any.get<T>();
+	KS_ASYNC_INLINE_API bool has_value() const noexcept { 
+		return ks_any::has_value(); 
+	}
+	KS_ASYNC_INLINE_API bool has_value() const volatile noexcept { 
+		return ks_any::has_value(); 
 	}
 
-private:
-	ks_any m_any;
+	template <class T>
+	KS_ASYNC_INLINE_API const T& get() const noexcept { 
+		return ks_any::template get<T>(); 
+	}
+
+public:
+	KS_ASYNC_INLINE_API void swap(ks_raw_value& r) noexcept {
+		ks_any::swap(r);
+	}
+
+	KS_ASYNC_INLINE_API void reset() noexcept {
+		ks_any::reset();
+	}
 };
 
-
 __KS_ASYNC_RAW_END
+
+
+namespace std {
+	inline void swap(__ks_async_raw::ks_raw_value& l, __ks_async_raw::ks_raw_value& r) noexcept {
+		l.swap(r);
+	}
+}

@@ -18,17 +18,17 @@ limitations under the License.
 template <>
 class ks_future<void> final {
 public:
-	ks_future(nullptr_t) : m_nothing_future(nullptr) {}
+	ks_future(nullptr_t) noexcept : m_nothing_future(nullptr) {}
 
-	ks_future(const ks_future&) = default;
+	ks_future(const ks_future&) noexcept = default;
 	ks_future(ks_future&&) noexcept = default;
 
-	ks_future& operator=(const ks_future&) = default;
+	ks_future& operator=(const ks_future&) noexcept = default;
 	ks_future& operator=(ks_future&&) noexcept = default;
 
 	//让ks_future看起来像一个智能指针
-	ks_future* operator->() { return this; }
-	const ks_future* operator->() const { return this; }
+	ks_future* operator->() noexcept { return this; }
+	const ks_future* operator->() const noexcept { return this; }
 
 	using value_type = void;
 	using this_future_type = ks_future<void>;
@@ -53,7 +53,7 @@ public: //resolved, rejected
 
 private: //__wrap_task_fn
 	template <class FN>
-	static auto __wrap_task_fn(FN&& task_fn) {
+	inline static auto __wrap_task_fn(FN&& task_fn) {
 		constexpr int arglist_mode =
 			(std::is_convertible_v<FN, std::function<void(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<void>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<void>(ks_cancel_inspector*)>>) ? 2 :
 			(std::is_convertible_v<FN, std::function<void()>> || std::is_convertible_v<FN, std::function<ks_result<void>()>> || std::is_convertible_v<FN, std::function<ks_future<void>()>>) ? 1 : 0;
@@ -62,7 +62,7 @@ private: //__wrap_task_fn
 	}
 
 	template <class FN>
-	static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 1>) {
+	inline static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN>, ks_future<void>> ? 3 :
@@ -71,7 +71,7 @@ private: //__wrap_task_fn
 		return ks_future<void>::__wrap_task_fn_by_arglist_ret(std::forward<FN>(task_fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
 	template <class FN>
-	static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 2>) {
+	inline static auto __wrap_task_fn_by_arglist(FN&& task_fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, ks_cancel_inspector*>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<void>> ? 3 :
@@ -80,48 +80,42 @@ private: //__wrap_task_fn
 		return ks_future<void>::__wrap_task_fn_by_arglist_ret(std::forward<FN>(task_fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
 
-	template <class FN>
-	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
+	_NOINLINE static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<void()> task_fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
+		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
 			task_fn();
 			return ks_result<nothing_t>(nothing);
 		};
 	}
-	template <class FN>
-	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
+	_NOINLINE static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<ks_result<void>()> task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
+		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
 			return task_fn().template cast<nothing_t>();
 		};
 	}
-	template <class FN>
-	static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_future<nothing_t> {
+	_NOINLINE static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<ks_future<void>()> task_fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
+		return[task_fn = std::move(task_fn)]()->ks_future<nothing_t> {
 			return task_fn().template cast<nothing_t>();
 		};
 	}
-	template <class FN>
-	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
+	_NOINLINE static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<void(ks_cancel_inspector*)> task_fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
+		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
 			task_fn(ks_cancel_inspector::__for_future());
 			return ks_result<nothing_t>(nothing);
 		};
 	}
-	template <class FN>
-	static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_result<nothing_t> {
+	_NOINLINE static std::function<ks_result<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<ks_result<void>(ks_cancel_inspector*)> task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
+		return[task_fn = std::move(task_fn)]()->ks_result<nothing_t> {
 			return task_fn(ks_cancel_inspector::__for_future()).template cast<nothing_t>();
 		};
 	}
-	template <class FN>
-	static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(FN&& task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return[task_fn = std::forward<FN>(task_fn)]()->ks_future<nothing_t> {
+	_NOINLINE static std::function<ks_future<nothing_t>()> __wrap_task_fn_by_arglist_ret(std::function<ks_future<void>(ks_cancel_inspector*)> task_fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
+		return[task_fn = std::move(task_fn)]()->ks_future<nothing_t> {
 			return task_fn(ks_cancel_inspector::__for_future()).template cast<nothing_t>();
 		};
 	}
 
 private: //__wrap_then_fn
 	template <class R, class FN>
-	static auto __wrap_then_fn(FN&& fn) {
+	inline static auto __wrap_then_fn(FN&& fn) {
 		constexpr int arglist_mode =
 			(std::is_convertible_v<FN, std::function<R(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<R>(ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<R>(ks_cancel_inspector*)>>) ? 2 :
 			(std::is_convertible_v<FN, std::function<R()>> || std::is_convertible_v<FN, std::function<ks_result<R>()>> || std::is_convertible_v<FN, std::function<ks_future<R>()>>) ? 1 : 0;
@@ -130,7 +124,7 @@ private: //__wrap_then_fn
 	}
 
 	template <class R, class FN>
-	static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
+	inline static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN>, ks_future<R>> ? 3 :
@@ -140,7 +134,7 @@ private: //__wrap_then_fn
 		return ks_future<void>::__wrap_then_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
 	template <class R, class FN>
-	static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
+	inline static auto __wrap_then_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, ks_cancel_inspector*>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN, ks_cancel_inspector*>, ks_future<R>> ? 3 :
@@ -150,63 +144,63 @@ private: //__wrap_then_fn
 		return ks_future<void>::__wrap_then_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
 
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<void()> fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
 		static_assert(std::is_void_v<R>, "R must be void");
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<void> {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<void> {
 			fn();
 			return ks_result<void>(nothing);
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<R()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<R> {
 			return ks_result<R>(fn());
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<ks_result<R>()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<R> {
 			return fn();
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_future<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_future<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_future<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<ks_future<R>()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_future<R> {
 			return fn();
 		};
 	}
 
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<void(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
 		static_assert(std::is_void_v<R>, "R must be void");
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<void> {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<void> {
 			fn(ks_cancel_inspector::__for_future());
 			return ks_result<void>(nothing);
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<R(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<R> {
 			return ks_result<R>(fn(ks_cancel_inspector::__for_future()));
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<ks_result<R>(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_result<R> {
 			return fn(ks_cancel_inspector::__for_future());
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_future<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return[fn = std::forward<FN>(fn)](const nothing_t&)->ks_future<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_future<R>(const nothing_t&)> __wrap_then_fn_by_arglist_ret(std::function<ks_future<R>(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
+		return[fn = std::move(fn)](const nothing_t&)->ks_future<R> {
 			return fn(ks_cancel_inspector::__for_future());
 		};
 	}
 
 private: //__wrap_transform_fn
 	template <class R, class FN>
-	static auto __wrap_transform_fn(FN&& fn) {
+	inline static auto __wrap_transform_fn(FN&& fn) {
 		constexpr int arglist_mode =
 			(std::is_convertible_v<FN, std::function<R(const ks_result<void>&, ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<void>&, ks_cancel_inspector*)>> || std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<void>&, ks_cancel_inspector*)>>) ? 2 :
 			(std::is_convertible_v<FN, std::function<R(const ks_result<void>&)>> || std::is_convertible_v<FN, std::function<ks_result<R>(const ks_result<void>&)>> || std::is_convertible_v<FN, std::function<ks_future<R>(const ks_result<void>&)>>) ? 1 : 0;
@@ -215,7 +209,7 @@ private: //__wrap_transform_fn
 	}
 
 	template <class R, class FN>
-	static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
+	inline static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 1>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN, const ks_result<void>&>, ks_future<R>> ? 3 :
@@ -225,7 +219,7 @@ private: //__wrap_transform_fn
 		return ks_future<void>::__wrap_transform_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 1>(), std::integral_constant<int, ret_mode>());
 	}
 	template <class R, class FN>
-	static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
+	inline static auto __wrap_transform_fn_by_arglist(FN&& fn, std::integral_constant<int, 2>) {
 		constexpr int ret_mode =
 			std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>> ? -1 :
 			std::is_convertible_v<std::invoke_result_t<FN, const ks_result<void>&, ks_cancel_inspector*>, ks_future<R>> ? 3 :
@@ -235,56 +229,56 @@ private: //__wrap_transform_fn
 		return ks_future<void>::__wrap_transform_fn_by_arglist_ret<R>(std::forward<FN>(fn), std::integral_constant<int, 2>(), std::integral_constant<int, ret_mode>());
 	}
 
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<void(const ks_result<void>&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>) {
 		static_assert(std::is_void_v<R>, "R must be void");
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<void> {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<void> {
 			fn(arg.cast<void>());
 			return ks_result<void>(nothing);
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<R(const ks_result<void>&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
 			return ks_result<R>(fn(arg.cast<void>()));
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<ks_result<R>(const ks_result<void>&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
 			return fn(arg.cast<void>());
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_future<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_future<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_future<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<ks_future<R>(const ks_result<void>&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_future<R> {
 			return fn(arg.cast<void>());
 		};
 	}
 
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<void(const ks_result<void>&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>) {
 		static_assert(std::is_void_v<R>, "R must be void");
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<void> {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<void> {
 			fn(arg.cast<void>(), ks_cancel_inspector::__for_future());
 			return ks_result<void>(nothing);
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<R(const ks_result<void>&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
 			return ks_result<R>(fn(arg.cast<void>(), ks_cancel_inspector::__for_future()));
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_result<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<ks_result<R>(const ks_result<void>&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_result<R> {
 			return fn(arg.cast<void>(), ks_cancel_inspector::__for_future());
 		};
 	}
-	template <class R, class FN>
-	static std::function<ks_future<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
-		return[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& arg)->ks_future<R> {
+	template <class R>
+	_NOINLINE static std::function<ks_future<R>(const ks_result<nothing_t>&)> __wrap_transform_fn_by_arglist_ret(std::function<ks_future<R>(const ks_result<void>&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>) {
+		return[fn = std::move(fn)](const ks_result<nothing_t>& arg)->ks_future<R> {
 			return fn(arg.cast<void>(), ks_cancel_inspector::__for_future());
 		};
 	}
@@ -393,11 +387,7 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void()>> && std::is_void_v<std::invoke_result_t<FN>>>>
 	ks_future<void> on_success(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		return m_nothing_future.on_success(
-			apartment, 
-			[fn = std::forward<FN>(fn)](nothing_t) -> void { fn(); },
-			context
-		); 
+		return this->__on_success_impl(apartment, context, std::forward<FN>(fn));
 	}
 	template <class FN>
 	ks_future<void> on_success(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
@@ -407,11 +397,7 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void(const ks_error&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_error&>>>>
 	ks_future<void> on_failure(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		return m_nothing_future.on_failure(
-			apartment,
-			[fn = std::forward<FN>(fn)](const ks_error& error) -> void { fn(error); },
-			context
-		);
+		return this->__on_failure_impl(apartment, context, std::forward<FN>(fn));
 	}
 	template <class FN>
 	ks_future<void> on_failure(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
@@ -421,23 +407,41 @@ public: //on_success, on_failure, on_completion
 	template <class FN, class _ = std::enable_if_t<
 		std::is_convertible_v<FN, std::function<void(const ks_result<void>&)>> && std::is_void_v<std::invoke_result_t<FN, const ks_result<void>&>>>>
 	ks_future<void> on_completion(ks_apartment* apartment, FN&& fn, const ks_async_context& context = {}) const {
-		return m_nothing_future.on_completion(
-			apartment, 
-			[fn = std::forward<FN>(fn)](const ks_result<nothing_t>& result) -> void { fn(ks_result<void>::__from_other(result)); },
-			context
-		); 
+		return this->__on_completion_impl(apartment, context, std::forward<FN>(fn));
 	}
 	template <class FN>
 	ks_future<void> on_completion(ks_apartment* apartment, const ks_async_context& context, FN&& fn) const { //only for compat
 		return this->on_completion(apartment, std::forward<FN>(fn), context);
 	}
 
+private: //__on_success, __on_failure, __on_completion
+	_NOINLINE ks_future<void> __on_success_impl(ks_apartment* apartment, const ks_async_context& context, std::function<void()> fn) const {
+		return m_nothing_future.on_success(
+			apartment,
+			[fn = std::move(fn)](nothing_t) -> void { fn(); },
+			context
+		);
+	}
+	_NOINLINE ks_future<void> __on_failure_impl(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_error&)> fn) const {
+		return m_nothing_future.on_failure(
+			apartment,
+			[fn = std::move(fn)](const ks_error& error) -> void { fn(error); },
+			context
+		);
+	}
+	_NOINLINE ks_future<void> __on_completion_impl(ks_apartment* apartment, const ks_async_context& context, std::function<void(const ks_result<void>&)> fn) const {
+		return m_nothing_future.on_completion(
+			apartment,
+			[fn = std::move(fn)](const ks_result<nothing_t>& result) -> void { fn(ks_result<void>::__from_other(result)); },
+			context
+		);
+	}
+
 public: //map, map_value, cast
-	template <class R, class FN, class _ = std::enable_if_t<
-		std::is_convertible_v<FN, std::function<R()>>>>
-	ks_future<R> map(FN&& fn) const {
+	template <class R>
+	_NOINLINE ks_future<R> map(std::function<R()> fn) const {
 		return m_nothing_future.template map<R>(
-			[fn = std::forward<FN>(fn)](const nothing_t&) -> R { return fn(); }
+			[fn = std::move(fn)](const nothing_t&) -> R { return fn(); }
 		);
 	}
 
@@ -494,7 +498,7 @@ private:
 	using __raw_cast_mode_t = typename ks_result<void>::__raw_cast_mode_t;
 
 	template <class R>
-	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
+	inline static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
 		return ks_result<void>::template __determine_raw_cast_mode<R>();
 	}
 
@@ -506,9 +510,9 @@ private:
 
 	ks_future(ks_future<nothing_t>&& nothing_future) noexcept : m_nothing_future(std::move(nothing_future)) {}
 
-	static ks_future<void> __from_raw(const ks_raw_future_ptr& raw_future) { return ks_future<nothing_t>::__from_raw(raw_future); }
-	static ks_future<void> __from_raw(ks_raw_future_ptr&& raw_future) { return ks_future<nothing_t>::__from_raw(std::move(raw_future)); }
-	const ks_raw_future_ptr& __get_raw() const { return m_nothing_future.__get_raw(); }
+	static ks_future<void> __from_raw(const ks_raw_future_ptr& raw_future) noexcept { return ks_future<nothing_t>::__from_raw(raw_future); }
+	static ks_future<void> __from_raw(ks_raw_future_ptr&& raw_future) noexcept { return ks_future<nothing_t>::__from_raw(std::move(raw_future)); }
+	const ks_raw_future_ptr& __get_raw() const noexcept { return m_nothing_future.__get_raw(); }
 
 	template <class T2> friend class ks_future;
 	template <class T2> friend class ks_promise;

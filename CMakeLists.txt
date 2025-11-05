@@ -68,9 +68,10 @@ set(MY_SOURCE_FILES
 	ks_async_flow.h
 
 	#about notificiation-center
-	ks_notification.h
 	ks_notification_center.h
 	ks_notification_center.cpp
+	ks_notification.h
+	ks_notification.cpp
 
 	#others
 	ks_pending_trigger.h
@@ -79,6 +80,7 @@ set(MY_SOURCE_FILES
 	ks_cancel_inspector.cpp
 	ks_async_base.h
 	ks_error.h
+	ks_error.cpp
 )
 
 set(MY_ASYNC_RAW_SOURCE_FILES
@@ -87,8 +89,10 @@ set(MY_ASYNC_RAW_SOURCE_FILES
 	ks-async-raw/ks_raw_future.cpp
 	ks-async-raw/ks_raw_promise.h
 	ks-async-raw/ks_raw_promise.cpp
-	ks-async-raw/ks_raw_value.h
 	ks-async-raw/ks_raw_result.h
+	ks-async-raw/ks_raw_result.cpp
+	ks-async-raw/ks_raw_value.h
+	ks-async-raw/ks_raw_value.cpp
 	ks-async-raw/ks_raw_async_flow.h
 	ks-async-raw/ks_raw_async_flow.cpp
 	ks-async-raw/ks_raw_internal_helper.hpp
@@ -168,8 +172,8 @@ set(PUBLIC_HEADER_FILES
 	ks_async_flow.h
 
 	#about notificiation-center
-	ks_notification.h
 	ks_notification_center.h
+	ks_notification.h
 
 	#others
 	ks_cancel_inspector.h
@@ -182,8 +186,8 @@ set(PUBLIC_ASYNC_RAW_HEADER_FILES
 	#ks-async-raw
 	ks-async-raw/ks_raw_future.h
 	ks-async-raw/ks_raw_promise.h
-	ks-async-raw/ks_raw_value.h
 	ks-async-raw/ks_raw_result.h
+	ks-async-raw/ks_raw_value.h
 	ks-async-raw/ks_raw_async_flow.h
 )
 

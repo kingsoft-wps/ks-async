@@ -130,7 +130,6 @@ const char* ks_notification_center::__ks_notification_center_data::name() {
 
 uint64_t ks_notification_center::__ks_notification_center_data::add_observer(const void* observer, const char* notification_name_pattern, std::function<void(const ks_notification&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
 	ASSERT(observer != nullptr);
-	ASSERT(apartment != nullptr);
 	if (observer == nullptr)
 		return 0;
 
@@ -139,8 +138,9 @@ uint64_t ks_notification_center::__ks_notification_center_data::add_observer(con
 	if (parsed_notification_name_pattern.base_name.empty())
 		return 0;
 
-	if (apartment == nullptr)
-		apartment = ks_apartment::current_thread_apartment_or_default_mta();
+	ASSERT(apartment != nullptr);
+	//if (apartment == nullptr)
+	//	apartment = ks_apartment::current_thread_apartment_or_default_mta();
 
 	std::unique_lock<ks_mutex> lock(m_mutex);
 
@@ -444,7 +444,7 @@ ks_notification_center* ks_notification_center::default_center() {
 }
 
 
-const char* ks_notification_center::name() {
+const char* ks_notification_center::name() noexcept {
 	return m_d->name();
 }
 

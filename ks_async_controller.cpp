@@ -19,10 +19,19 @@ limitations under the License.
 void __forcelink_to_ks_async_controller_cpp() {}
 
 
-//慎用，使用不当可能会造成死锁或卡顿！
-_DECL_DEPRECATED void ks_async_controller::__wait_all() const {
-	//暂以最简陋的手段实现，最小化内存占用
-	while (m_controller_data_ptr->pending_count != 0) {
-		std::this_thread::yield(); 
-	}
+ks_async_controller::ks_async_controller()
+	: m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {
 }
+
+ks_async_controller::~ks_async_controller() noexcept {
+	//m_controller_data_ptr.reset();
+}
+
+
+////慎用，使用不当可能会造成死锁或卡顿！
+//_DEPRECATED void ks_async_controller::__wait_all() const {
+//	//暂以最简陋的手段实现，最小化内存占用
+//	while (m_controller_data_ptr->pending_count != 0) {
+//		std::this_thread::yield(); 
+//	}
+//}

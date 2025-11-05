@@ -286,7 +286,7 @@ namespace _KSConcurrencyImpl {
         }
 
         template <class T>
-        inline void __atomic_wait_explicit(const std::atomic<T>* object, T old, std::memory_order order) const {
+        inline void __atomic_wait_explicit(const std::atomic<T>* object, T old, std::memory_order order) {
             object->wait(old, order);
         }
 

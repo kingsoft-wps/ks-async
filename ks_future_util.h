@@ -268,23 +268,23 @@ private:
 	template <class T, class FN>
 	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist(FN&& fn, std::integral_constant<int, 2>);
 
-	template <class T, class FN>
-	static std::function<ks_future<void>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>);
+	template <class T>
+	static std::function<ks_future<void>()> __wrap_async_fn_0_by_arglist_ret(std::function<void()> fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<T()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<ks_result<T>()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<ks_future<T>()> fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>);
 
-	template <class T, class FN>
-	static std::function<ks_future<void>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>);
-	template <class T, class FN>
-	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>);
+	template <class T>
+	static std::function<ks_future<void>()> __wrap_async_fn_0_by_arglist_ret(std::function<void(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<T(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<ks_result<T>(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>);
+	template <class T>
+	static std::function<ks_future<T>()> __wrap_async_fn_0_by_arglist_ret(std::function<ks_future<T>(ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>);
 
 private:
 	template <class T, class ARG1, class FN>
@@ -295,23 +295,23 @@ private:
 	template <class T, class ARG1, class FN>
 	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist(FN&& fn, std::integral_constant<int, 2>);
 
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<void>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>);
+	template <class T, class ARG1>
+	static std::function<ks_future<void>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<void(const ARG1&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, -1>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<T(const ARG1&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 1>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<ks_result<T>(const ARG1&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 2>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<ks_future<T>(const ARG1&)> fn, std::integral_constant<int, 1>, std::integral_constant<int, 3>);
 
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<void>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>);
-	template <class T, class ARG1, class FN>
-	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(FN&& fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>);
+	template <class T, class ARG1>
+	static std::function<ks_future<void>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<void(const ARG1&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, -1>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<T(const ARG1&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 1>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<ks_result<T>(const ARG1&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 2>);
+	template <class T, class ARG1>
+	static std::function<ks_future<T>(const ARG1&)> __wrap_async_fn_1_by_arglist_ret(std::function<ks_future<T>(const ARG1&, ks_cancel_inspector*)> fn, std::integral_constant<int, 2>, std::integral_constant<int, 3>);
 
 private:
 	ks_future_util() = delete;

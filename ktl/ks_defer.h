@@ -15,18 +15,18 @@ limitations under the License.
 
 #pragma once
 
+#ifndef __KS_DEFER_DEF
+#define __KS_DEFER_DEF
+
 #include "ks_cxxbase.h"
 #include <functional>
 #include <vector>
 
 
-#ifndef __KS_DEFER_DEF
-#define __KS_DEFER_DEF
-
 class ks_defer {
 public:
-	ks_defer() {}
-	explicit ks_defer(std::function<void()>&& fn) { this->add(std::move(fn)); }
+	ks_defer() noexcept {}
+	explicit ks_defer(std::function<void()>&& fn) noexcept : m_pri_fn(std::move(fn)) {}
 
 	ks_defer(const ks_defer&) = delete;
 	ks_defer(ks_defer&& other) noexcept { //仅支持移动构造
@@ -61,7 +61,7 @@ public:
 		m_pri_fn = {};
 	}
 
-	void reset() {
+	void reset() noexcept {
 		m_more_fns.clear();
 		m_pri_fn = {};
 	}

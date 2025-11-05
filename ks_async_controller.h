@@ -22,49 +22,38 @@ limitations under the License.
 
 class ks_async_controller final {
 public:
-	KS_ASYNC_INLINE_API ks_async_controller() 
-		: m_controller_data_ptr(std::make_shared<_CONTROLLER_DATA>()) {
-	}
-
-	KS_ASYNC_INLINE_API ~ks_async_controller() {
-		ASSERT(!m_controller_data_ptr->is_bound_with_aproc ? this->is_all_completed() : true);
-		this->try_cancel();  //析构时自动try_cancel
-	}
-
+	KS_ASYNC_API ks_async_controller();
 	_DISABLE_COPY_CONSTRUCTOR(ks_async_controller);
 
-public:
-	void __mark_bound_with_aproc(bool bound_with_aproc) {
-		ASSERT(bound_with_aproc);
-		ASSERT(!m_controller_data_ptr->is_bound_with_aproc);
-		ASSERT(m_controller_data_ptr->pending_count == 0);
-		const_cast<bool&>(m_controller_data_ptr->is_bound_with_aproc) = bound_with_aproc;
-	}
+	KS_ASYNC_API ~ks_async_controller() noexcept;
 
 public:
-	KS_ASYNC_INLINE_API void try_cancel() {
-		m_controller_data_ptr->cancel_ctrl_v = true;
-	}
-
-	KS_ASYNC_INLINE_API bool check_cancelled() {
-		return m_controller_data_ptr->cancel_ctrl_v;
+	KS_ASYNC_INLINE_API void __mark_bound_with_aproc(bool bound_with_aproc) noexcept {
+		//ASSERT(bound_with_aproc);
+		//ASSERT(!m_controller_data_ptr->is_bound_with_aproc);
+		//ASSERT(m_controller_data_ptr->pending_count == 0);
+		//const_cast<bool&>(m_controller_data_ptr->is_bound_with_aproc) = bound_with_aproc;
+		_NOOP();
 	}
 
 public:
-	KS_ASYNC_INLINE_API bool is_all_completed() const {
-		return m_controller_data_ptr->pending_count == 0;
+	KS_ASYNC_INLINE_API void try_cancel() noexcept {
+		m_controller_data_ptr->do_try_cancel();
 	}
 
-	//慎用，使用不当可能会造成死锁或卡顿！
-	_DECL_DEPRECATED KS_ASYNC_API void __wait_all() const;
+	KS_ASYNC_INLINE_API bool check_cancelled() noexcept {
+		return m_controller_data_ptr->do_check_cancelled();
+	}
 
 private:
 	struct _CONTROLLER_DATA {
-		volatile bool cancel_ctrl_v = false;
-		const bool is_bound_with_aproc = false; //const-like
-		std::atomic<int> pending_count{ 0 };
+		std::atomic<bool> cancel_ctrl{false};
+
+		void do_try_cancel() noexcept { this->cancel_ctrl.store(true, std::memory_order_relaxed); }
+		bool do_check_cancelled() noexcept { return this->cancel_ctrl.load(std::memory_order_relaxed); }
 	};
 
+private:
 	const std::shared_ptr<_CONTROLLER_DATA> m_controller_data_ptr;
 
 	friend class ks_async_context;

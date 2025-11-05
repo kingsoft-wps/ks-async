@@ -31,7 +31,22 @@ __KS_ASYNC_RAW_BEGIN
 
 
 class ks_raw_async_flow;
-using ks_raw_async_flow_ptr = std::shared_ptr<ks_raw_async_flow>;
+
+//using ks_raw_async_flow_ptr = std::shared_ptr<ks_raw_async_flow>;
+struct ks_raw_async_flow_ptr : std::shared_ptr<ks_raw_async_flow> {
+	ks_raw_async_flow_ptr() noexcept = default;
+	ks_raw_async_flow_ptr(const ks_raw_async_flow_ptr&) noexcept = default;
+	ks_raw_async_flow_ptr(ks_raw_async_flow_ptr&&) noexcept = default;
+	_NOINLINE ks_raw_async_flow_ptr& operator=(const ks_raw_async_flow_ptr&) noexcept = default;
+	_NOINLINE ks_raw_async_flow_ptr& operator=(ks_raw_async_flow_ptr&&) noexcept = default;
+	_NOINLINE ~ks_raw_async_flow_ptr() noexcept = default;
+
+	ks_raw_async_flow_ptr(std::shared_ptr<ks_raw_async_flow> r) noexcept : shared_ptr(std::move(r)) {}
+	ks_raw_async_flow_ptr(nullptr_t) noexcept : shared_ptr(nullptr) {}
+
+	void swap(ks_raw_async_flow_ptr& r) noexcept { shared_ptr::swap(r); }
+};
+
 
 class ks_raw_async_flow final : public std::enable_shared_from_this<ks_raw_async_flow> {
 public:
@@ -110,8 +125,8 @@ private:
 	enum class __raw_ctor { v };
 
 public: //called by make_shared in create
-	explicit ks_raw_async_flow(__raw_ctor);
-	~ks_raw_async_flow();
+	explicit ks_raw_async_flow(__raw_ctor) noexcept;
+	~ks_raw_async_flow() noexcept;
 	_DISABLE_COPY_CONSTRUCTOR(ks_raw_async_flow);
 
 private:
@@ -225,3 +240,10 @@ private:
 
 
 __KS_ASYNC_RAW_END
+
+
+namespace std {
+	inline void swap(__ks_async_raw::ks_raw_async_flow_ptr& l, __ks_async_raw::ks_raw_async_flow_ptr& r) noexcept {
+		l.swap(r);
+	}
+}

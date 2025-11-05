@@ -28,13 +28,13 @@ public:
 	ks_result(const ks_error& error) : m_raw_result(error) {}
 	ks_result(ks_error&& error) : m_raw_result(std::move(error)) {}
 
-	ks_result(const ks_result&) = default;
+	ks_result(const ks_result&) noexcept = default;
 	ks_result(ks_result&&) noexcept = default;
 
-	ks_result& operator=(const ks_result&) = default;
+	ks_result& operator=(const ks_result&) noexcept = default;
 	ks_result& operator=(ks_result&&) noexcept = default;
 
-	static ks_result<T> __bare() { return ks_result(__raw_ctor::v); }
+	static ks_result<T> __bare() noexcept { return ks_result(__raw_ctor::v); }
 	static ks_result<T> __either(const T& value, const ks_error& error) { return !error.has_code() ? ks_result<T>(value) : ks_result<T>(error); }
 	static ks_result<T> __either(const T* value, const ks_error* error) { return !(error != nullptr && error->has_code()) ? (value != nullptr ? ks_result<T>(*value) : ks_result<T>::__bare()) : (error != nullptr ? ks_result<T>(*error) : ks_result<T>::__bare()); }
 
@@ -42,20 +42,20 @@ public:
 	using this_result_type = ks_result<T>;
 
 public:
-	bool is_completed() const { return m_raw_result.is_completed(); }
-	bool is_completed() const volatile { return m_raw_result.is_completed(); }
+	bool is_completed() const noexcept { return m_raw_result.is_completed(); }
+	bool is_completed() const volatile noexcept { return m_raw_result.is_completed(); }
 
-	bool is_value() const { return m_raw_result.is_value(); }
-	bool is_value() const volatile { return m_raw_result.is_value(); }
+	bool is_value() const noexcept { return m_raw_result.is_value(); }
+	bool is_value() const volatile noexcept { return m_raw_result.is_value(); }
 
-	bool is_error() const { return m_raw_result.is_error(); }
-	bool is_error() const volatile { return m_raw_result.is_error(); }
+	bool is_error() const noexcept { return m_raw_result.is_error(); }
+	bool is_error() const volatile noexcept { return m_raw_result.is_error(); }
 
-	const T& to_value() const noexcept(false) { return m_raw_result.to_value().template get<T>(); }
-	ks_error to_error() const noexcept(false) { return m_raw_result.to_error(); }
+	const T& to_value() const { return m_raw_result.to_value().template get<T>(); }
+	ks_error to_error() const { return m_raw_result.to_error(); }
 
 	template <class R, class FN, class _ = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<FN, const T&>, R>>>
-	ks_result<R> map(FN&& fn) const {
+	_NOINLINE ks_result<R> map(FN&& fn) const {
 		if (this->is_value())
 			return ks_result<R>(fn(this->to_value()));
 		else if (this->is_error())
@@ -65,7 +65,7 @@ public:
 	}
 
 	template <class R, class X = R, class _ = std::enable_if_t<std::is_convertible_v<X, R>>>
-	ks_result<R> map_value(X&& other_value) const {
+	_NOINLINE ks_result<R> map_value(X&& other_value) const {
 		if (this->is_value())
 			return ks_result<R>(std::forward<X>(other_value));
 		else if (this->is_error())
@@ -81,11 +81,22 @@ public:
 		return __do_cast<R>(std::integral_constant<__raw_cast_mode_t, cast_mode>());
 	}
 
+public:
+	void swap(ks_result& r) noexcept {
+		//if (this != &r) {
+			m_raw_result.swap(r.m_raw_result);
+		//}
+	}
+
+	void reset() noexcept {
+		m_raw_result.reset();
+	}
+
 private:
 	enum class __raw_cast_mode_t { invalid, to_same, to_nothing, to_other };
 
 	template <class R>
-	static constexpr __raw_cast_mode_t __determine_raw_cast_mode() {
+	inline static constexpr __raw_cast_mode_t __determine_raw_cast_mode() noexcept {
 		using XT = std::remove_cvref_t<T>;
 		using XR = std::remove_cvref_t<R>;
 		using PROXT = std::conditional_t<std::is_void_v<XT>, nothing_t, XT>;
@@ -102,18 +113,18 @@ private:
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_same> __cast_mode) const {
+	inline ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_same> __cast_mode) const {
 		return ks_result<R>::__from_raw(m_raw_result);
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_nothing> __cast_mode) const {
-		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of_nothing() : m_raw_result;
+	inline ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_nothing> __cast_mode) const {
+		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of<nothing_t>(nothing) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
 	}
 
 	template <class R>
-	ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_other> __cast_mode) const {
+	inline ks_result<R> __do_cast(std::integral_constant<__raw_cast_mode_t, __raw_cast_mode_t::to_other> __cast_mode) const {
 		ks_raw_result raw_result2 = m_raw_result.is_value() ? ks_raw_value::of<R>(m_raw_result.to_value().template get<T>()) : m_raw_result;
 		return ks_result<R>::__from_raw(raw_result2);
 	}
@@ -123,20 +134,19 @@ private:
 	using ks_raw_value = __ks_async_raw::ks_raw_value;
 
 	enum class __raw_ctor { v };
-	explicit ks_result(__raw_ctor) : m_raw_result() {}
+	explicit ks_result(__raw_ctor) noexcept : m_raw_result() {}
+	explicit ks_result(__raw_ctor, const ks_raw_result& raw_result) noexcept : m_raw_result(raw_result) {}
+	explicit ks_result(__raw_ctor, ks_raw_result&& raw_result) noexcept : m_raw_result(std::move(raw_result)) {}
 
-	explicit ks_result(const ks_raw_result& raw_result, int) : m_raw_result(raw_result) {}
-	explicit ks_result(ks_raw_result&& raw_result, int) : m_raw_result(std::move(raw_result)) {}
-
-	static ks_result __from_raw(const ks_raw_result& raw_result) {
-		return ks_result(raw_result, 0);
+	static ks_result __from_raw(const ks_raw_result& raw_result) noexcept {
+		return ks_result(__raw_ctor::v, raw_result);
 	}
 
-	static ks_result __from_raw(ks_raw_result&& raw_result) {
-		return ks_result(std::move(raw_result), 0);
+	static ks_result __from_raw(ks_raw_result&& raw_result) noexcept {
+		return ks_result(__raw_ctor::v, std::move(raw_result));
 	}
 
-	ks_raw_result __get_raw() const {
+	ks_raw_result __get_raw() const noexcept {
 		return m_raw_result;
 	}
 
@@ -149,6 +159,13 @@ private:
 private:
 	ks_raw_result m_raw_result;
 };
+
+namespace std {
+	template <class T>
+	inline void swap(ks_result<T>& l, ks_result<T>& r) noexcept {
+		l.swap(r);
+	}
+}
 
 
 #include "ks_result_void.inl"

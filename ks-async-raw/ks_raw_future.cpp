@@ -661,8 +661,9 @@ public:
 
 public:
 	ks_raw_promise_ptr create_promise_representative() {
-		return std::make_shared<ks_raw_promise_representative>(
-			std::static_pointer_cast<ks_raw_promise_future>(this->shared_from_this()));
+		return std::static_pointer_cast<ks_raw_promise>(
+			std::make_shared<ks_raw_promise_representative>(
+				std::static_pointer_cast<ks_raw_promise_future>(this->shared_from_this())));
 	}
 
 protected:
@@ -730,7 +731,7 @@ private:
 
 	public: //override ks_raw_promise's methods
 		virtual ks_raw_future_ptr get_future() override {
-			return m_promise_future;
+			return std::static_pointer_cast<ks_raw_future>(m_promise_future);
 		}
 
 		virtual void resolve(const ks_raw_value & value) override {
@@ -1604,33 +1605,33 @@ private:
 ks_raw_future_ptr ks_raw_future::resolved(const ks_raw_value& value, ks_apartment* apartment) {
 	auto dx_future = std::make_shared<ks_raw_dx_future>(ks_raw_future_mode::DX);
 	dx_future->init(apartment, ks_raw_result(value));
-	return dx_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(dx_future));
 }
 
 ks_raw_future_ptr ks_raw_future::rejected(const ks_error& error, ks_apartment* apartment) {
 	auto dx_future = std::make_shared<ks_raw_dx_future>(ks_raw_future_mode::DX);
 	dx_future->init(apartment, ks_raw_result(error));
-	return dx_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(dx_future));
 }
 
 ks_raw_future_ptr ks_raw_future::__from_result(const ks_raw_result& result, ks_apartment* apartment) {
 	ASSERT(result.is_completed());
 	auto dx_future = std::make_shared<ks_raw_dx_future>(ks_raw_future_mode::DX);
 	dx_future->init(apartment, result.is_completed() ? result : ks_raw_result(ks_error::unexpected_error()));
-	return dx_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(dx_future));
 }
 
 
 ks_raw_future_ptr ks_raw_future::post(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment) {
 	auto task_future = std::make_shared<ks_raw_task_future>(ks_raw_future_mode::TASK);
 	task_future->init(apartment, std::move(task_fn), context, 0);
-	return task_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(task_future));
 }
 
 ks_raw_future_ptr ks_raw_future::post_delayed(std::function<ks_raw_result()>&& task_fn, const ks_async_context& context, ks_apartment* apartment, int64_t delay) {
 	auto task_future = std::make_shared<ks_raw_task_future>(ks_raw_future_mode::TASK_DELAYED);
 	task_future->init(apartment, std::move(task_fn), context, delay);
-	return task_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(task_future));
 }
 
 
@@ -1640,7 +1641,7 @@ ks_raw_future_ptr ks_raw_future::all(const std::vector<ks_raw_future_ptr>& futur
 
 	auto aggr_future = std::make_shared<ks_raw_aggr_future>(ks_raw_future_mode::ALL);
 	aggr_future->init(apartment, futures);
-	return aggr_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(aggr_future));
 }
 
 ks_raw_future_ptr ks_raw_future::all_completed(const std::vector<ks_raw_future_ptr>& futures, ks_apartment* apartment) {
@@ -1649,7 +1650,7 @@ ks_raw_future_ptr ks_raw_future::all_completed(const std::vector<ks_raw_future_p
 
 	auto aggr_future = std::make_shared<ks_raw_aggr_future>(ks_raw_future_mode::ALL_COMPLETED);
 	aggr_future->init(apartment, futures);
-	return aggr_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(aggr_future));
 }
 
 ks_raw_future_ptr ks_raw_future::any(const std::vector<ks_raw_future_ptr>& futures, ks_apartment* apartment) {
@@ -1660,7 +1661,7 @@ ks_raw_future_ptr ks_raw_future::any(const std::vector<ks_raw_future_ptr>& futur
 
 	auto aggr_future = std::make_shared<ks_raw_aggr_future>(ks_raw_future_mode::ANY);
 	aggr_future->init(apartment, futures);
-	return aggr_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(aggr_future));
 }
 
 void ks_raw_future::set_timeout(int64_t timeout, bool backtrack) {
@@ -1714,7 +1715,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::then(std::function<ks_raw_result(const 
 
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::THEN);
 	pipe_future->init(apartment, std::move(fn_ex), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::trap(std::function<ks_raw_result(const ks_error &)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1727,13 +1728,13 @@ ks_raw_future_ptr ks_raw_future_baseimp::trap(std::function<ks_raw_result(const 
 
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::TRAP);
 	pipe_future->init(apartment, std::move(fn_ex), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::transform(std::function<ks_raw_result(const ks_raw_result &)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::TRANSFORM);
 	pipe_future->init(apartment, std::move(fn), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::flat_then(std::function<ks_raw_future_ptr(const ks_raw_value&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1748,7 +1749,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::flat_then(std::function<ks_raw_future_p
 
 	auto flatten_future = std::make_shared<ks_raw_flatten_future>(ks_raw_future_mode::FLATTEN_THEN);
 	flatten_future->init(apartment, std::move(afn_ex), context, this->shared_from_this());
-	return flatten_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(flatten_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::flat_trap(std::function<ks_raw_future_ptr(const ks_error&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1763,13 +1764,13 @@ ks_raw_future_ptr ks_raw_future_baseimp::flat_trap(std::function<ks_raw_future_p
 
 	auto flatten_future = std::make_shared<ks_raw_flatten_future>(ks_raw_future_mode::FLATTEN_TRAP);
 	flatten_future->init(apartment, std::move(afn_ex), context, this->shared_from_this());
-	return flatten_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(flatten_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::flat_transform(std::function<ks_raw_future_ptr(const ks_raw_result&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
 	auto flatten_future = std::make_shared<ks_raw_flatten_future>(ks_raw_future_mode::FLATTEN_TRANSFORM);
 	flatten_future->init(apartment, std::move(fn), context, this->shared_from_this());
-	return flatten_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(flatten_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::on_success(std::function<void(const ks_raw_value&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1781,7 +1782,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::on_success(std::function<void(const ks_
 
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::ON_SUCCESS);
 	pipe_future->init(apartment, std::move(fn_ex), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::on_failure(std::function<void(const ks_error&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1793,7 +1794,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::on_failure(std::function<void(const ks_
 
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::ON_FAILURE);
 	pipe_future->init(apartment, std::move(fn_ex), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::on_completion(std::function<void(const ks_raw_result&)>&& fn, const ks_async_context& context, ks_apartment* apartment) {
@@ -1804,7 +1805,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::on_completion(std::function<void(const 
 
 	auto pipe_future = std::make_shared<ks_raw_pipe_future>(ks_raw_future_mode::ON_COMPLETION);
 	pipe_future->init(apartment, std::move(fn_ex), context, this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 ks_raw_future_ptr ks_raw_future_baseimp::noop(ks_apartment* apartment) {
@@ -1813,7 +1814,7 @@ ks_raw_future_ptr ks_raw_future_baseimp::noop(ks_apartment* apartment) {
 		[](const auto& input) -> auto { return input; },
 		make_async_context().set_priority(0x10000), 
 		this->shared_from_this());
-	return pipe_future;
+	return std::static_pointer_cast<ks_raw_future>(std::move(pipe_future));
 }
 
 

@@ -119,15 +119,15 @@ namespace {
 }
 
 
-ks_apartment* ks_apartment::ui_sta() {
+ks_apartment* ks_apartment::ui_sta() noexcept {
 	return g_ui_sta;
 }
 
-ks_apartment* ks_apartment::master_sta() {
+ks_apartment* ks_apartment::master_sta() noexcept {
 	return g_master_sta;
 }
 
-ks_apartment* ks_apartment::background_sta() {
+ks_apartment* ks_apartment::background_sta() noexcept {
 	static ks_single_thread_apartment_imp g_background_sta(
 		"background_sta", 
 		ks_single_thread_apartment_imp::auto_register_flag | ks_single_thread_apartment_imp::endless_instance_flag,
@@ -135,7 +135,7 @@ ks_apartment* ks_apartment::background_sta() {
 	return &g_background_sta;
 }
 
-ks_apartment* ks_apartment::default_mta() {
+ks_apartment* ks_apartment::default_mta() noexcept {
 	static ks_thread_pool_apartment_imp g_default_mta(
 		"default_mta", 
 		__determine_default_mta_max_thread_count(),
@@ -144,11 +144,11 @@ ks_apartment* ks_apartment::default_mta() {
 	return &g_default_mta;
 }
 
-ks_apartment* ks_apartment::current_thread_apartment() {
+ks_apartment* ks_apartment::current_thread_apartment() noexcept {
 	return tls_current_thread_apartment;
 }
 
-ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
+ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() noexcept {
 	ks_apartment* cur_apartment = tls_current_thread_apartment;
 	if (cur_apartment == nullptr)
 		cur_apartment = ks_apartment::default_mta();
@@ -156,7 +156,7 @@ ks_apartment* ks_apartment::current_thread_apartment_or_default_mta() {
 	return cur_apartment;
 }
 
-ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartment) {
+ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartment) noexcept {
 	ks_apartment* cur_apartment = tls_current_thread_apartment;
 	if (cur_apartment == nullptr)
 		cur_apartment = or_apartment;
@@ -164,7 +164,7 @@ ks_apartment* ks_apartment::current_thread_apartment_or(ks_apartment* or_apartme
 	return cur_apartment;
 }
 
-ks_apartment* ks_apartment::find_public_apartment(const char* name) {
+ks_apartment* ks_apartment::find_public_apartment(const char* name) noexcept {
 	std::unique_lock<ks_spinlock> lock(g_public_apartment_mutex);
 	ASSERT(name != nullptr);
 
