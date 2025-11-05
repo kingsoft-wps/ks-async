@@ -26,18 +26,18 @@ class ks_refcount : private std::atomic<T> {
     using __underlying_atomic_type = std::atomic<T>;
 
 public:
-    ks_refcount(T desired) : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
-    ~ks_refcount() { ASSERT(this->peek_value() == 0); }
+    ks_refcount(T desired) noexcept : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
+    ~ks_refcount() noexcept { ASSERT(this->peek_value() == 0); }
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
-    T add(T update = 1) {
+    T add(T update = 1) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
         ASSERT(new_value > 0 && new_value >= new_value - update);
         return new_value;
     }
 
-    _NODISCARD T sub(T update = 1) {
+    _NODISCARD T sub(T update = 1) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
         ASSERT(new_value >= 0 && new_value <= new_value + update);
@@ -47,15 +47,15 @@ public:
         return new_value;
     }
 
-    T operator++() { return this->add(1); }
-    T operator++(int) { return this->add(1) - 1; }
-    T operator+=(T update) { return this->add(update); }
+    T operator++() noexcept { return this->add(1); }
+    T operator++(int) noexcept { return this->add(1) - 1; }
+    T operator+=(T update) noexcept { return this->add(update); }
 
-    _NODISCARD T operator--() { return this->sub(1); }
-    _NODISCARD T operator--(int) { return this->sub(1) + 1; }
-    _NODISCARD T operator-=(T update) { return this->sub(update); }
+    _NODISCARD T operator--() noexcept { return this->sub(1); }
+    _NODISCARD T operator--(int) noexcept { return this->sub(1) + 1; }
+    _NODISCARD T operator-=(T update) noexcept { return this->sub(update); }
 
-    _NODISCARD T peek_value() const {
+    _NODISCARD T peek_value() const noexcept {
         return __underlying_atomic_type::load(std::memory_order_relaxed);
     }
 };

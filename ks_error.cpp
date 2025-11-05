@@ -13,22 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#pragma once
-
-#include "ks_async_base.h"
 #include "ks_error.h"
 
-_INTERFACE_LIKE class ks_cancel_inspector {
-public:
-	virtual bool check_cancelled() = 0;
+void __forcelink_to_ks_error_cpp() {}
 
-protected:
-	ks_cancel_inspector() noexcept = default;
-	~ks_cancel_inspector() noexcept = default;  //protected
-	_DISABLE_COPY_CONSTRUCTOR(ks_cancel_inspector);
-
-private:
-	__KS_ASYNC_PRIVATE_API static ks_cancel_inspector* __for_future() noexcept;
-	template <class T2> friend class ks_future;
-	friend class ks_future_util;
-};

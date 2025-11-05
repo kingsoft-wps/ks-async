@@ -28,31 +28,33 @@ class ks_notification_builder;
 
 class ks_notification final {
 public:
-	ks_notification(const ks_notification&) = default;
-	ks_notification(ks_notification&&) noexcept = default;
+	KS_ASYNC_INLINE_API ks_notification(const ks_notification&) noexcept = default;
+	KS_ASYNC_INLINE_API ks_notification(ks_notification&&) noexcept = default;
 
-	ks_notification& operator=(const ks_notification&) = default;
-	ks_notification& operator=(ks_notification&& r) noexcept = default; 
+	KS_ASYNC_API ks_notification& operator=(const ks_notification&) noexcept;
+	KS_ASYNC_API ks_notification& operator=(ks_notification&&) noexcept;
+
+	KS_ASYNC_API ~ks_notification() noexcept;
 
 public:
-	const void* get_sender() const {
+	KS_ASYNC_INLINE_API const void* get_sender() const {
 		return m_data_ptr->sender;
 	}
 
-	const char* get_name() const {
+	KS_ASYNC_INLINE_API const char* get_name() const {
 		return m_data_ptr->name.c_str();
 	}
 
-	bool has_payload() const {
+	KS_ASYNC_INLINE_API bool has_payload() const {
 		return m_data_ptr->payload_any.has_value();
 	}
 
 	template <class T>
-	const T& get_payload() const {
+	KS_ASYNC_INLINE_API const T& get_payload() const {
 		return m_data_ptr->payload_any.get<T>();
 	}
 
-	const ks_async_context& get_context() const {
+	KS_ASYNC_INLINE_API const ks_async_context& get_context() const {
 		return m_data_ptr->context;
 	}
 
@@ -76,44 +78,34 @@ private:
 
 class ks_notification_builder final {
 public:
-	ks_notification_builder() : m_data{} {}
+	KS_ASYNC_INLINE_API ks_notification_builder() : m_data() {}
 	_DISABLE_COPY_CONSTRUCTOR(ks_notification_builder);
 
 public:
-	ks_notification_builder& set_sender(const void* sender) {
+	KS_ASYNC_INLINE_API ks_notification_builder& set_sender(const void* sender) {
 		m_data.sender = sender;
 		return *this;
 	}
 
-	ks_notification_builder& set_name(const char* name) {
+	KS_ASYNC_INLINE_API ks_notification_builder& set_name(const char* name) {
 		m_data.name = name;
 		return *this;
 	}
 
 	template <class T, class X = T, class _ = std::enable_if_t<std::is_convertible_v<X, T>>>
-	ks_notification_builder& set_payload(X&& payload) {
+	KS_ASYNC_INLINE_API ks_notification_builder& set_payload(X&& payload) {
 		m_data.payload_any = ks_any::of<T>(std::forward<X>(payload));
 		return *this;
 	}
 
-	ks_notification_builder& set_context(const ks_async_context& context) {
+	KS_ASYNC_INLINE_API ks_notification_builder& set_context(const ks_async_context& context) {
 		m_data.context = context;
 		return *this;
 	}
 
 public:
-	ks_notification build() {
-		ASSERT(m_data.sender != nullptr);
-		ASSERT(!m_data.name.empty());
-
-		std::shared_ptr<__NOTIFICATION_DATA> data_ptr = std::make_shared<__NOTIFICATION_DATA>(std::move(m_data));
-#ifdef _DEBUG
-		m_data = __NOTIFICATION_DATA{};
-#endif
-
-		return ks_notification(std::move(data_ptr));
-	}
-
+	KS_ASYNC_API ks_notification build();
+	
 private:
 	using __NOTIFICATION_DATA = ks_notification::__NOTIFICATION_DATA;
 

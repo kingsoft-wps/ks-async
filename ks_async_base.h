@@ -25,9 +25,13 @@ limitations under the License.
 #   ifdef KS_ASYNC_EXPORTS
 #       define KS_ASYNC_API _DECL_EXPORT
 #       define KS_ASYNC_INLINE_API
+#       define __KS_ASYNC_PRIVATE_API _DECL_EXPORT
+#       define __KS_ASYNC_PRIVATE_INLINE_API
 #   else
 #       define KS_ASYNC_API _DECL_IMPORT
 #       define KS_ASYNC_INLINE_API
+#       define __KS_ASYNC_PRIVATE_API _DECL_IMPORT
+#       define __KS_ASYNC_PRIVATE_INLINE_API
 #   endif
 #endif
 

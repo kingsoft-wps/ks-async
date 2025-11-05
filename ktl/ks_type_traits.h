@@ -203,9 +203,9 @@ namespace std {
 	struct weak_pointer_traits<std::weak_ptr<X>> {
 		static constexpr bool is_weak_pointer_v = true;
 		using locker_type = std::shared_ptr<X>;
-		static std::shared_ptr<X> try_lock_weak_pointer(const std::weak_ptr<X>& pointer) { return pointer.lock(); }
-		static void unlock_weak_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) { locker.reset(); }
-		static bool check_weak_pointer_expired(const std::weak_ptr<X>& pointer) { return pointer.expired(); }
+		static std::shared_ptr<X> try_lock_weak_pointer(const std::weak_ptr<X>& pointer) noexcept(noexcept(pointer.lock())) { return pointer.lock(); }
+		static void unlock_weak_pointer(const std::weak_ptr<X>& pointer, std::shared_ptr<X>& locker) noexcept(noexcept(locker.reset())) { locker.reset(); }
+		static bool check_weak_pointer_expired(const std::weak_ptr<X>& pointer) noexcept(noexcept(pointer.expired())) { return pointer.expired(); }
 	};
 
 	//is_shared_pointer
@@ -236,16 +236,6 @@ namespace std { //helper funcs
 		return std::forward<T>(arg);
 	}
 
-	template <class T>
-	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>& arg) noexcept {
-		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
-			(void)std::remove_cvref_t<T>(std::move(arg));
-	}
-	template <class T>
-	constexpr inline void __try_prune_if_mutable_rvalue_reference(std::remove_reference_t<T>&& arg) noexcept {
-		if (std::is_mutable_rvalue_reference<T>::value && std::is_nothrow_move_constructible<std::remove_cvref_t<T>>::value)
-			(void)std::remove_cvref_t<T>(std::move(arg));
-	}
 }
 
 

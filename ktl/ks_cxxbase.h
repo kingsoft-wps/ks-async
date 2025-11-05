@@ -38,14 +38,14 @@ using nullptr_t = decltype(nullptr);
 
 #ifndef _NOTHING_DEFINED
 #define _NOTHING_DEFINED
-	struct nothing_t { explicit nothing_t() = default; };
+	struct nothing_t {};
 	constexpr nothing_t nothing = nothing_t{};  //nothing相当于其他现代语言中的unit，但unit这个名字与uint太容易混淆了，所以我们用nothing来命名
 #endif //__NOTHING_DEF
 
 #ifndef _CREATE_INST_DEFINED
 #define _CREATE_INST_DEFINED
 namespace std {
-	struct create_inst_t { explicit create_inst_t() = default; };
+	struct create_inst_t {};
 	constexpr create_inst_t create_inst = create_inst_t{};  //这类似于KComObjectPtr构造函数的create_instance参数，是通用版本，用于明确指示实例化
 }
 #endif //_CREATE_INST_DEFINED
@@ -54,6 +54,11 @@ namespace std {
 //宏_ABSTRACT定义
 #ifndef _ABSTRACT
 #	define _ABSTRACT
+#endif
+
+//宏_INTERFACE_LIKE定义
+#ifndef _INTERFACE_LIKE
+#	define _INTERFACE_LIKE
 #endif
 
 //宏_NAMESPACE_LIKE定义
@@ -91,12 +96,12 @@ namespace std {
 #	endif
 #endif
 
-//宏_DECL_DEPRECATED定义
-#ifndef _DECL_DEPRECATED
+//宏_DEPRECATED定义
+#ifndef _DEPRECATED
 #	if defined(_MSC_VER)
-#		define _DECL_DEPRECATED __declspec(deprecated)
+#		define _DEPRECATED __declspec(deprecated)
 #	elif defined(__GNUC__)
-#		define _DECL_DEPRECATED __attribute__((__deprecated__))
+#		define _DEPRECATED __attribute__((__deprecated__))
 #	else
 #		error how to decl-deprecated?
 #	endif
@@ -110,6 +115,29 @@ namespace std {
 #		define _NODISCARD __attribute__((warn_unused_result))
 #	else
 #		error how to decl-nodiscard?
+#	endif
+#endif
+
+
+//宏_NO_INLINE定义
+#ifndef _NO_INLINE
+#	if defined(_MSC_VER)
+#		define _NO_INLINE __declspec(noinline)
+#	elif defined(__GNUC__)
+#		define _NO_INLINE __attribute__((noinline))
+#	else
+#		error how to decl-noinline?
+#	endif
+#endif
+
+//宏_FORCE_INLINE定义
+#ifndef _FORCE_INLINE
+#	if defined(_MSC_VER)
+#		define _FORCE_INLINE __forceinline
+#	elif defined(__GNUC__)
+#		define _FORCE_INLINE __attribute__((always_inline))
+#	else
+#		error how to decl-forceinline?
 #	endif
 #endif
 

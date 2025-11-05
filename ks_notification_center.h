@@ -29,7 +29,7 @@ public:
 	KS_ASYNC_API static ks_notification_center* default_center(); //default-center singleton
 
 public:
-	KS_ASYNC_API const char* name();
+	KS_ASYNC_API const char* name() noexcept;
 
 public:
 	KS_ASYNC_API uint64_t add_observer(
