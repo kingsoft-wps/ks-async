@@ -15,8 +15,8 @@ limitations under the License.
 
 #pragma once
 
-#ifndef __KS_LATCH_STD_DEF
-#define __KS_LATCH_STD_DEF
+#ifndef __KS_WAITGROUP_STD_DEF
+#define __KS_WAITGROUP_STD_DEF
 
 #include "ks_concurrency_helper.h"
 #include <mutex>
@@ -25,22 +25,23 @@ limitations under the License.
 
 namespace _KSConcurrencyImpl {
 
-class ks_latch_std {
+class ks_waitgroup_std {
 public:
-    explicit ks_latch_std(ptrdiff_t desired)
+    explicit ks_waitgroup_std(ptrdiff_t desired)
         : m_counter(desired) {
         ASSERT(desired >= 0);
     }
 
-    _DISABLE_COPY_CONSTRUCTOR(ks_latch_std);
+    _DISABLE_COPY_CONSTRUCTOR(ks_waitgroup_std);
 
-    void add(ptrdiff_t update = 1) {
+    void add(ptrdiff_t update) {
         std::unique_lock<std::mutex> lock(m_mutex);
         ASSERT(update > 0);
         m_counter += update;
     }
 
-    void count_down(ptrdiff_t update = 1) {
+    void done() {
+        constexpr ptrdiff_t update = 1;
         std::unique_lock<std::mutex> lock(m_mutex);
         ASSERT(update > 0);
         m_counter -= update;
@@ -62,6 +63,23 @@ public:
 		return (m_counter == 0);
     }
 
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        while (m_counter != 0) {
+            if (m_cv.wait_until(lock, abs_time) == std::cv_status::timeout) {
+                return m_counter == 0;
+            }
+        }
+        
+        return true;
+    }
+
 private:
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_cv;
@@ -70,4 +88,4 @@ private:
 
 } // namespace _KSConcurrencyImpl
 
-#endif // __KS_LATCH_STD_DEF
+#endif // __KS_WAITGROUP_STD_DEF

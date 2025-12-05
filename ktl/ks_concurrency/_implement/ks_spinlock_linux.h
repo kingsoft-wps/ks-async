@@ -62,8 +62,7 @@ public:
         while (true) {
             ASSERT((current32 & 0xFFFFFF00) != 0);
             if ((uint8_t)(current32) != 0) {
-                if (_helper::linux_futex32_wait((uint32_t*)&m_spinValue, current32, nullptr) == _helper::_LINUX_FUTEX32_NOT_SUPPORTED)
-                    std::this_thread::yield();
+                _helper::__atomic_wait_explicit(&m_spinValue, current32, std::memory_order_relaxed);
             }
 
             uint8_t expected8 = 0;
@@ -92,7 +91,7 @@ public:
 
         uint32_t current = m_spinValue.load(std::memory_order_relaxed);
         if ((uint8_t)(current) == 0 && (current & 0xFFFFFF00) != 0) {
-            _helper::linux_futex32_wake_one((uint32_t*)&m_spinValue); //唤醒1个等待者
+            _helper::__atomic_notify_one(&m_spinValue); //唤醒1个等待者
         }
     }
 

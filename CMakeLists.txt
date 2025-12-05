@@ -115,7 +115,7 @@ set(MY_KTL_SOURCE_FILES
 	ktl/ks_concurrency/ks_mutex.h
 	ktl/ks_concurrency/ks_condition_variable.h
 	ktl/ks_concurrency/ks_semaphore.h
-	ktl/ks_concurrency/ks_latch.h
+	ktl/ks_concurrency/ks_waitgroup.h
 	ktl/ks_concurrency/ks_event.h
 	#ktl/ks_concurrency/_implement/* (internal)
 	ktl/ks_concurrency/_implement/ks_atomic_storage.h
@@ -134,10 +134,10 @@ set(MY_KTL_SOURCE_FILES
 	ktl/ks_concurrency/_implement/ks_semaphore_win.h
 	ktl/ks_concurrency/_implement/ks_semaphore_mac.h
 	ktl/ks_concurrency/_implement/ks_semaphore_linux.h
-	ktl/ks_concurrency/_implement/ks_latch_std.h
-	ktl/ks_concurrency/_implement/ks_latch_win.h
-	ktl/ks_concurrency/_implement/ks_latch_mac.h
-	ktl/ks_concurrency/_implement/ks_latch_linux.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_std.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_win.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_mac.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_linux.h
 	ktl/ks_concurrency/_implement/ks_event_std.h
 	ktl/ks_concurrency/_implement/ks_event_win.h
 	ktl/ks_concurrency/_implement/ks_event_mac.h
@@ -211,7 +211,7 @@ set(PUBLIC_KTL_CONCURRENCY_HEADER_FILES
 	ktl/ks_concurrency/ks_mutex.h
 	ktl/ks_concurrency/ks_condition_variable.h
 	ktl/ks_concurrency/ks_semaphore.h
-	ktl/ks_concurrency/ks_latch.h
+	ktl/ks_concurrency/ks_waitgroup.h
 	ktl/ks_concurrency/ks_event.h
 )
 
@@ -233,10 +233,10 @@ set(PUBLIC_KTL_CONCURRENCY_IMPLEMENT_HEADER_FILES
 	ktl/ks_concurrency/_implement/ks_semaphore_win.h
 	ktl/ks_concurrency/_implement/ks_semaphore_mac.h
 	ktl/ks_concurrency/_implement/ks_semaphore_linux.h
-	ktl/ks_concurrency/_implement/ks_latch_std.h
-	ktl/ks_concurrency/_implement/ks_latch_win.h
-	ktl/ks_concurrency/_implement/ks_latch_mac.h
-	ktl/ks_concurrency/_implement/ks_latch_linux.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_std.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_win.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_mac.h
+	ktl/ks_concurrency/_implement/ks_waitgroup_linux.h
 	ktl/ks_concurrency/_implement/ks_event_std.h
 	ktl/ks_concurrency/_implement/ks_event_win.h
 	ktl/ks_concurrency/_implement/ks_event_mac.h

@@ -21,7 +21,7 @@ limitations under the License.
 
 #include "ks_concurrency_helper.h"
 #include "ks_spinlock_mac.h"
-#include "ks_latch_mac.h"
+#include "ks_waitgroup_mac.h"
 
 
 namespace _KSConcurrencyImpl {
@@ -30,9 +30,10 @@ class ks_event_mac_ossync {
 public:
     explicit ks_event_mac_ossync(bool initialState, bool manualReset) 
         : m_atomicState32(initialState ? 1 : 0), m_manualReset(manualReset) {
-        ASSERT(_helper::getOSSyncApis()->wait_on_address != nullptr &&
-               _helper::getOSSyncApis()->wake_by_address_any != nullptr &&
-               _helper::getOSSyncApis()->wake_by_address_all != nullptr);
+        ASSERT(_helper::__getAppleSyncApis()->wait_on_address != nullptr &&
+                _helper::__getAppleSyncApis()->wait_on_address_with_timeout != nullptr &&
+               _helper::__getAppleSyncApis()->wake_by_address_any != nullptr &&
+               _helper::__getAppleSyncApis()->wake_by_address_all != nullptr);
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_event_mac_ossync);
@@ -41,9 +42,9 @@ public:
        uint32_t expected32 = 0;
         if (m_atomicState32.compare_exchange_strong(expected32, 1, std::memory_order_release, std::memory_order_relaxed)) {
             if (m_manualReset)
-                _helper::getOSSyncApis()->wake_by_address_all(&m_atomicState32, sizeof(uint32_t), _helper::OSSYNC_WAKE_BY_ADDRESS_NONE);
+                _helper::__atomic_notify_all(&m_atomicState32);
             else
-                _helper::getOSSyncApis()->wake_by_address_any(&m_atomicState32, sizeof(uint32_t), _helper::OSSYNC_WAKE_BY_ADDRESS_NONE);
+                _helper::__atomic_notify_one(&m_atomicState32);
         }
     }
 
@@ -51,7 +52,7 @@ public:
          m_atomicState32.store(0, std::memory_order_relaxed);
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
             if (m_manualReset) {
                 const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
@@ -64,11 +65,11 @@ public:
                     return; //ok
             }
 
-            _helper::getOSSyncApis()->wait_on_address(&m_atomicState32, 0, sizeof(uint32_t), _helper::OSSYNC_WAIT_ON_ADDRESS_NONE);
+            m_atomicState32.wait(0, std::memory_order_relaxed);
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         if (m_manualReset) {
             const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
             if (state32 != 0)
@@ -83,8 +84,34 @@ public:
         return false;
     }
 
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        for (;;) {
+            if (m_manualReset) {
+                const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
+                if (state32 != 0)
+                    return true; //ok
+            }
+            else {
+                uint32_t expected32 = 1;
+                if (m_atomicState32.compare_exchange_strong(expected32, 0, std::memory_order_acquire, std::memory_order_relaxed)) 
+                    return true; //ok
+            }
+
+            if (Clock::now() >= abs_time)
+                return false; //timeout
+
+            (void)_helper::__atomic_wait_until_explicit(&m_atomicState32, (uint32_t)0, abs_time, std::memory_order_relaxed);
+        }
+    }
+
 private:
-    std::atomic<uint32_t> m_atomicState32;
+    mutable std::atomic<uint32_t> m_atomicState32;
     const bool m_manualReset;
 };
 
@@ -92,7 +119,7 @@ private:
 class ks_event_mac_gdc {
 public:
     explicit ks_event_mac_gdc(bool initialState = false, bool manualReset = false)
-        : m_spinlock(), m_state_latch(initialState ? 0 : 1)
+        : m_spinlock(), m_state_waitgroup(initialState ? 0 : 1)
         , m_state(initialState), m_manualReset(manualReset) {
     }
 
@@ -104,9 +131,9 @@ public:
         if (!m_state) {
             m_state = true;
 
-            ASSERT(!m_state_latch.try_wait());
-            m_state_latch.count_down();
-            ASSERT(m_state_latch.try_wait());
+            ASSERT(!m_state_waitgroup.try_wait());
+            m_state_waitgroup.done();
+            ASSERT(m_state_waitgroup.try_wait());
         }
 
         m_spinlock.unlock();
@@ -118,35 +145,35 @@ public:
         if (m_state) {
             m_state = false;
 
-            ASSERT(m_state_latch.try_wait());
-            m_state_latch.add();
-            ASSERT(!m_state_latch.try_wait());
+            ASSERT(m_state_waitgroup.try_wait());
+            m_state_waitgroup.add(1);
+            ASSERT(!m_state_waitgroup.try_wait());
         }
 
         m_spinlock.unlock();
     }
 
-    void wait() {
+    void wait() const {
         m_spinlock.lock();
 
         while (!m_state) {
             m_spinlock.unlock();
-            m_state_latch.wait();
+            m_state_waitgroup.wait();
             m_spinlock.lock();
         }
 
         if (!m_manualReset) {
             m_state = false;
 
-            ASSERT(m_state_latch.try_wait());
-            m_state_latch.add();
-            ASSERT(!m_state_latch.try_wait());
+            ASSERT(m_state_waitgroup.try_wait());
+            m_state_waitgroup.add(1);
+            ASSERT(!m_state_waitgroup.try_wait());
         }
 
         m_spinlock.unlock();
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         bool ret = false;
         m_spinlock.lock();
 
@@ -156,9 +183,9 @@ public:
             if (!m_manualReset) {
                 m_state = false;
 
-                ASSERT(m_state_latch.try_wait());
-                m_state_latch.add();
-                ASSERT(!m_state_latch.try_wait());
+                ASSERT(m_state_waitgroup.try_wait());
+                m_state_waitgroup.add(1);
+                ASSERT(!m_state_waitgroup.try_wait());
             }
         }
 
@@ -166,10 +193,39 @@ public:
         return ret;
     }
 
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        m_spinlock.lock();
+
+        while (!m_state) {
+            m_spinlock.unlock();
+            if (Clock::now() >= abs_time)
+                return false; //timeout
+            (void)m_state_waitgroup.wait_until(abs_time);
+            m_spinlock.lock();
+        }
+
+        if (!m_manualReset) {
+            m_state = false;
+
+            ASSERT(m_state_waitgroup.try_wait());
+            m_state_waitgroup.add(1);
+            ASSERT(!m_state_waitgroup.try_wait());
+        }
+
+        m_spinlock.unlock();
+        return true;
+    }
+
 private:
-    ks_spinlock_mac_unfair m_spinlock;
-    ks_latch_mac_gdc m_state_latch;
-    bool m_state;
+    mutable ks_spinlock_mac_unfair m_spinlock;
+    mutable ks_waitgroup_mac_gdc m_state_waitgroup;
+    mutable bool m_state;
     const bool m_manualReset;
 };
 
@@ -210,7 +266,7 @@ public:
         }
     }
 
-    void wait() {
+    void wait() const {
         if (m_use_ossync) {
             m_ossync_impl.wait();
         } else {
@@ -218,11 +274,29 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         if (m_use_ossync) {
             return m_ossync_impl.try_wait();
         } else {
             return m_gdc_impl.try_wait();
+        }
+    }
+
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        if (m_use_ossync) {
+            return m_ossync_impl.wait_for(rel_time);
+        } else {
+            return m_gdc_impl.wait_for(rel_time);
+        }
+    }
+
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        if (m_use_ossync) {
+            return m_ossync_impl.wait_until(abs_time);
+        } else {
+            return m_gdc_impl.wait_until(abs_time);
         }
     }
 
@@ -232,7 +306,7 @@ private:
         ks_event_mac_gdc m_gdc_impl;
     };
 
-    const bool m_use_ossync = (bool)(_helper::getOSSyncApis()->wait_on_address);
+    const bool m_use_ossync = (bool)(_helper::__getAppleSyncApis()->wait_on_address);
 };
 
 } // namespace _KSConcurrencyImpl

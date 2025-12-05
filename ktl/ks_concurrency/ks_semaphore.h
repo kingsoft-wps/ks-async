@@ -25,7 +25,7 @@ limitations under the License.
 #elif defined(__linux__)
 #   include "_implement/ks_semaphore_linux.h"
 #else
-#   include "implement/ks_semaphore_std.h"
+#   include "_implement/ks_semaphore_std.h"
 #endif
 
 class ks_semaphore {

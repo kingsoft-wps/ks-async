@@ -49,7 +49,7 @@ public:
         ::ResetEvent(m_eventHandle);
     }
 
-    void wait() {
+    void wait() const {
         DWORD ret = ::WaitForSingleObject(m_eventHandle, INFINITE);
         if (ret != WAIT_OBJECT_0) {
             ASSERT(false);
@@ -57,7 +57,7 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         DWORD ret = ::WaitForSingleObject(m_eventHandle, 0);
         if (ret == WAIT_OBJECT_0) 
             return true;
@@ -67,6 +67,38 @@ public:
         } else {
             ASSERT(false);
             throw std::runtime_error("Failed to try wait event");
+        }
+    }
+
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        for (;;) {
+            auto remain_time = abs_time - std::chrono::steady_clock::now();
+            long long remain_ms = std::chrono::duration_cast<std::chrono::milliseconds>(remain_time).count();
+            if (remain_ms < 0)
+                remain_ms = 0;
+            else if (remain_ms >= (long long)MAXDWORD)
+                remain_ms = (long long)MAXDWORD - 1; //可能分为多次wait
+
+            DWORD ret = ::WaitForSingleObject(m_eventHandle, (DWORD)remain_ms);
+            if (ret == WAIT_OBJECT_0) {
+                return true;
+            }
+            else if (ret == WAIT_TIMEOUT) {
+                if (remain_ms == 0 || std::chrono::steady_clock::now() >= abs_time)
+                    return false; //timeout
+                else
+                    continue;
+            }
+            else {
+                ASSERT(false);
+                throw std::runtime_error("Failed to try wait event");
+            }
         }
     }
 

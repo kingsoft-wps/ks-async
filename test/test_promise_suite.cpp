@@ -17,50 +17,50 @@ limitations under the License.
 #include <thread>
 
 TEST(test_promise_suite, test_promise) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     auto promise_succ = ks_promise<std::string>::create();
     promise_succ.get_future()
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
         EXPECT_EQ(_result_to_str(result), "pass");
-        work_latch.count_down();
+        work_wg.done();
             });
 
     std::thread([promise_succ]() {
         promise_succ.resolve("pass");
         }).join();
 
-    work_latch.wait();
-    work_latch.add(1);
+    work_wg.wait();
+    work_wg.add(1);
 
     auto promise_error = ks_promise<std::string>::create();
     ks_error ret = ks_error().unexpected_error();
 
     promise_error.get_future()
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
         ASSERT_TRUE(result.is_error());
         EXPECT_EQ(result.to_error().get_code(), 0xFF338001);
-        work_latch.count_down();
+        work_wg.done();
             });
 
     std::thread([promise_error,&ret]() {
         promise_error.reject(ret);
         }).join();
 
-    work_latch.wait();
-    work_latch.add(1);
+    work_wg.wait();
+    work_wg.add(1);
 
     auto promise_sett = ks_promise<std::string>::create();
     promise_succ.get_future()
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
         EXPECT_EQ(_result_to_str(result), "pass");
-        work_latch.count_down();
+        work_wg.done();
             });
 
     std::thread([promise_sett]() {
         promise_sett.try_settle(ks_result<std::string>("pass"));
         }).join();
 
-    work_latch.wait();
+    work_wg.wait();
 }

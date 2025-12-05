@@ -22,6 +22,7 @@ limitations under the License.
 #include "../ks_future_util.h"
 #include "../ks_async_flow.h"
 #include "../ks_notification_center.h"
+#include "../ktl/ks_concurrency.h"
 
 #include <iostream>
 #include <sstream>

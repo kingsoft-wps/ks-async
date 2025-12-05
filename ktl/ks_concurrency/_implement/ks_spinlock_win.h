@@ -28,9 +28,9 @@ namespace _KSConcurrencyImpl {
 class ks_spinlock_win_srw {
 public:
     ks_spinlock_win_srw() : m_srwLock{ 0 } {
-        ASSERT(_helper::getWinSynchApis()->pfnAcquireSRWLockExclusive != nullptr &&
-               _helper::getWinSynchApis()->pfnTryAcquireSRWLockExclusive != nullptr &&
-               _helper::getWinSynchApis()->pfnReleaseSRWLockExclusive != nullptr);
+        ASSERT(_helper::__getWinSynchApis()->pfnAcquireSRWLockExclusive != nullptr &&
+               _helper::__getWinSynchApis()->pfnTryAcquireSRWLockExclusive != nullptr &&
+               _helper::__getWinSynchApis()->pfnReleaseSRWLockExclusive != nullptr);
     }
 
    _DISABLE_COPY_CONSTRUCTOR(ks_spinlock_win_srw);
@@ -40,20 +40,20 @@ public:
    }
    
    void lock() {
-        _helper::getWinSynchApis()->pfnAcquireSRWLockExclusive(&m_srwLock);
+        _helper::__getWinSynchApis()->pfnAcquireSRWLockExclusive(&m_srwLock);
     }
 
     _NODISCARD bool try_lock() {
-        return (bool)_helper::getWinSynchApis()->pfnTryAcquireSRWLockExclusive(&m_srwLock);
+        return (bool)_helper::__getWinSynchApis()->pfnTryAcquireSRWLockExclusive(&m_srwLock);
     }
 
     void unlock() {
-        _helper::getWinSynchApis()->pfnReleaseSRWLockExclusive(&m_srwLock);
+        _helper::__getWinSynchApis()->pfnReleaseSRWLockExclusive(&m_srwLock);
     }
 
 private:
     union {
-        _helper::SRWLOCK m_srwLock;
+        _helper::_WinSynchDefs::SRWLOCK m_srwLock;
         void* m_alignment; // 用于对齐
     };
 };

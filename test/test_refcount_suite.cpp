@@ -26,7 +26,7 @@ TEST(test_refcount_suite, test_refcount) {
     ks_refcount<ptrdiff_t> refcount(0);
     ptrdiff_t tval;
 
-    tval = refcount.add();
+    tval = refcount.add(1);
     EXPECT_EQ(tval, 1);
     EXPECT_EQ(refcount.peek_value(), 1);
 

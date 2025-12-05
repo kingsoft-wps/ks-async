@@ -16,25 +16,25 @@ limitations under the License.
 #include "test_base.h"
 
 TEST(test_parallel_suite, test_parallel) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     auto c = std::make_shared<std::atomic<int>>(0);
     ks_future_util
         ::parallel(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>{5, [c]() { ++(*c); }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel(
@@ -43,17 +43,17 @@ TEST(test_parallel_suite, test_parallel) {
                  auto result = ks_result<void>(nothing);
                  return result;
             }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
      *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel(
@@ -61,50 +61,50 @@ TEST(test_parallel_suite, test_parallel) {
             std::vector<std::function<void()>>{5,[c]() { ++(*c);
                    return ks_future<void>::resolved(nothing);
             }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>(0,[c]() { ++(*c);
             }))
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 0);
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>{1, [c]() { ++(*c); }
             })
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 1);
 }
 
 TEST(test_parallel_suite, test_parallel_n) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     auto c = std::make_shared<std::atomic<int>>(0);
     ks_future_util
@@ -112,17 +112,17 @@ TEST(test_parallel_suite, test_parallel_n) {
             ks_apartment::default_mta(),
             [c]() { ++(*c); },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel_n(
@@ -132,17 +132,17 @@ TEST(test_parallel_suite, test_parallel_n) {
                return result;
             },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
      *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel_n(
@@ -151,17 +151,17 @@ TEST(test_parallel_suite, test_parallel_n) {
              return ks_future<void>::resolved(nothing);
             },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel_n(
@@ -169,15 +169,15 @@ TEST(test_parallel_suite, test_parallel_n) {
             [c]() { ++(*c);
             },
             0)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 0);
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::parallel_n(
@@ -185,35 +185,35 @@ TEST(test_parallel_suite, test_parallel_n) {
             [c]() { ++(*c);
             },
             1)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 1);
 }
 
 TEST(test_sequential_suite, test_sequential) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     auto c = std::make_shared<std::atomic<int>>(0);
     ks_future_util
         ::sequential(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>{5, [c]() { ++(*c); }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential(
@@ -222,17 +222,17 @@ TEST(test_sequential_suite, test_sequential) {
                  auto result = ks_result<void>(nothing);
                  return result;
             }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
      *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential(
@@ -240,51 +240,51 @@ TEST(test_sequential_suite, test_sequential) {
             std::vector<std::function<void()>>{5,[c]() { ++(*c);
                    return ks_future<void>::resolved(nothing);
             }})
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>(0,[c]() { ++(*c);
             }))
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 0);
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential(
             ks_apartment::default_mta(),
             std::vector<std::function<void()>>{1, [c]() { ++(*c); }
             })
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 1);
 
  }
 
 TEST(test_sequential_suite, test_sequential_n) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     auto c = std::make_shared<std::atomic<int>>(0);
     ks_future_util
@@ -292,17 +292,17 @@ TEST(test_sequential_suite, test_sequential_n) {
             ks_apartment::default_mta(),
             [c]() { ++(*c); },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential_n(
@@ -312,17 +312,17 @@ TEST(test_sequential_suite, test_sequential_n) {
                return result;
             },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
      *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential_n(
@@ -331,17 +331,17 @@ TEST(test_sequential_suite, test_sequential_n) {
              return ks_future<void>::resolved(nothing);
             },
             5)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 5);
 
     *c = 0;
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential_n(
@@ -349,15 +349,15 @@ TEST(test_sequential_suite, test_sequential_n) {
             [c]() { ++(*c);
             },
             0)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 0);
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     ks_future_util
         ::sequential_n(
@@ -365,11 +365,11 @@ TEST(test_sequential_suite, test_sequential_n) {
             [c]() { ++(*c);
             },
             1)
-        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+        .on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
            EXPECT_EQ(_result_to_str(result), "VOID");
-           work_latch.count_down();
+           work_wg.done();
         });
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_EQ(*c, 1);
 }

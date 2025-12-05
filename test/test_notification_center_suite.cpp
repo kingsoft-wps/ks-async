@@ -16,7 +16,7 @@ limitations under the License.
 #include "test_base.h"
 
 TEST(test_notification_center_suite, test_notification_center) {
-    ks_latch work_latch(0);
+    ks_waitgroup work_wg(0);
 
     std::atomic<int> ab_match{ 0 };
     std::atomic<int> a_match{ 0 };
@@ -27,39 +27,39 @@ TEST(test_notification_center_suite, test_notification_center) {
         ASSERT(false);
         });
 
-    observer_id=ks_notification_center::default_center()->add_observer(&observer, "a.b.*", ks_apartment::default_mta(), [&ab_match,&work_latch](const ks_notification& notification) {
+    observer_id=ks_notification_center::default_center()->add_observer(&observer, "a.b.*", ks_apartment::default_mta(), [&ab_match,&work_wg](const ks_notification& notification) {
         ab_match++;
-        work_latch.count_down();
+        work_wg.done();
         });
 
-    ks_notification_center::default_center()->add_observer(&observer, "a.*", ks_apartment::default_mta(), [&a_match,&work_latch](const ks_notification& notification) {
+    ks_notification_center::default_center()->add_observer(&observer, "a.*", ks_apartment::default_mta(), [&a_match,&work_wg](const ks_notification& notification) {
         a_match++;
-        work_latch.count_down();
+        work_wg.done();
         });
 
     ks_notification_center::default_center()->post_notification(&sender, "a.x.y.z");
-    work_latch.add(1);
+    work_wg.add(1);
     
     ks_notification_center::default_center()->post_notification_with_payload<int>(&sender, "a.x.y.z", 1);
-    work_latch.add(1);
+    work_wg.add(1);
     
     ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.b.c.e", "xxx");
-    work_latch.add(2);
+    work_wg.add(2);
     
     ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.b.c", "xxx");
-    work_latch.add(2);
+    work_wg.add(2);
     
     ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.c", "xxx");
-    work_latch.add(1);
+    work_wg.add(1);
 
-    work_latch.wait();
+    work_wg.wait();
 
     ks_notification_center::default_center()->remove_observer(&observer, observer_id);
 
     ks_notification_center::default_center()->post_notification_with_payload<std::string>(&sender, "a.b.d", "xxx");
-    work_latch.add(1);
+    work_wg.add(1);
 
-    work_latch.wait();
+    work_wg.wait();
     ks_notification_center::default_center()->remove_observer(&observer);
     ks_notification_center::default_center()->remove_observer(&sender);
 

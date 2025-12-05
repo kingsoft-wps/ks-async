@@ -38,7 +38,13 @@ public:
     void set_event() { m_impl.set_event(); }
     void reset_event() { m_impl.reset_event(); }
     void wait() { m_impl.wait(); }
+
     _NODISCARD bool try_wait() { return m_impl.try_wait(); }
+
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) { return m_impl.wait_for(rel_time); }
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) { return m_impl.wait_until(abs_time); }
 
 private:
 #if defined(_WIN32)

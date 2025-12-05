@@ -22,8 +22,8 @@ limitations under the License.
 
 
 TEST(test_fork_suite, test_fork) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_apartment::default_mta()->atfork_prepare();
     ks_apartment::background_sta()->atfork_prepare();
@@ -56,8 +56,8 @@ TEST(test_fork_suite, test_fork) {
     //     ASSERT_TRUE(waited_pid == pid);
     // }
 
-    work_latch.count_down();
-    work_latch.wait();
+    work_wg.done();
+    work_wg.wait();
 }
 
 

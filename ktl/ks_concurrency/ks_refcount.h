@@ -18,6 +18,7 @@ limitations under the License.
 #ifndef __KS_REFCOUNT_DEF
 #define __KS_REFCOUNT_DEF
 
+#include "../ks_cxxbase.h"
 #include <atomic>
 
 template <class T>

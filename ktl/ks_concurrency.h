@@ -28,7 +28,7 @@ limitations under the License.
 #include "ks_concurrency/ks_condition_variable.h"
 
 #include "ks_concurrency/ks_semaphore.h"
-#include "ks_concurrency/ks_latch.h"
 #include "ks_concurrency/ks_event.h"
+#include "ks_concurrency/ks_waitgroup.h"
 
 #endif //__KS_CONCURRENCY_DEF

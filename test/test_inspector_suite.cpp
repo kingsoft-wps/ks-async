@@ -16,8 +16,8 @@ limitations under the License.
 #include "test_base.h"
 
 TEST(test_inspector_suite, test_inspector) {
-     ks_latch work_latch(0);
-    work_latch.add(1);
+     ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_pending_trigger trigger;
     auto future = ks_future<void>::post_pending(ks_apartment::default_mta(), make_async_context(), [](ks_cancel_inspector* inspector) -> ks_result<void>{
@@ -27,13 +27,13 @@ TEST(test_inspector_suite, test_inspector) {
             return nothing;
      },&trigger);
 
-    future.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch](const auto& result) {
+    future.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg](const auto& result) {
         ASSERT_TRUE(result.is_error());
         EXPECT_EQ(result.to_error().get_code(), 0xFF338003);
-        work_latch.count_down();
+        work_wg.done();
      });
 
     future.__try_cancel();
 
-    work_latch.wait();
+    work_wg.wait();
 }

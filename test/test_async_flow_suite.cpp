@@ -17,10 +17,10 @@ limitations under the License.
 #include "../ks_error.h"
 
 TEST(test_async_flow_suite, test_is_completed) {
-    ks_latch work_latch(0);
+    ks_waitgroup work_wg(0);
 
     ks_async_flow flow;
-    work_latch.add(1);
+    work_wg.add(1);
     bool b;
     uint64_t id;
 
@@ -40,15 +40,15 @@ TEST(test_async_flow_suite, test_is_completed) {
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow.start();
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_TRUE(flow.is_flow_completed());
     ASSERT_TRUE(flow.is_task_completed("a1"));
     ASSERT_TRUE(flow.is_task_completed("a2"));
@@ -56,7 +56,7 @@ TEST(test_async_flow_suite, test_is_completed) {
 }
 
 TEST(test_async_flow_suite, test_task_observer) {
-    ks_latch work_latch(0);
+    ks_waitgroup work_wg(0);
 
     ks_async_flow flow;
     bool b;
@@ -73,20 +73,20 @@ TEST(test_async_flow_suite, test_task_observer) {
         return "a1-tasktask";
         });
     ASSERT_TRUE(b);
-    work_latch.add(1);
+    work_wg.add(1);
 
     b = flow.add_task<std::string>("a2", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_result<std::string>("a2-tasktask");
         });
     ASSERT_TRUE(b);
-    work_latch.add(1);
+    work_wg.add(1);
 
     b = flow.add_task<std::string>("b1: a1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         EXPECT_TRUE(this_flow.is_task_completed("a1"));
         return ks_future<std::string>::resolved("b1-tasktask");
         });
     ASSERT_TRUE(b);
-    work_latch.add(1);
+    work_wg.add(1);
 
     id = flow.add_task_running_observer("*", ks_apartment::background_sta(), [&task_running_count](const ks_async_flow& this_flow, const char* task_name) {
         task_running_count++;
@@ -98,10 +98,10 @@ TEST(test_async_flow_suite, test_task_observer) {
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [&task_completed_count,&work_latch](const ks_async_flow& this_flow, const char* task_name, const ks_error& error) {
+    id = flow.add_task_completed_observer("*", ks_apartment::background_sta(), [&task_completed_count,&work_wg](const ks_async_flow& this_flow, const char* task_name, const ks_error& error) {
         if (!error.has_code())
             task_completed_count++;
-        work_latch.count_down();
+        work_wg.done();
         }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
@@ -113,7 +113,7 @@ TEST(test_async_flow_suite, test_task_observer) {
 
     flow.start();
 
-    work_latch.wait();
+    work_wg.wait();
 
     EXPECT_EQ(task_running_count, 3);
     EXPECT_EQ(task_completed_count, 3);
@@ -122,10 +122,10 @@ TEST(test_async_flow_suite, test_task_observer) {
 }
 
 TEST(test_async_flow_suite, test_flow_observer) {
-    ks_latch work_latch(0);
+    ks_waitgroup work_wg(0);
 
     ks_async_flow flow1, flow2;
-    work_latch.add(2);
+    work_wg.add(2);
     bool b;
     uint64_t id;
 
@@ -158,31 +158,31 @@ TEST(test_async_flow_suite, test_flow_observer) {
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    id = flow1.add_flow_completed_observer(ks_apartment::background_sta(), [&flow_completed_count,&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow1.add_flow_completed_observer(ks_apartment::background_sta(), [&flow_completed_count,&work_wg](const ks_async_flow& flow, const ks_error& error) {
         flow_completed_count++;
         EXPECT_EQ(error.get_code(), 0);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
-    id = flow2.add_flow_completed_observer(ks_apartment::background_sta(), [&flow_completed_count,&work_latch](const ks_async_flow& flow, const ks_error& error) {
+    id = flow2.add_flow_completed_observer(ks_apartment::background_sta(), [&flow_completed_count,&work_wg](const ks_async_flow& flow, const ks_error& error) {
         flow_completed_count++;
         EXPECT_EQ(error.get_code(), 0);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow1.start();
     flow2.start();
 
-    work_latch.wait();
+    work_wg.wait();
     EXPECT_EQ(flow_running_count, 2);
     EXPECT_EQ(flow_completed_count, 2);
 }
 
 TEST(test_async_flow_suite, test_get_future) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_async_flow flow;
     bool b;
@@ -205,9 +205,9 @@ TEST(test_async_flow_suite, test_get_future) {
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
@@ -217,46 +217,46 @@ TEST(test_async_flow_suite, test_get_future) {
     ks_future<std::string> future_b1 = flow.get_task_future<std::string>("b1");
     flow.start();
 
-    work_latch.wait();
+    work_wg.wait();
     EXPECT_EQ(flow.peek_task_result<std::string>("a1").to_value(), "a1-tasktask");
     EXPECT_EQ(flow.peek_task_result<std::string>("a2").to_value(), "a2-tasktask");
     EXPECT_EQ(flow.peek_task_result<std::string>("b1").to_value(), "b1-tasktask");
 
-    work_latch.add(4);
+    work_wg.add(4);
 
-    flow_future.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch,&park](const auto& result) {
+    flow_future.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg,&park](const auto& result) {
         ASSERT_TRUE(result.is_value());
         park++;
-        work_latch.count_down();
+        work_wg.done();
      });
 
 
-    future_a1.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch,&task_future_count](const auto& result) {
+    future_a1.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg,&task_future_count](const auto& result) {
         ASSERT_TRUE(result.is_value());
         task_future_count++;
-        work_latch.count_down();
+        work_wg.done();
      });
 
-    future_a2.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch,&task_future_count](const auto& result) {
+    future_a2.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg,&task_future_count](const auto& result) {
         ASSERT_TRUE(result.is_value());
         task_future_count++;
-        work_latch.count_down();
+        work_wg.done();
      });
 
-    future_b1.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_latch,&task_future_count](const auto& result) {
+    future_b1.on_completion(ks_apartment::default_mta(), make_async_context(), [&work_wg,&task_future_count](const auto& result) {
         ASSERT_TRUE(result.is_value());
         task_future_count++;
-        work_latch.count_down();
+        work_wg.done();
      });
 
-    work_latch.wait();
+    work_wg.wait();
     EXPECT_EQ(park, 1);
     EXPECT_EQ(task_future_count, 3);
 }
 
 TEST(test_async_flow_suite, test_error) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_async_flow flow, flow_error;
     bool b;
@@ -279,15 +279,15 @@ TEST(test_async_flow_suite, test_error) {
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338001);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow.start();
 
-    work_latch.wait();
+    work_wg.wait();
 
     EXPECT_EQ(a3, 0);
     ASSERT_TRUE(flow.is_flow_completed());
@@ -299,22 +299,22 @@ TEST(test_async_flow_suite, test_error) {
     EXPECT_TRUE(flow.is_task_completed("a3"));
     EXPECT_EQ(flow.get_last_failed_task_name(),"a2");
 
-    work_latch.add(1);
+    work_wg.add(1);
 
     b = flow_error.add_task<std::string>("c1", ks_apartment::default_mta(), [](const ks_async_flow& this_flow) {
         return ks_error().unexpected_error();
         });
     ASSERT_TRUE(b);
 
-     id = flow_error.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+     id = flow_error.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338001);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow_error.start();
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_TRUE(flow_error.is_flow_completed());
     EXPECT_EQ(flow_error.get_last_error().get_code(), ks_error::unexpected_error().get_code());
     EXPECT_TRUE(flow_error.is_task_completed("c1"));
@@ -324,8 +324,8 @@ TEST(test_async_flow_suite, test_error) {
 
 
 TEST(test_async_flow_suite, test_try_cancel) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_async_flow flow;
     bool b;
@@ -341,15 +341,15 @@ TEST(test_async_flow_suite, test_try_cancel) {
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0xFF338003);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow.__try_cancel();
     
-    work_latch.wait();
+    work_wg.wait();
     EXPECT_TRUE(flow.is_flow_completed());
     EXPECT_EQ(flow.get_last_error().get_code(), ks_error::cancelled_error().get_code());
     EXPECT_TRUE(flow.is_task_completed("a1"));
@@ -358,8 +358,8 @@ TEST(test_async_flow_suite, test_try_cancel) {
 }
 
 TEST(test_async_flow_suite, test_complex_dependent) {
-    ks_latch work_latch(0);
-    work_latch.add(1);
+    ks_waitgroup work_wg(0);
+    work_wg.add(1);
 
     ks_async_flow flow;
     bool b;
@@ -418,15 +418,15 @@ TEST(test_async_flow_suite, test_complex_dependent) {
         });
     ASSERT_TRUE(b);
 
-    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_latch](const ks_async_flow& this_flow, const ks_error& error) {
+    id = flow.add_flow_completed_observer(ks_apartment::background_sta(), [&work_wg](const ks_async_flow& this_flow, const ks_error& error) {
         EXPECT_EQ(error.get_code(), 0);
-        work_latch.count_down();
+        work_wg.done();
     }, ks_async_context());
     ASSERT_TRUE(id != 0);
 
     flow.start();
 
-    work_latch.wait();
+    work_wg.wait();
     ASSERT_TRUE(flow.is_flow_completed());
     EXPECT_TRUE(flow.is_task_completed("d1"));
 }

@@ -81,7 +81,7 @@ TEST(test_spinlock_basic_suite, test_unlock) {
 }
 
 // 自旋锁有效性测试
-TEST(test_spindlock_mutil_thread_suite, test_lock_and_unlock) {
+TEST(test_spinlock_mutil_thread_suite, test_lock_and_unlock) {
     ks_spinlock lock;
     long long counter = 0;
 
@@ -106,7 +106,7 @@ TEST(test_spindlock_mutil_thread_suite, test_lock_and_unlock) {
         << "Counter value does not match the expected result.";
 }
 
-TEST(test_spindlock_mutil_thread_suite, test_trylock_and_unlock) {
+TEST(test_spinlock_mutil_thread_suite, test_trylock_and_unlock) {
     ks_spinlock lock;
     long long counter = 0;
 
@@ -131,7 +131,7 @@ TEST(test_spindlock_mutil_thread_suite, test_trylock_and_unlock) {
         << "Counter value does not match the expected result.";
 }
 
-TEST(test_spindlock_mutil_thread_suite, test_random) {
+TEST(test_spinlock_mutil_thread_suite, test_random) {
     ks_spinlock lock;
     long long counter = 0;
     int threadNum = 10;
@@ -169,7 +169,7 @@ TEST(test_spindlock_mutil_thread_suite, test_random) {
 
 // 单个长任务+N个短任务，等待测试
 // 注：系统忙时会失败，先禁用此CASE
-//TEST(test_spindlock_mutil_thread_suite, test_wait_feature) {
+//TEST(test_spinlock_mutil_thread_suite, test_wait_feature) {
 //    ks_spinlock lock;
 //    // 长短任务
 //    long long longTaskDuration = 1000;

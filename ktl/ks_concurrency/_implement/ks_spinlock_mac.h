@@ -41,9 +41,9 @@ public:
    }
    
    void lock() {
-       const auto unfair_lock_lock_with_flags_fn = _helper::getOSSyncApis()->unfair_lock_lock_with_flags;
+       const auto unfair_lock_lock_with_flags_fn = _helper::__getAppleSyncApis()->unfair_lock_lock_with_flags;
         if (unfair_lock_lock_with_flags_fn)
-            unfair_lock_lock_with_flags_fn(&m_unfairLock, _helper::OS_UNFAIR_LOCK_FLAG_ADAPTIVE_SPIN);
+            unfair_lock_lock_with_flags_fn(&m_unfairLock, _helper::_AppleSyncDefs::OSUNFAIR_LOCK_FLAG_ADAPTIVE_SPIN);
         else
             os_unfair_lock_lock(&m_unfairLock);
     }

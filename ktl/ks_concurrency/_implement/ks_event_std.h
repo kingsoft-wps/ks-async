@@ -48,7 +48,7 @@ public:
         m_state = false;
     }
 
-    void wait() {
+    void wait() const {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (!m_state) {
             m_cv.wait(lock);
@@ -59,7 +59,7 @@ public:
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
 		std::unique_lock<std::mutex> lock(m_mutex);
         if (!m_state)
             return false;
@@ -67,13 +67,35 @@ public:
         if (!m_manualReset) {
             m_state = false;
         }
+
         return true;
     }
 
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+ 
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (!m_state) {
+            if (m_cv.wait_until(lock, abs_time) == std::cv_status::timeout) {
+                return false;
+            }
+        }
+
+        if (!m_manualReset) {
+            m_state = false;
+        }
+
+        return true;
+    }
+    
 private:
     std::mutex m_mutex;
     std::condition_variable m_cv;
-    bool m_state;
+    mutable bool m_state;
     const bool m_manualReset;
 };
 

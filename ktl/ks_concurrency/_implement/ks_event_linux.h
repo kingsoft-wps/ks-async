@@ -36,9 +36,9 @@ public:
         uint32_t expected32 = 0;
         if (m_atomicState32.compare_exchange_strong(expected32, 1, std::memory_order_release, std::memory_order_relaxed)) {
             if (m_manualReset)
-                _helper::linux_futex32_wake_all((uint32_t*)&m_atomicState32);
+                _helper::__atomic_notify_all(&m_atomicState32);
             else
-                _helper::linux_futex32_wake_one((uint32_t*)&m_atomicState32);
+                _helper::__atomic_notify_one(&m_atomicState32);
         }
     }
 
@@ -46,7 +46,7 @@ public:
         m_atomicState32.store(0, std::memory_order_relaxed);
     }
 
-    void wait() {
+    void wait() const {
         for (;;) {
             if (m_manualReset) {
                 const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
@@ -59,14 +59,11 @@ public:
                     return; //ok
             }
 
-            if (_helper::linux_futex32_wait((uint32_t*)&m_atomicState32, 0, nullptr) == _helper::_LINUX_FUTEX32_NOT_SUPPORTED) {
-                ASSERT(false);
-                std::this_thread::yield();
-            }
+            _helper::__atomic_wait_explicit(&m_atomicState32, (uint32_t)0, std::memory_order_relaxed);
         }
     }
 
-    _NODISCARD bool try_wait() {
+    _NODISCARD bool try_wait() const {
         if (m_manualReset) {
             const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
             if (state32 != 0)
@@ -81,8 +78,34 @@ public:
         return false;
     }
 
+    template<class Rep, class Period>
+    _NODISCARD bool wait_for(const std::chrono::duration<Rep, Period>& rel_time) const {
+        return this->wait_until(std::chrono::steady_clock::now() + rel_time);
+    }
+ 
+    template<class Clock, class Duration>
+    _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
+        for (;;) {
+            if (m_manualReset) {
+                const uint32_t state32 = m_atomicState32.load(std::memory_order_acquire);
+                if (state32 != 0)
+                    return true; //ok
+            }
+            else {
+                uint32_t expected32 = 1;
+                if (m_atomicState32.compare_exchange_strong(expected32, 0, std::memory_order_acquire, std::memory_order_relaxed)) 
+                    return true; //ok
+            }
+
+            if (Clock::now() >= abs_time)
+                return false; //timeout
+
+            (void)_helper::__atomic_wait_until_explicit(&m_atomicState32, (uint32_t)0, abs_time, std::memory_order_relaxed);
+        }
+    }
+
 private:
-    std::atomic<uint32_t> m_atomicState32;
+    mutable std::atomic<uint32_t> m_atomicState32;
     const bool m_manualReset;
 };
 

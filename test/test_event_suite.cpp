@@ -60,3 +60,47 @@ TEST(test_event_suite, test_auto_event) {
 
     t.join();
 }
+
+TEST(test_event_suite, test_manual_event_wait_for) {
+    ks_event ev(false, true);
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    ev.set_event();
+    EXPECT_TRUE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_TRUE(ev.wait_for(std::chrono::milliseconds(10)));
+    ev.reset_event();
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+}
+
+TEST(test_event_suite, test_manual_event_wait_until) {
+    ks_event ev(false, true);
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    ev.set_event();
+    EXPECT_TRUE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_TRUE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    ev.reset_event();
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+}
+
+TEST(test_event_suite, test_auto_event_wait_for) {
+    ks_event ev(false, false);
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    ev.set_event();
+    EXPECT_TRUE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_for(std::chrono::milliseconds(10)));
+}
+
+TEST(test_event_suite, test_auto_event_wait_until) {
+    ks_event ev(false, false);
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    ev.set_event();
+    EXPECT_TRUE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+    EXPECT_FALSE(ev.wait_until(std::chrono::steady_clock::now() + std::chrono::milliseconds(10)));
+}
