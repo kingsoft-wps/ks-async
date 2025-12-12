@@ -340,17 +340,18 @@ void ks_single_thread_apartment_imp::_work_thread_proc(ks_single_thread_apartmen
 #endif
 
 		//try next delaying_fn
-		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
+		if (!d->delaying_fn_queue.empty()) {
 			size_t moved_fn_count = 0;
 			const auto now = std::chrono::steady_clock::now();
 			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
-				//直接将到期的delaying项移入idle队列（忽略priority）
+				//直接将到期的delaying项移入now队列
 				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
 				d->delaying_fn_queue.pop_front();
 				++moved_fn_count;
 			}
 
 			if (moved_fn_count != 0) {
+				//_prepare_work_thread_locked(self, d, lock); //sta不需要
 				continue;
 			}
 		}
@@ -593,6 +594,7 @@ bool ks_single_thread_apartment_imp::__run_nested_pump_loop_for_extern_waiting(v
 		ASSERT(tls_current_thread_pump_loop_depth >= 1);
 	});
 
+	auto* self = this;
 	auto d = m_d;
 	bool was_satisified = false;
 	
@@ -615,17 +617,18 @@ bool ks_single_thread_apartment_imp::__run_nested_pump_loop_for_extern_waiting(v
 #endif
 
 		//try next delaying_fn
-		if (!d->delaying_fn_queue.empty() && d->state_v == _STATE::RUNNING) {
+		if (!d->delaying_fn_queue.empty()) {
 			size_t moved_fn_count = 0;
 			const auto now = std::chrono::steady_clock::now();
 			while (!d->delaying_fn_queue.empty() && d->delaying_fn_queue.front()->until_time <= now) {
-				//直接将到期的delaying项移入idle队列（忽略priority）
+				//直接将到期的delaying项移入now队列
 				_do_put_fn_item_into_now_list_locked(d, std::move(d->delaying_fn_queue.front()), lock);
 				d->delaying_fn_queue.pop_front();
 				++moved_fn_count;
 			}
 
 			if (moved_fn_count != 0) {
+				//_prepare_work_thread_locked(self, d, lock); //sta不需要
 				continue;
 			}
 		}
