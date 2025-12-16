@@ -35,23 +35,16 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
 public:
-    T inc_ref() noexcept {
-        return this->add_ref(1);
-    }
-
-    _NODISCARD T dec_ref() noexcept {
-        return this->sub_ref(1);
-    }
-
-public:
-    T add_ref(T update) noexcept {
+    T add_ref() noexcept {
+        constexpr T update = 1;
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
         ASSERT(new_value > 0 && new_value >= new_value - update);
         return new_value;
     }
 
-    _NODISCARD T sub_ref(T update) noexcept {
+    _NODISCARD T revoke_ref() noexcept {
+        constexpr T update = 1;
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
         ASSERT(new_value >= 0 && new_value <= new_value + update);
@@ -66,13 +59,11 @@ public:
     }
 
 public:
-    T operator++() noexcept { return this->inc_ref(); }
-    T operator++(int) noexcept { return this->inc_ref() - 1; }
-    T operator+=(T update) noexcept { return this->add_ref(update); }
+    T operator++() noexcept { return this->add_ref(); }
+    T operator++(int) noexcept { return this->add_ref() - 1; }
 
-    _NODISCARD T operator--() noexcept { return this->dec_ref(); }
-    _NODISCARD T operator--(int) noexcept { return this->dec_ref() + 1; }
-    _NODISCARD T operator-=(T update) noexcept { return this->sub_ref(update); }
+    _NODISCARD T operator--() noexcept { return this->revoke_ref(); }
+    _NODISCARD T operator--(int) noexcept { return this->revoke_ref() + 1; }
 };
 
 #endif // __KS_REFCOUNT_DEF
