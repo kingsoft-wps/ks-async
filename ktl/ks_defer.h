@@ -37,7 +37,9 @@ public:
 	ks_defer& operator=(const ks_defer&) = delete;
 	ks_defer& operator=(ks_defer&&) noexcept = delete;
 
-	~ks_defer() { this->apply(); }
+	~ks_defer() {
+		this->apply();
+	}
 
 public:
 	template <class FN, class _ = std::enable_if_t<std::is_convertible_v<FN, std::function<void()>>>>

@@ -44,7 +44,7 @@ public:
 #if !__has_feature(objc_arc)
         dispatch_release(m_dispatchGroup);
 #endif
-        m_dispatchGroup = nullptr;
+        //m_dispatchGroup = nullptr;
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_waitgroup_mac_gdc);

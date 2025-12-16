@@ -36,7 +36,7 @@ public:
 
     ~ks_event_win_synch() {
         ::CloseHandle(m_eventHandle);
-        m_eventHandle = nullptr;
+        //m_eventHandle = NULL;
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_event_win_synch);

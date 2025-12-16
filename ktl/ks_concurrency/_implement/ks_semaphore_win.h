@@ -37,7 +37,7 @@ public:
 
     ~ks_semaphore_win_synch() {
         ::CloseHandle(m_semaphoreHandle);
-        m_semaphoreHandle = NULL;
+        //m_semaphoreHandle = NULL;
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_win_synch);

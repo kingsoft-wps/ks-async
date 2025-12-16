@@ -95,7 +95,7 @@ public:
 	}
 
 	~ks_any() noexcept {
-		__do_release_data(m_data_p); //instead of this->reset()
+		__do_release_data(m_data_p);
 		//m_data_p = nullptr;
 	}
 
@@ -218,7 +218,7 @@ private:
 			if (data_p->ref_count.fetch_sub(1, std::memory_order_release) == 1) {
 				std::atomic_thread_fence(std::memory_order_acquire);
 				data_p->x_dtor(data_p->x_addr());
-				data_p->~_DATA_HEADER();
+				data_p->~_DATA_HEADER();  //here maybe throw, and then auto terminate!
 				delete[](unsigned char*)data_p;
 			}
 		}

@@ -28,17 +28,30 @@ class ks_refcount : private std::atomic<T> {
 
 public:
     ks_refcount(T desired) noexcept : __underlying_atomic_type(desired) { ASSERT(desired >= 0); }
+#ifdef _DEBUG
     ~ks_refcount() noexcept { ASSERT(this->peek_value() == 0); }
+#endif
+
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
-    T add(T update = 1) noexcept {
+public:
+    T inc_ref() noexcept {
+        return this->add_ref(1);
+    }
+
+    _NODISCARD T dec_ref() noexcept {
+        return this->sub_ref(1);
+    }
+
+public:
+    T add_ref(T update) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
         ASSERT(new_value > 0 && new_value >= new_value - update);
         return new_value;
     }
 
-    _NODISCARD T sub(T update = 1) noexcept {
+    _NODISCARD T sub_ref(T update) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
         ASSERT(new_value >= 0 && new_value <= new_value + update);
@@ -48,17 +61,18 @@ public:
         return new_value;
     }
 
-    T operator++() noexcept { return this->add(1); }
-    T operator++(int) noexcept { return this->add(1) - 1; }
-    T operator+=(T update) noexcept { return this->add(update); }
-
-    _NODISCARD T operator--() noexcept { return this->sub(1); }
-    _NODISCARD T operator--(int) noexcept { return this->sub(1) + 1; }
-    _NODISCARD T operator-=(T update) noexcept { return this->sub(update); }
-
-    _NODISCARD T peek_value() const noexcept {
-        return __underlying_atomic_type::load(std::memory_order_relaxed);
+    _NODISCARD T peek_value(bool with_acquire_order = false) const noexcept {
+        return __underlying_atomic_type::load(with_acquire_order ? std::memory_order_acquire : std::memory_order_relaxed);
     }
+
+public:
+    T operator++() noexcept { return this->inc_ref(); }
+    T operator++(int) noexcept { return this->inc_ref() - 1; }
+    T operator+=(T update) noexcept { return this->add_ref(update); }
+
+    _NODISCARD T operator--() noexcept { return this->dec_ref(); }
+    _NODISCARD T operator--(int) noexcept { return this->dec_ref() + 1; }
+    _NODISCARD T operator-=(T update) noexcept { return this->sub_ref(update); }
 };
 
 #endif // __KS_REFCOUNT_DEF

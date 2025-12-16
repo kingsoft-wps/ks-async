@@ -113,7 +113,7 @@ public:
 
     ~ks_waitgroup_win_ev() {
         ::CloseHandle(m_eventHandle);
-        m_eventHandle = NULL;
+        //m_eventHandle = NULL;
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_waitgroup_win_ev);

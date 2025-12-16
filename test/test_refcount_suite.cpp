@@ -26,19 +26,19 @@ TEST(test_refcount_suite, test_refcount) {
     ks_refcount<ptrdiff_t> refcount(0);
     ptrdiff_t tval;
 
-    tval = refcount.add(1);
+    tval = refcount.inc_ref();
     EXPECT_EQ(tval, 1);
     EXPECT_EQ(refcount.peek_value(), 1);
 
-    tval = refcount.add(2);
+    tval = refcount.add_ref(2);
     EXPECT_EQ(tval, 3);
     EXPECT_EQ(refcount.peek_value(), 3);
 
-    tval = refcount.sub(2);
+    tval = refcount.sub_ref(2);
     EXPECT_EQ(tval, 1);
     EXPECT_EQ(refcount.peek_value(), 1);
 
-    tval = refcount.sub();
+    tval = refcount.dec_ref();
     EXPECT_EQ(tval, 0);
     EXPECT_EQ(refcount.peek_value(), 0);
 }

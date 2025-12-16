@@ -44,7 +44,7 @@ public:
 #if !__has_feature(objc_arc)
         dispatch_release(m_dispatchSemaphore);
 #endif
-        m_dispatchSemaphore = nullptr;
+        //m_dispatchSemaphore = nullptr;
     }
 
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_mac_gdc);
