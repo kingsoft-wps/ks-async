@@ -41,13 +41,14 @@ public:
     }
 
     void done() {
-        constexpr ptrdiff_t update = 1;
         std::unique_lock<std::mutex> lock(m_mutex);
-        ASSERT(update > 0);
-        m_counter -= update;
-        ASSERT(m_counter >= 0);
+        m_counter -= 1;
         if (m_counter == 0) {
             m_cv.notify_all();
+        }
+        else if (m_counter < 0) {
+            ASSERT(false);
+            throw std::runtime_error("waitgroup::done() underflow");
         }
     }
 

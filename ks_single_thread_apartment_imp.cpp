@@ -597,7 +597,8 @@ bool ks_single_thread_apartment_imp::__run_nested_pump_loop_for_extern_waiting(v
 	auto* self = this;
 	auto d = m_d;
 	bool was_satisified = false;
-	
+	_UNUSED(self);
+
 	while (true) {
 		if (extern_pred_fn()) {
 			was_satisified = true;

@@ -42,12 +42,13 @@ public:
     }
 
     void done() {
-        constexpr ptrdiff_t update = 1;
-        ASSERT(update > 0);
-        ptrdiff_t current = m_counter.fetch_sub(update, std::memory_order_release) - update;
-        ASSERT(current >= 0);
+        ptrdiff_t current = m_counter.fetch_sub(1, std::memory_order_release) - 1;
         if (current == 0) {
             _helper::__atomic_notify_all(&m_counter);
+        }
+        else if (current < 0) {
+            ASSERT(false);
+            throw std::runtime_error("waitgroup::done() underflow");
         }
     }
 

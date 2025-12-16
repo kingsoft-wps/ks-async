@@ -56,11 +56,8 @@ public:
         }
     }
 
-    void done(ptrdiff_t update = 1) {
-        ASSERT(update >= 0);
-        for (ptrdiff_t i = 0; i < update; ++i) {
- 			dispatch_group_leave(m_dispatchGroup);
-        }
+    void done() {
+ 		dispatch_group_leave(m_dispatchGroup);
     }
 
     void wait() const {
