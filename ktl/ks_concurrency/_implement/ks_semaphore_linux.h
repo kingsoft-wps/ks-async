@@ -42,7 +42,7 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_linux_posix);
 
     void release(ptrdiff_t update = 1) {
-        ASSERT(update > 0);
+        ASSERT(update >= 0);
         for (ptrdiff_t i = 0; i < update; ++i) {
             sem_post(&m_sem);
         }

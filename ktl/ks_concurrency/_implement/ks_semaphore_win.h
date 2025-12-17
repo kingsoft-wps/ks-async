@@ -43,7 +43,7 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_win_synch);
 
     void release(ptrdiff_t update = 1) {
-        ASSERT(update > 0 && (ptrdiff_t)(LONG)update == update);
+        ASSERT(update >= 0 && (ptrdiff_t)(LONG)update == update);
         ::ReleaseSemaphore(m_semaphoreHandle, (LONG)update, NULL);
     }
 

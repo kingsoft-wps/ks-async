@@ -35,16 +35,27 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_refcount);
 
 public:
-    T add_ref() noexcept {
-        constexpr T update = 1;
+    T incr() noexcept {
+        return this->__add(1);
+    }
+
+    _NODISCARD T decr() noexcept {
+        return this->__subtract(1);
+    }
+
+    _NODISCARD T peek_value(bool with_acquire_order = false) const noexcept {
+        return __underlying_atomic_type::load(with_acquire_order ? std::memory_order_acquire : std::memory_order_relaxed);
+    }
+
+private:
+    T __add(T update) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_add(update, std::memory_order_relaxed) + update;
         ASSERT(new_value > 0 && new_value >= new_value - update);
         return new_value;
     }
 
-    _NODISCARD T revoke_ref() noexcept {
-        constexpr T update = 1;
+    _NODISCARD T __subtract(T update) noexcept {
         ASSERT(update >= 0);
         T new_value = __underlying_atomic_type::fetch_sub(update, std::memory_order_release) - update;
         ASSERT(new_value >= 0 && new_value <= new_value + update);
@@ -54,16 +65,14 @@ public:
         return new_value;
     }
 
-    _NODISCARD T peek_value(bool with_acquire_order = false) const noexcept {
-        return __underlying_atomic_type::load(with_acquire_order ? std::memory_order_acquire : std::memory_order_relaxed);
-    }
-
 public:
-    T operator++() noexcept { return this->add_ref(); }
-    T operator++(int) noexcept { return this->add_ref() - 1; }
+    T operator++() noexcept { return this->incr(); }
+    T operator++(int) noexcept { return this->incr() - 1; }
+    //T operator+=(T update) noexcept { return this->__add(update); }
 
-    _NODISCARD T operator--() noexcept { return this->revoke_ref(); }
-    _NODISCARD T operator--(int) noexcept { return this->revoke_ref() + 1; }
+    _NODISCARD T operator--() noexcept { return this->decr(); }
+    _NODISCARD T operator--(int) noexcept { return this->decr() + 1; }
+    //_NODISCARD T operator-=(T update) noexcept { return this->__subtract(update); }
 };
 
 #endif // __KS_REFCOUNT_DEF

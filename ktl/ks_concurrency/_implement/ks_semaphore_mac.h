@@ -50,7 +50,7 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_semaphore_mac_gdc);
 
     void release(ptrdiff_t update = 1) {
-		ASSERT(update > 0);
+		ASSERT(update >= 0);
         while (--update >= 0) {
             dispatch_semaphore_signal(m_dispatchSemaphore);
         }

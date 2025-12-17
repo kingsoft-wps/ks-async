@@ -37,7 +37,7 @@ public:
     _DISABLE_COPY_CONSTRUCTOR(ks_waitgroup_win_synch);
 
     void add(ptrdiff_t update) {
-        ASSERT(update > 0);
+        ASSERT(update >= 0);
         m_counter.fetch_add(update, std::memory_order_relaxed);
     }
 

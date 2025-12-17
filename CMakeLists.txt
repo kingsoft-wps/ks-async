@@ -342,7 +342,6 @@ if (KS_ASYNC_TEST_ENABLED)
 	target_include_directories(${MY_LIB_BENCH_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bench)	
 	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE ${MY_TEST_LINKING_LIB_NAME})
 	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE benchmark::benchmark)
-	target_link_libraries(${MY_LIB_BENCH_NAME} PRIVATE benchmark::benchmark_main)
 
 endif()
 

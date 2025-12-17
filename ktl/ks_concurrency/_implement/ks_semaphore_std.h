@@ -36,7 +36,7 @@ public:
 
     void release(ptrdiff_t update = 1) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        ASSERT(update > 0);
+        ASSERT(update >= 0);
         m_counter += update;
 
         if (update == 1) {
