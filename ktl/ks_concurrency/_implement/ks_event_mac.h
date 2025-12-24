@@ -65,7 +65,7 @@ public:
                     return; //ok
             }
 
-            m_atomicState32.wait(0, std::memory_order_relaxed);
+            _helper::__atomic_wait_explicit(&m_atomicState32, (uint32_t)0, std::memory_order_relaxed);
         }
     }
 
