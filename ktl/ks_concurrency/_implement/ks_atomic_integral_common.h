@@ -16,7 +16,7 @@ limitations under the License.
 #pragma once
 
 #ifndef __KS_ATOMIC_INTEGRAL_COMMON_DEF
-#define __KS_ATOMIC_INTEGRAL_COMMON3_DEF
+#define __KS_ATOMIC_INTEGRAL_COMMON_DEF
 
 #include "ks_concurrency_helper.h"
 #include "../../ks_type_traits.h"

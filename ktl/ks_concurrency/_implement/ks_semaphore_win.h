@@ -44,7 +44,10 @@ public:
 
     void release(ptrdiff_t update = 1) {
         ASSERT(update >= 0 && (ptrdiff_t)(LONG)update == update);
-        ::ReleaseSemaphore(m_semaphoreHandle, (LONG)update, NULL);
+        if (!::ReleaseSemaphore(m_semaphoreHandle, (LONG)update, NULL)) {
+            ASSERT(false);
+            throw std::runtime_error("Failed to release semaphore");
+        }
     }
 
     void acquire() {

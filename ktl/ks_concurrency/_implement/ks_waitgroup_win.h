@@ -83,7 +83,7 @@ public:
             if (Clock::now() >= abs_time)
                 return false; //timeout
 
-            auto remain_time = abs_time -  std::chrono::steady_clock::now();
+            auto remain_time = abs_time -  Clock::now();
             long long remain_ms = std::chrono::duration_cast<std::chrono::milliseconds>(remain_time).count();
             if (remain_ms < 0)
                 remain_ms = 0;
