@@ -79,12 +79,16 @@ public:
     template<class Clock, class Duration>
     _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (!m_state) {
+        while (!m_state) {
             if (m_cv.wait_until(lock, abs_time) == std::cv_status::timeout) {
-                return false;
+                 if (!m_state)
+                    return false;
+                else
+                    break;
             }
         }
 
+        ASSERT(m_state);
         if (!m_manualReset) {
             m_state = false;
         }
@@ -93,8 +97,8 @@ public:
     }
     
 private:
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
+    mutable std::mutex m_mutex;
+    mutable std::condition_variable m_cv;
     mutable bool m_state;
     const bool m_manualReset;
 };

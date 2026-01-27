@@ -78,7 +78,7 @@ public:
     template<class Clock, class Duration>
     _NODISCARD bool wait_until(const std::chrono::time_point<Clock, Duration>& abs_time) const {
         for (;;) {
-            auto remain_time = abs_time - std::chrono::steady_clock::now();
+            auto remain_time = abs_time - Clock::now();
             long long remain_ms = std::chrono::duration_cast<std::chrono::milliseconds>(remain_time).count();
             if (remain_ms < 0)
                 remain_ms = 0;
@@ -90,7 +90,7 @@ public:
                 return true;
             }
             else if (ret == WAIT_TIMEOUT) {
-                if (remain_ms == 0 || std::chrono::steady_clock::now() >= abs_time)
+                if (remain_ms == 0 || Clock::now() >= abs_time)
                     return false; //timeout
                 else
                     continue;

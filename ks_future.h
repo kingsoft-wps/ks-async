@@ -875,7 +875,7 @@ private: //__transform
 			fn(ks_result<T>::__from_raw(raw_result));
 			return ks_raw_value::of<nothing_t>(nothing);
 		};
-		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		ks_raw_future_ptr raw_future2 = m_raw_future->transform(std::move(raw_fn), context, apartment);
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 	template <class R>
@@ -884,7 +884,7 @@ private: //__transform
 			fn(ks_result<T>::__from_raw(raw_result), ks_cancel_inspector::__for_future());
 			return ks_raw_value::of<nothing_t>(nothing);
 		};
-		ks_raw_future_ptr raw_future2 = m_raw_future->then(std::move(raw_fn), context, apartment);
+		ks_raw_future_ptr raw_future2 = m_raw_future->transform(std::move(raw_fn), context, apartment);
 		return ks_future<R>::__from_raw(raw_future2);
 	}
 

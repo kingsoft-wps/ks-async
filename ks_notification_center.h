@@ -46,6 +46,8 @@ public:
 		const char* notification_name, 
 		const ks_async_context& notification_context = {}) {
 
+		ASSERT(notification_name != nullptr);
+
 		return this->post_notification_indirect(
 			ks_notification_builder()
 				.set_sender(sender)
@@ -60,6 +62,8 @@ public:
 		const char* notification_name, X&& notification_payload,
 		const ks_async_context& notification_context = {}) {
 
+		ASSERT(notification_name != nullptr);
+		
 		return this->post_notification_indirect(
 			ks_notification_builder()
 				.set_sender(sender)

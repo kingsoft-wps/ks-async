@@ -104,7 +104,7 @@ public:
     explicit ks_waitgroup_win_ev(ptrdiff_t desired)
         : m_counter(desired) {
         ASSERT(desired >= 0);
-        m_eventHandle = ::CreateEventW(NULL, TRUE, desired > 0, NULL);
+        m_eventHandle = ::CreateEventW(NULL, TRUE, desired <= 0, NULL);
         if (m_eventHandle == NULL) {
             ASSERT(false);
             throw std::runtime_error("Failed to create event handle");
@@ -176,7 +176,7 @@ public:
 
             std::this_thread::yield(); //因为counter++与ResetEvent有时间差，故这里额外yield一下
 
-            auto remain_time = abs_time -  std::chrono::steady_clock::now();
+            auto remain_time = abs_time -  Clock::now();
             long long remain_ms = std::chrono::duration_cast<std::chrono::milliseconds>(remain_time).count();
             if (remain_ms < 0)
                 remain_ms = 0;

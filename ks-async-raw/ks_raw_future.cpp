@@ -286,7 +286,7 @@ protected:
 	}
 
 	virtual void do_add_next_multi(const std::vector<ks_raw_future_ptr>& next_futures) override final {
-		if (next_futures.empty()) {
+		if (!next_futures.empty()) {
 			ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
 			return this->do_add_next_multi_locked(next_futures, lock, false);
 		}

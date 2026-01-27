@@ -713,11 +713,11 @@ void ks_raw_async_flow::do_make_flow_completed_locked(const ks_error& flow_error
 	//settle flow-promise (void)
 	if (m_flow_promise_void_opt != nullptr) {
 		if (m_flow_status_v == status_t::succeeded) {
-			m_flow_promise_this_wrapped_keepper_until_completed->resolve(ks_raw_value::of<nothing_t>(nothing));
+			m_flow_promise_void_opt->resolve(ks_raw_value::of<nothing_t>(nothing));
 		}
 		else {
 			ASSERT(flow_error.has_code());
-			m_flow_promise_this_wrapped_keepper_until_completed->reject(flow_error);
+			m_flow_promise_void_opt->reject(flow_error);
 		}
 	}
 
