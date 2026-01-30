@@ -116,7 +116,7 @@ private:
 	}
 
 	static ks_result<void> __from_raw(ks_raw_result&& raw_result) noexcept {
-		return ks_result<void>::__from_raw(raw_result);
+		return ks_result<void>::__from_raw(std::move(raw_result));
 	}
 
 	ks_raw_result __get_raw() const noexcept {

@@ -87,10 +87,12 @@ public:
         std::atomic<uint8_t>* low_atomic_uint8_p = (std::atomic<uint8_t>*)(&m_spinValue);
 
         ASSERT(low_atomic_uint8_p->load(std::memory_order_relaxed) == 1);
-        low_atomic_uint8_p->store(0, std::memory_order_release);
-
-        uint32_t current = m_spinValue.load(std::memory_order_relaxed);
-        if ((uint8_t)(current) == 0 && (current & 0xFFFFFF00) != 0) {
+        //用fetch_and优化掉一个store+load操作...
+        //low_atomic_uint8_p->store(0, std::memory_order_release);
+        //uint32_t current = m_spinValue.load(std::memory_order_relaxed);
+        uint32_t current = m_spinValue.fetch_and(uint32_t(0xFFFFFF00), std::memory_order_release) & uint32_t(0xFFFFFF00);
+        //if ((uint8_t)(current) == 0 && (current & 0xFFFFFF00) != 0) {
+        if (current != 0) {
             _helper::__atomic_notify_one(&m_spinValue); //唤醒1个等待者
         }
     }
