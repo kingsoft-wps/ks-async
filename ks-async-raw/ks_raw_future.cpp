@@ -478,6 +478,10 @@ protected:
 		auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
 		ASSERT(intermediate_data_ptr != nullptr);
 
+		std::chrono::steady_clock::time_point t_timeout_time = timeout > 0 ? intermediate_data_ptr->m_create_time + std::chrono::milliseconds(timeout) : std::chrono::steady_clock::time_point{};
+		if (t_timeout_time == intermediate_data_ptr->m_timeout_time)
+			return; //no change, skip
+
 		//cancel prev-timeout
 		if (intermediate_data_ptr->m_timeout_schedule_id != 0) {
 			ASSERT(intermediate_data_ptr->m_timeout_apartment != nullptr);
@@ -486,8 +490,8 @@ protected:
 		}
 
 		//update timeout_time
-		intermediate_data_ptr->m_timeout_time = timeout > 0 ? intermediate_data_ptr->m_create_time + std::chrono::milliseconds(timeout) : std::chrono::steady_clock::time_point{};
-		if (timeout <= 0) 
+		intermediate_data_ptr->m_timeout_time = t_timeout_time;
+		if (intermediate_data_ptr->m_timeout_time == std::chrono::steady_clock::time_point{})
 			return; //infinity (no-timeout forever)
 
 		//check timeout, at once
@@ -504,16 +508,17 @@ protected:
 		//schedule timeout
 		intermediate_data_ptr->m_timeout_apartment = do_determine_timeout_apartment(intermediate_data_ptr->m_spec_apartment);
 		intermediate_data_ptr->m_timeout_schedule_id = intermediate_data_ptr->m_timeout_apartment->schedule_delayed(
-			[this, this_shared = this->shared_from_this(), intermediate_data_ptr, schedule_id = intermediate_data_ptr->m_timeout_schedule_id, error, backtrack]() -> void {
+			[this, this_shared = this->shared_from_this(), intermediate_data_ptr, t_timeout_time, error, backtrack]() -> void {
 			ks_raw_future_unique_lock lock2(__get_mutex(), __is_using_pseudo_mutex());
 			if (m_completed_result.is_completed())
 				return;
 
 			ASSERT(intermediate_data_ptr != nullptr);
-			if (schedule_id != intermediate_data_ptr->m_timeout_schedule_id)
+			if (t_timeout_time != intermediate_data_ptr->m_timeout_time)
 				return;
 
 			intermediate_data_ptr->m_timeout_schedule_id = 0; //reset
+			intermediate_data_ptr->m_timeout_time = std::chrono::steady_clock::time_point{};
 
 			lock2.unlock();
 			this->do_try_cancel(error, backtrack); //will become timeout
@@ -659,6 +664,21 @@ public:
 		do_init_base_locked(spec_apartment, ks_async_context{}, __get_intermediate_data_ex_ptr(lock), lock);
 	}
 
+private:
+	void do_try_settle(const ks_raw_result& result) {
+		ks_raw_future_unique_lock lock(__get_mutex(), __is_using_pseudo_mutex());
+		ASSERT(result.is_completed());
+
+		if (m_completed_result.is_completed())
+			return; //has been settled already?
+
+		ks_raw_result result_alt = result;
+		if (result.is_value() && this->do_check_cancelled_locked(lock))
+			result_alt = this->do_acquire_cancelled_error_locked(ks_error::unexpected_error(), lock);
+
+		this->do_complete_locked(result_alt, nullptr, false, false, lock, false);
+	}
+
 public:
 	ks_raw_promise_ptr create_promise_representative() {
 		return std::static_pointer_cast<ks_raw_promise>(
@@ -668,7 +688,7 @@ public:
 
 protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
-		//ks_raw_promise_future的此方法不应被调用，而是应直接do_complete
+		//ks_raw_promise_future的此方法不应被调用
 		ASSERT(false);
 	}
 
@@ -735,17 +755,17 @@ private:
 		}
 
 		virtual void resolve(const ks_raw_value & value) override {
-			m_promise_future->do_complete(value, nullptr, false, false);
+			m_promise_future->do_try_settle(value);
 		}
 
 		virtual void reject(const ks_error & error) override {
-			m_promise_future->do_complete(error, nullptr, false, false);
+			m_promise_future->do_try_settle(error);
 		}
 
 		virtual void try_settle(const ks_raw_result & result) override {
 			ASSERT(result.is_completed());
 			if (result.is_completed())
-				m_promise_future->do_complete(result, nullptr, false, false);
+				m_promise_future->do_try_settle(result);
 		}
 
 	private:
@@ -842,7 +862,7 @@ private:
 
 protected:
 	virtual void on_feeded_by_prev(const ks_raw_result& prev_result, ks_raw_future* prev_future, ks_apartment* prev_advice_apartment) override {
-		//ks_raw_promise_future的此方法不应被调用，而是应直接do_complete
+		//ks_raw_task_future的此方法不应被调用
 		ASSERT(false);
 	}
 

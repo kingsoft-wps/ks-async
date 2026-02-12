@@ -64,3 +64,29 @@ TEST(test_promise_suite, test_promise) {
 
     work_wg.wait();
 }
+
+TEST(test_promise_suite, test_promise_timeout) {
+    ks_waitgroup work_wg(0);
+
+    auto promise = ks_promise<std::string>::create();
+    auto future = promise.get_future();
+
+    // 设置 50ms 超时
+    future.set_timeout(20);
+
+    // 500ms 后 resolve（远超 50ms 超时）
+    work_wg.add(1);
+    ks_future<void>::post_delayed(ks_apartment::default_mta(), [&work_wg, promise]() {
+        promise.try_settle(ks_result<std::string>(std::string("late_result")));
+        work_wg.done();
+        }, 200);
+
+    // 等待结果
+    work_wg.add(1);
+    future.on_completion(ks_apartment::default_mta(), [&work_wg](const auto& result) {
+        EXPECT_TRUE(result.is_error() && result.to_error().get_code() == ks_error::TIMEOUT_ERROR_CODE);
+        work_wg.done();
+    });
+
+    work_wg.wait();
+}
