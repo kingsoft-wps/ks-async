@@ -81,15 +81,19 @@ TEST(test_waitgroup_mutil_thread_suite, test_done_and_wait) {
     ks_waitgroup waitgroup(5);
     std::atomic<int> count(0);
     int thread_count = 10;
+    ks_semaphore sem_done(0);
     std::vector<std::thread> threads;
     for (int i = 0; i < thread_count; ++i) {
-        threads.emplace_back([&waitgroup, &count]() {
+        threads.emplace_back([&waitgroup, &count, &sem_done]() {
             count.fetch_add(1);
+            sem_done.release();
             waitgroup.wait();
             count.fetch_sub(1);
         });
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    for (int i = 0; i < thread_count; ++i) {
+        sem_done.acquire();
+    }
     EXPECT_EQ(count.load(), thread_count) << "All threads should be waiting.";
     waitgroup.done();
     waitgroup.done();
@@ -130,20 +134,29 @@ TEST(test_waitgroup_mutil_thread_suite, test_add) {
     ks_waitgroup waitgroup(1);
     std::atomic<int> count(0);
     int thread_count = 10;
+    ks_semaphore sem_done(0);
+    ks_semaphore sem_finish(0);
     std::vector<std::thread> threads;
     for (int i = 0; i < thread_count; ++i) {
-        threads.emplace_back([&waitgroup, &count]() {
+        threads.emplace_back([&waitgroup, &count, &sem_done, &sem_finish]() {
             waitgroup.add(1);
             count.fetch_add(1);
+            sem_done.release();
             waitgroup.done();
             waitgroup.wait();
             count.fetch_sub(1);
+            sem_finish.release();
         });
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    for (int i = 0; i < thread_count; ++i) {
+        sem_done.acquire();
+    }
     EXPECT_EQ(count.load(), thread_count) << "All threads should be waiting.";
     waitgroup.done();
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    for (int i = 0; i < thread_count; ++i) {
+        sem_finish.acquire();
+    }
     EXPECT_EQ(count.load(), 0) << "All threads should have finished.";
     
     for (auto& t : threads) {
