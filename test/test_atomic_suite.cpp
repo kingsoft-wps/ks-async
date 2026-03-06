@@ -27,9 +27,10 @@ TEST(test_atomic_suite, test_atomic_int_wait) {
 
     std::thread t1([&x]() {
         x.store(1);
-        x.__notify_one();
+        x.__notify_all();
     });
     std::thread t2([&x]() {
+        x.__wait(0);
         x.store(2);
         x.__notify_all();
     });
