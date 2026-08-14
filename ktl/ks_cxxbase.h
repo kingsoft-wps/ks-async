@@ -138,7 +138,7 @@ namespace std {
 #	if defined(_MSC_VER)
 #		define _ALWAYS_INLINE __forceinline
 #	elif defined(__GNUC__)
-#		define _ALWAYS_INLINE __attribute__((always_inline))
+#		define _ALWAYS_INLINE __inline__ __attribute__((always_inline))
 #	else
 #		error how to define _ALWAYS_INLINE?
 #	endif
