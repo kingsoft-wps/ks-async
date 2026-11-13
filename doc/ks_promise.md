@@ -42,7 +42,7 @@ explicit ks_promise<T>::ks_promise(std::create_inst, ks_apartment* apartment_hin
 #### 描述：创建一个ks_promise对象。
 #### 参数：
   - std::create_inst: 传入固定值std::create_inst，用以明确意图。
-  - apartment_hint: 可选参数，指定内部兜底用套间，可以传nullptr。一般兜底时首选使用settle调用时的current_thread_apartment，但若调用发生在非套间线程，则次选使用apartment_hint，再若为nullptr，则最后使用default_mta。
+  - apartment_hint: 可选参数，指定内部兜底用套间，若传nullptr，则使用settle调用时的current_thread_apartment_or_default_mta()。
 #### 特别说明：新ks_promise对象应该最终完成（reslove或reject），以避免相关ks_future永不能完成，从而产生意料外的资源泄漏。
 <br>
 <br>

@@ -374,17 +374,8 @@ protected:
 
 		//here, intermediate_data_ptr maybe nullptr (when dx)!
 		auto intermediate_data_ptr = __get_intermediate_data_ptr(lock);
-
-		ks_raw_result my_completed_result = completed_result.require_completed_or_error();  //as const
-		ks_apartment* my_completed_apartment = nullptr;  //as const
-		if (__get_mode() == ks_raw_future_mode::PROMISE) {
-			my_completed_apartment = ks_apartment::current_thread_apartment();
-			if (my_completed_apartment == nullptr)
-				my_completed_apartment = do_determine_completed_apartment(intermediate_data_ptr != nullptr ? intermediate_data_ptr->m_spec_apartment : nullptr, hint_apartment);
-		}
-		else {
-			my_completed_apartment = do_determine_completed_apartment(intermediate_data_ptr != nullptr ? intermediate_data_ptr->m_spec_apartment : nullptr, hint_apartment);
-		}
+		ks_raw_result const my_completed_result = completed_result.require_completed_or_error();
+		ks_apartment* const my_completed_apartment = do_determine_completed_apartment(intermediate_data_ptr != nullptr ? intermediate_data_ptr->m_spec_apartment : nullptr, hint_apartment);
 
 		m_completed_result = my_completed_result;
 		m_completed_apartment = my_completed_apartment;
