@@ -317,7 +317,7 @@ protected:
 			uint64_t act_schedule_id = prefer_completed_apartment->schedule(
 				[this, this_shared = this->shared_from_this(), next_future, my_completed_result, prefer_completed_apartment]() {
 				next_future->on_feeded_by_prev(my_completed_result, this, prefer_completed_apartment);
-			}, 0);
+			}, 0x10000);
 
 			if (act_schedule_id == 0) {
 				lock.unlock();
@@ -352,7 +352,7 @@ protected:
 					[this, this_shared = this->shared_from_this(), next_futures, my_completed_result, prefer_completed_apartment]() {
 					for (auto& next_future : next_futures)
 						next_future->on_feeded_by_prev(my_completed_result, this, prefer_completed_apartment);
-				}, 0);
+				}, 0x10000);
 
 				if (act_schedule_id == 0) {
 					lock.unlock();
@@ -459,7 +459,7 @@ protected:
 							t_next_future_1st->on_feeded_by_prev(my_completed_result, this, my_completed_apartment);
 						for (auto& next_future : t_next_future_more)
 							next_future->on_feeded_by_prev(my_completed_result, this, my_completed_apartment);
-					}, 0);
+					}, 0x10000);
 
 					if (act_schedule_id == 0) {
 						if (t_next_future_1st != nullptr)
