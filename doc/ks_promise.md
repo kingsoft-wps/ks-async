@@ -37,11 +37,12 @@ ks_future<ks_stdptr<IDataBuffer>> async_download(const std::string& url) {
 # 构造方法
 
 ```C++
-explicit ks_promise<T>::ks_promise(std::create_inst);
+explicit ks_promise<T>::ks_promise(std::create_inst, ks_apartment* apartment_hint = nullptr);
 ```
 #### 描述：创建一个ks_promise对象。
 #### 参数：
   - std::create_inst: 传入固定值std::create_inst，用以明确意图。
+  - apartment_hint: 指定内部兜底用apartment，若传入nullptr，则使用current_thread_apartment或default_mta。
 #### 特别说明：新ks_promise对象应该最终完成（reslove或reject），以避免相关ks_future永不能完成，从而产生意料外的资源泄漏。
 <br>
 <br>

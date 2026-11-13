@@ -27,8 +27,8 @@ class ks_promise final {
 public:
 	ks_promise(nullptr_t) noexcept : m_raw_promise(nullptr) {}
 
-	explicit ks_promise(std::create_inst_t) : m_raw_promise(__do_create_raw_promise()) {}
-	static ks_promise<T> create() { return ks_promise<T>(std::create_inst); }
+	explicit ks_promise(std::create_inst_t, ks_apartment* apartment_hint = nullptr) : m_raw_promise(__do_create_raw_promise(apartment_hint)) {}
+	static ks_promise<T> create(ks_apartment* apartment_hint = nullptr) { return ks_promise<T>(std::create_inst, apartment_hint); }  //the create method is deprecated
 
 	ks_promise(const ks_promise&) noexcept = default;
 	ks_promise(ks_promise&&) noexcept = default;
@@ -97,8 +97,9 @@ private:
 	static ks_promise<T> __from_raw(ks_raw_promise_ptr&& raw_promise) noexcept { return ks_promise<T>(std::move(raw_promise), 0); }
 	const ks_raw_promise_ptr& __get_raw() const noexcept { return m_raw_promise; }
 
-	static ks_raw_promise_ptr __do_create_raw_promise() {
-		ks_apartment* apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
+	static ks_raw_promise_ptr __do_create_raw_promise(ks_apartment* apartment_hint) {
+		if (apartment_hint == nullptr)
+			apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
 		return ks_raw_promise::create(apartment_hint);
 	}
 

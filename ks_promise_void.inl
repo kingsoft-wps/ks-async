@@ -20,8 +20,8 @@ class ks_promise<void> final {
 public:
 	ks_promise(nullptr_t) noexcept : m_nothing_promise(nullptr) {}
 
-	explicit ks_promise(std::create_inst_t) : m_nothing_promise(std::create_inst) {}
-	static ks_promise<void> create() { return ks_promise<void>(std::create_inst); }
+	explicit ks_promise(std::create_inst_t, ks_apartment* apartment_hint = nullptr) : m_nothing_promise(std::create_inst, apartment_hint) {}
+	static ks_promise<void> create(ks_apartment* apartment_hint = nullptr) { return ks_promise<void>(std::create_inst, apartment_hint); }  //the create method is deprecated
 
 	ks_promise(const ks_promise&) noexcept = default;
 	ks_promise(ks_promise&&) noexcept = default;
