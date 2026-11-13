@@ -98,8 +98,8 @@ private:
 	const ks_raw_promise_ptr& __get_raw() const noexcept { return m_raw_promise; }
 
 	static ks_raw_promise_ptr __do_create_raw_promise(ks_apartment* apartment_hint) {
-		if (apartment_hint == nullptr)
-			apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
+		//if (apartment_hint == nullptr)
+		//	apartment_hint = ks_apartment::current_thread_apartment_or_default_mta();
 		return ks_raw_promise::create(apartment_hint);
 	}
 
